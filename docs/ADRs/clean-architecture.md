@@ -16,7 +16,7 @@ Adotamos a **Clean Architecture** proposta por Robert C. Martin, focando em seus
 ### Camadas
 
 | Camada | Responsabilidade | Exemplo |
-|--------|------------------|---------|
+| -------- | ------------------ | --------- |
 | **Domain** | Entidades e Value Objects puros | `Entity`, `ID`, `Email` |
 | **Usecases** | Lógica de aplicação, DTOs, interfaces de repositório | `CreateUseCase`, `Repository` (interface) |
 | **Infrastructure** | Implementações concretas (DB, Web, Cache) | `PostgresRepository`, `GinHandler` |
@@ -43,7 +43,7 @@ Adotamos a **Clean Architecture** proposta por Robert C. Martin, focando em seus
 
 ### Estrutura de Pastas
 
-```
+```text
 internal/
 ├── domain/              # 🟢 Camada mais interna (sem dependências externas)
 │   └── entity/

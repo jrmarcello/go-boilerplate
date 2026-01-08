@@ -1,4 +1,4 @@
-# Decisão de Arquitetura: Tratamento de Erros Centralizado
+# Decisão de Arquitetura: Tratamento de Erros
 
 ## Contexto
 
@@ -6,41 +6,81 @@ Em APIs Go, é comum misturar lógica de domínio com códigos HTTP (ex: retorna
 
 ## Decisão
 
-Adotamos um sistema de **Tratamento de Erros com Tradução em Camadas**.
+Adotamos um sistema de **Tratamento de Erros com Tradução em Camadas**, onde cada camada tem responsabilidades claras:
 
-### Fluxo de Erros
+| Camada | Responsabilidade | Conhece HTTP? |
+| ------ | ---------------- | ------------- |
+| **Domain** | Erros semânticos puros | ❌ Não |
+| **Use Case** | Erros de aplicação (`AppError`) | ❌ Não |
+| **Handler** | Tradução para HTTP Status | ✅ Sim |
 
-1. **Domain (Puro)**: Retorna erros semânticos (`ErrInvalidCPF`). **Ignora HTTP**.
-2. **Use Case (Application)**: Pode retornar erros de aplicação (`AppError`) com códigos de erro (`INVALID_CPF`).
-3. **Handler/Translator (Infra)**: Intercepta erros e decide o Status Code.
+### Fluxo
 
-### Tradução
-
-Implementamos um `HandleError` centralizado na camada de infraestrutura que:
-
-1. Verifica se é um `AppError` (já traduzido).
-2. Verifica se é um erro de domínio conhecido e traduz para `AppError` + HTTP Status correspondente.
-3. Caso contrário, retorna **500 Internal Server Error**.
+1. **Domain**: Retorna erros como `ErrNotFound`, `ErrInvalidEmail`.
+2. **Use Case**: Propaga ou enriquece erros com contexto.
+3. **Handler**: Intercepta, traduz para HTTP e responde com formato padronizado.
 
 ## Justificativa
 
-- **Pureza do Domínio**: Entidades não dependem de bibliotecas HTTP ou frameworks.
-- **Consistência**: Toda resposta de erro segue o mesmo formato JSON (`error`, `code`, `trace_id`).
-- **Simplicidade**: Handlers delegam o tratamento para uma função única, removendo switches repetitivos.
+1. **Pureza do Domínio**: Entidades não dependem de bibliotecas HTTP.
+2. **Consistência**: Toda resposta de erro segue o mesmo formato JSON.
+3. **Simplicidade**: Handlers delegam tratamento para função única `HandleError`.
 
-## Exemplo de Implementação
+## Consequências
+
+- **Positivas**:
+  - Domínio 100% testável sem mocks HTTP.
+  - Formato de erro padronizado com `trace_id` para debug.
+  - Código de handler limpo e enxuto.
+
+- **Negativas**:
+  - Necessidade de manter o `translator` atualizado com novos erros.
+
+## Implementação
+
+### Erros de Domínio
 
 ```go
-// Domain
-var ErrInvalidCPF = errors.New("CPF inválido")
+// domain/entity/errors.go
+var (
+    ErrNotFound     = errors.New("entity not found")
+    ErrInvalidEmail = errors.New("invalid email format")
+)
+```
 
-// Handler (Translator)
-func translateDomainError(err error) *usecases.AppError {
+### Tradutor (Handler)
+
+```go
+// infrastructure/web/handler/error.go
+func HandleError(c *gin.Context, span trace.Span, err error) {
+    status, code, message := translateError(err)
+    
+    span.SetStatus(codes.Error, code)
+    c.JSON(status, ErrorResponse{
+        Error:   message,
+        Code:    code,
+        TraceID: extractTraceID(span),
+    })
+}
+
+func translateError(err error) (int, string, string) {
     switch {
-    case errors.Is(err, vo.ErrInvalidCPF):
-        return personuc.ErrInvalidCPF // Mapeia para 400
+    case errors.Is(err, entity.ErrNotFound):
+        return 404, "NOT_FOUND", "Entity not found"
+    case errors.Is(err, entity.ErrInvalidEmail):
+        return 400, "INVALID_EMAIL", "Invalid email format"
     default:
-        return nil
+        return 500, "INTERNAL_ERROR", "Internal server error"
     }
+}
+```
+
+### Formato de Resposta
+
+```json
+{
+    "error": "Entity not found",
+    "code": "NOT_FOUND",
+    "trace_id": "abc123..."
 }
 ```

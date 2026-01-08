@@ -1,39 +1,68 @@
-# Decisão de Arquitetura: Estratégia de Configuração (Viper + .env)
+# Decisão de Arquitetura: Estratégia de Configuração
 
 ## Contexto
 
-A aplicação precisa ser configurável em múltiplos ambientes: **Desenvolvimento Local**, **Infraestrutura Docker** e **Produção (Kubernetes)**. Precisamos de uma estratégia unificada que evite duplicidade e mantenha a conformidade com o 12-factor App.
+A aplicação precisa ser configurável em múltiplos ambientes: **Desenvolvimento Local**, **Infraestrutura Docker** e **Produção (Kubernetes)**. Precisamos de uma estratégia unificada que evite duplicidade e mantenha a conformidade com o 12-Factor App.
 
 ## Decisão
 
-Adotamos uma abordagem híbrida utilizando **Viper** com prioridade para **Variáveis de Ambiente**, centralizando a configuração local em um único arquivo `.env`.
+Adotamos **Viper** como biblioteca de configuração com prioridade para **Variáveis de Ambiente**, centralizando a configuração local em um único arquivo `.env`.
 
-### Estrutura de Prioridade (Viper)
+### Hierarquia de Prioridade
 
-1. 🥇 **Variáveis de Ambiente**: Precedência máxima. Injetadas pelo Kubernetes (ConfigMaps/Secrets) ou Docker Compose.
-2. 🥈 **Arquivo .env**: Fonte da verdade para desenvolvimento local.
-3. 🥉 **Defaults no Código**: Fallback seguro (ex: `localhost`) para garantir que o app rode mesmo sem configuração explícita em dev.
+| Prioridade | Fonte | Uso |
+| ---------- | ----- | --- |
+| 🥇 Alta | Variáveis de Ambiente | Kubernetes (ConfigMaps/Secrets), Docker Compose |
+| 🥈 Média | Arquivo `.env` | Desenvolvimento local |
+| 🥉 Baixa | Defaults no Código | Fallback seguro (`localhost`) |
 
 ## Justificativa
 
-1. **Single Source of Truth (Local)**:
-    - O arquivo `.env` na raiz é consumido simultaneamente pelo:
-        - **Docker Compose**: Para subir infra (Postgres, Redis).
-        - **Go Application**: Via Viper (modo `SetConfigType("env")`).
-        - **Makefile**: Para injetar variáveis nos comandos.
-    - Eliminamos a necessidade de arquivos duplicados (`docker/.env`, `config.yaml`).
+1. **Single Source of Truth (Local)**: O arquivo `.env` na raiz é consumido simultaneamente pelo Docker Compose, Go Application (Viper) e Makefile.
+2. **Transparência em Produção**: O K8s injeta configurações via Env Vars, que têm precedência máxima.
+3. **Simplicidade (DX)**: O desenvolvedor precisa apenas criar um arquivo `.env`.
 
-2. **Transparência em Produção (K8s)**:
-    - O Viper mapeia automaticamente env vars (ex: `SERVER_PORT` -> `server.port`).
-    - O K8s injeta configurações exclusivamente via Variáveis de Ambiente.
-    - Como Env Vars têm prioridade máxima, o comportamento em produção é determinístico e desacoplado de arquivos locais.
+## Consequências
 
-3. **Simplicidade (DX)**:
-    - O desenvolvedor precisa apenas criar um arquivo: `.env`.
-    - `make dev` e `make docker-up` funcionam em harmonia.
+- **Positivas**:
+  - Eliminamos arquivos duplicados (`docker/.env`, `config.yaml`).
+  - `make dev` e `make docker-up` funcionam em harmonia.
+  - Comportamento determinístico em produção.
+
+- **Negativas**:
+  - Dependência da biblioteca Viper.
+  - Necessidade de documentar a hierarquia de configuração.
 
 ## Implementação
 
-- **Biblioteca**: `github.com/spf13/viper`
-- **Mapping**: `v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))`
-- **Arquivo**: `v.SetConfigFile(".env")` (Ignorado se não existir, sem quebrar a app).
+### Configuração do Viper
+
+```go
+// config/config.go
+func Load() (*Config, error) {
+    v := viper.New()
+
+    // 1. Defaults
+    setDefaults(v)
+
+    // 2. Arquivo .env (opcional)
+    v.SetConfigFile(".env")
+    v.SetConfigType("env")
+    _ = v.ReadInConfig()
+
+    // 3. Variáveis de Ambiente (precedência máxima)
+    v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+    v.AutomaticEnv()
+
+    var cfg Config
+    return &cfg, v.Unmarshal(&cfg)
+}
+```
+
+### Mapeamento de Variáveis
+
+| Struct Field | Env Var | Default |
+| ------------ | ------- | ------- |
+| `Server.Port` | `SERVER_PORT` | `8080` |
+| `DB.DSN` | `DB_DSN` | `postgres://...` |
+| `Redis.Enabled` | `REDIS_ENABLED` | `false` |
