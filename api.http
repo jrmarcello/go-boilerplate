@@ -1,0 +1,87 @@
+### Use com REST Client (VS Code) ou JetBrains HTTP Client
+
+@baseUrl = http://localhost:8080
+@entityId = 01KE2MQK8DENP9WWK1RT5B2PNE
+
+### ============================================
+### Health Checks
+### ============================================
+
+### Liveness Probe
+GET {{baseUrl}}/health
+
+### Readiness Probe (verifica conexão com DB)
+GET {{baseUrl}}/ready
+
+### ============================================
+### Entities - CRUD
+### ============================================
+
+### Criar Entity
+POST {{baseUrl}}/entities
+Content-Type: application/json
+
+{
+  "name": "João da Silva",
+  "email": "joao@example.com"
+}
+
+### Criar Entity (outro exemplo)
+POST {{baseUrl}}/entities
+Content-Type: application/json
+
+{
+  "name": "Maria Santos",
+  "email": "maria@example.com"
+}
+
+### Listar Entities (paginado)
+GET {{baseUrl}}/entities?page=1&limit=20
+
+### Listar Entities (com filtros)
+GET {{baseUrl}}/entities?name=maria&active_only=true&page=1&limit=20
+
+### Buscar Entity por ID
+GET {{baseUrl}}/entities/{{entityId}}
+
+### Atualizar Entity
+PUT {{baseUrl}}/entities/{{entityId}}
+Content-Type: application/json
+
+{
+  "name": "João da Silva Updated",
+  "email": "joao.novo@example.com"
+}
+
+### Deletar Entity (Soft Delete)
+DELETE {{baseUrl}}/entities/{{entityId}}
+
+### ============================================
+### Casos de Erro
+### ============================================
+
+### Email Inválido
+POST {{baseUrl}}/entities
+Content-Type: application/json
+
+{
+  "name": "Teste Email",
+  "email": "email-invalido"
+}
+
+### Entity não encontrada
+GET {{baseUrl}}/entities/01XXXXXXXXXXXXXXXXXXXXXX
+
+### ============================================
+### Com Idempotency Key (evita duplicação)
+### ============================================
+
+### Criar Entity com Idempotency Key
+POST {{baseUrl}}/entities
+Content-Type: application/json
+X-Idempotency-Key: unique-key-123
+
+{
+  "name": "Entity Idempotente",
+  "email": "idempotent@example.com"
+}
