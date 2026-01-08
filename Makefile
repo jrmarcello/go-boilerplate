@@ -4,12 +4,8 @@ ifeq ($(GOBIN),)
 	GOBIN := $(shell go env GOPATH)/bin
 endif
 
-# Carrega variáveis do .env (se existir)
--include .env
-export
-
-# Fallback caso .env não exista
-DB_DSN ?= postgres://user:password@localhost:5432/dbname?sslmode=disable
+# Fallback defaults (match config.go defaults for local dev)
+DB_DSN ?= postgres://user:password@localhost:5432/entities?sslmode=disable
 MIGRATIONS_DIR := internal/infrastructure/db/postgres/migration
 
 # Declara todos os targets que não são arquivos
@@ -44,14 +40,13 @@ setup: tools ## 🚀 Setup completo: tools + hooks + docker + migrations
 	@$(GOBIN)/lefthook install || lefthook install
 	@echo ""
 	@echo "🐳 Starting Docker containers..."
-	@docker compose -f docker/docker-compose.yml up -d
+	@$(MAKE) docker-up
 	@echo ""
 	@echo "⏳ Waiting for database to be ready..."
 	@sleep 5
 	@echo ""
 	@echo "📊 Running database migrations..."
-	@$(GOBIN)/goose -dir $(MIGRATIONS_DIR) postgres "$(DB_DSN)" up || \
-		goose -dir $(MIGRATIONS_DIR) postgres "$(DB_DSN)" up
+	@$(MAKE) migrate-up
 	@echo ""
 	@echo "============================================"
 	@echo "✅ Setup complete!"
@@ -74,10 +69,10 @@ tools: ## 📦 Instala ferramentas de desenvolvimento
 # DESENVOLVIMENTO
 # ============================================
 
-dev: ## 🔥 Inicia servidor com hot reload (air)
+dev: ## 🔥 Inicia servidor com hot reload (air) using code defaults
 	@$(GOBIN)/air || air
 
-run: ## ▶️  Inicia servidor sem hot reload
+run: ## ▶️  Inicia servidor sem hot reload using code defaults
 	go run cmd/api/main.go
 
 lint: ## 🔍 Roda linters básicos (vet + gofmt)
@@ -126,11 +121,11 @@ clean: ## 🧹 Remove arquivos gerados
 # DOCKER
 # ============================================
 
-docker-up: ## 🐳 Sobe containers Docker
-	docker compose -f docker/docker-compose.yml up -d
+docker-up: ## 🐳 Sobe containers Docker (usando docker/.env)
+	docker compose --env-file docker/.env -f docker/docker-compose.yml up -d
 
 docker-down: ## 🐳 Para containers Docker
-	docker compose -f docker/docker-compose.yml down
+	docker compose --env-file docker/.env -f docker/docker-compose.yml down
 
 docker-build: ## 🐳 Cria a imagem de produção otimizada
 	docker build -f docker/Dockerfile -t entities-service-registry-api .
@@ -248,5 +243,5 @@ load-spike: ## 🔥 Spike test - pico súbito de usuários
 
 load-clean: ## 🔥 Limpa dados de testes de carga do banco
 	@echo "🧹 Limpando dados de load test..."
-	@docker exec $$(docker ps --format '{{.Names}}' | grep -E 'db|postgres' | head -1) psql -U user -d dbname -c "DELETE FROM entities WHERE name LIKE 'Load Test%';"
+	@docker exec $$(docker ps --format '{{.Names}}' | grep -E 'db|postgres' | head -1) psql -U user -d entities -c "DELETE FROM entities WHERE name LIKE 'Load Test%';"
 	@echo "✅ Dados de load test removidos"

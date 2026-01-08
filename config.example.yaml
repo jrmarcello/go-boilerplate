@@ -1,0 +1,14 @@
+server:
+  port: "8080"
+
+db:
+  dsn: "postgres://user:password@localhost:5432/entities?sslmode=disable"
+
+otel:
+  service_name: "entity-service"
+  collector_url: ""
+
+redis:
+  url: "redis://localhost:6379"
+  ttl: "5m"
+  enabled: false
