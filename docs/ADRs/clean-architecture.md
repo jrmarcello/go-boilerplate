@@ -2,78 +2,112 @@
 
 ## Contexto
 
-Aplicações complexas tendem a se tornar difíceis de manter, testar e evoluir quando as regras de negócio estão acopladas a detalhes de implementação (frameworks, banco de dados, UI).## Decisão
+Aplicações complexas tendem a se tornar difíceis de manter, testar e evoluir quando as regras de negócio estão acopladas a detalhes de implementação (frameworks, banco de dados, UI). Buscamos uma arquitetura que garanta longevidade ao projeto e facilite a manutenção.
 
-Adotamos a **Clean Architecture** baseada estritamente em seus pilares fundamentais, priorizando a separação de preocupações e a testabilidade, sem necessariamente adotar a terminologia de "Portas e Adaptadores" (Hexagonal).
+## Decisão
 
-### Regra Fundamental (The Dependency Rule)
+Adotamos a **Clean Architecture** proposta por Robert C. Martin, focando em seus **pilares fundamentais**:
 
-A regra suprema que seguimos é: **dependências de código fonte devem apontar apenas para dentro**. As camadas internas (Domínio) não devem saber nada sobre as camadas externas (Web, DB).
+1. **Regra da Dependência**: Dependências de código fonte apontam **apenas para dentro** (camadas internas nunca conhecem camadas externas).
+2. **Entidades**: Objetos de domínio que encapsulam regras de negócio corporativas.
+3. **Casos de Uso**: Orquestram o fluxo de dados e aplicam regras de negócio específicas da aplicação.
+4. **Inversão de Dependência**: Camadas internas definem **interfaces**; camadas externas as implementam.
 
-- **Entidades (Domain)**: Objetos de negócio puros. Não dependem de nada.
-- **Casos de Uso (Usecases)**: Regras de aplicação. Dependem apenas do Domínio.
-- **Adapters/Infra (Infrastructure)**: Implementações técnicas. Dependem dos Casos de Uso e Domínio.
+### Camadas
+
+| Camada | Responsabilidade | Exemplo |
+|--------|------------------|---------|
+| **Domain** | Entidades e Value Objects puros | `Entity`, `ID`, `Email` |
+| **Usecases** | Lógica de aplicação, DTOs, interfaces de repositório | `CreateUseCase`, `Repository` (interface) |
+| **Infrastructure** | Implementações concretas (DB, Web, Cache) | `PostgresRepository`, `GinHandler` |
 
 ## Justificativa
 
-1. **Independência de Frameworks**: Frameworks são ferramentas e devem ser mantidos nas bordas (Infraestrutura).
-2. **Testabilidade**: A lógica de negócio pode ser testada unitariamente sem subir banco de dados ou servidor web.
-3. **Independência de Banco de Dados**: O banco de dados é um detalhe de infraestrutura. A regra de negócio interage com interfaces (repositórios).
-4. **Independência de UI**: A API Web é apenas um mecanismo de entrega.
+1. **Independência de Frameworks**: Frameworks são ferramentas, não o centro da aplicação.
+2. **Testabilidade**: Regras de negócio testáveis sem UI, DB ou Web Server.
+3. **Independência de Banco de Dados**: O DB é um detalhe. Podemos trocar Postgres por Mongo ou In-Memory sem tocar nas regras de negócio.
+4. **Independência de Interface**: A UI (Web, CLI, Mobile) pode mudar sem afetar o core.
 
 ## Consequências
 
 - **Positivas**:
-  - Código desacoplado e fácil de testar.
-  - Facilidade para trocar tecnologias de ponta (ex: biblioteca de log, banco de dados).
-  - Manutenção simplificada a longo prazo.
+  - Padronização do projeto.
+  - Testes unitários triviais (mocks fáceis).
+  - Evolução flexível (ex: começar com repositório em memória).
 
 - **Negativas**:
-  - Boilerplate inicial (criação de arquivos em camadas separadas).
-  - Exige disciplina para interfaces e DI.
+  - Setup inicial mais verboso (mais arquivos e camadas).
+  - Curva de aprendizado inicial para quem vem de MVC tradicional.
 
 ## Implementação
 
 ### Estrutura de Pastas
 
-Organizamos o projeto para refletir as camadas da arquitetura:
-
-```text
+```
 internal/
-├── domain/            # (Inner Layer) Regras de Negócio Corporativas
-│   └── entity/        # Structs, Value Objects e Interfaces de Erros Puros
+├── domain/              # 🟢 Camada mais interna (sem dependências externas)
+│   └── entity/
+│       ├── entity.go         # Entidade de domínio
+│       ├── errors.go         # Erros de domínio
+│       └── filter.go         # Filtros de busca
 │
-├── usecases/          # (Application Layer) Regras de Aplicação
-│   └── entity/        # Interactors que orquestram o fluxo
-│       ├── create.go  # Lógica específica
-│       └── interfaces.go # Define interfaces que a Infra deve implementar (ex: Repository)
+├── usecases/            # 🟡 Orquestração (depende apenas do Domain)
+│   └── entity/
+│       ├── interfaces/
+│       │   └── repository.go  # Interface do repositório (definida aqui!)
+│       ├── create.go          # Caso de uso de criação
+│       ├── get.go
+│       └── dto/               # Data Transfer Objects
 │
-└── infrastructure/    # (Outer Layer) Detalhes Técnicos
-    ├── db/            # Implementação real do banco (Postgres)
-    └── web/           # Controllers, Routers (Gin)
+└── infrastructure/      # 🔴 Camada externa (implementa interfaces)
+    ├── db/postgres/
+    │   └── repository/
+    │       └── entity.go      # Implementação concreta do Repository
+    └── web/
+        ├── handler/
+        │   └── entity.go      # Handler HTTP (Gin)
+        └── router/
 ```
 
-### Injeção de Dependência (DI)
+### Inversão de Dependência (DI)
 
-Seguimos o **Princípio de Inversão de Dependência (DIP)**.
-
-1. **Definição**: O Use Case precisa salvar dados, mas não pode depender do banco de dados (Infra).
-2. **Abstração**: O Use Case define uma interface `Repository` na camada `usecases` (ou `domain`).
-3. **Implementação**: A camada `infrastructure` implementa essa interface.
-4. **Injeção**: No `main.go` (ou `router`), injetamos a implementação concreta dentro do Use Case.
+O **Use Case** define a interface do repositório. A **Infrastructure** a implementa.
 
 ```go
-// Camada Use Case (Define o contrato)
+// usecases/entity/interfaces/repository.go (Camada Interna)
 type Repository interface {
-    Create(ctx context.Context, e *entity.Entity) error
+    Save(ctx context.Context, e *entity.Entity) error
+    FindByID(ctx context.Context, id vo.ID) (*entity.Entity, error)
+}
+```
+
+```go
+// infrastructure/db/postgres/repository/entity.go (Camada Externa)
+type EntityRepository struct {
+    db *sqlx.DB
 }
 
-// Camada Infrastructure (Cumpre o contrato)
-type PostgresRepo struct { db *sqlx.DB }
-func (r *PostgresRepo) Create(ctx context.Context, e *entity.Entity) error { ... }
-
-// Main (Cola tudo)
-repo := postgres.NewRepo(dbConn)       // Infra
-useCase := entityuc.NewCreate(repo)    // Use Case recebendo Infra como interface
-handler := web.NewHandler(useCase)     // Web recebendo Use Case
+func (r *EntityRepository) Save(ctx context.Context, e *entity.Entity) error {
+    // Implementação concreta usando sqlx
+}
 ```
+
+### Composição (Bootstrap)
+
+No `main.go` ou `server.go`, injetamos as dependências concretas:
+
+```go
+// cmd/api/server.go
+func Run(cfg *config.Config) {
+    db := postgres.Connect(cfg.DB.DSN)
+
+    // Injeção de Dependência
+    repo := repository.NewEntityRepository(db)   // Implementação concreta
+    createUC := entityuc.NewCreateUseCase(repo)  // Use Case recebe a interface
+    handler := handler.NewEntityHandler(createUC)
+
+    router.Setup(handler)
+}
+```
+
+O Use Case (`createUC`) **não sabe** que está falando com Postgres. Ele só conhece a interface `Repository`. Isso permite trocar a implementação (ex: para MongoDB ou um mock em testes) sem alterar o caso de uso.
