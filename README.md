@@ -1,189 +1,172 @@
-# MS Boilerplate Go
+# Go Microservice Boilerplate
 
-[![Go Version](https://img.shields.io/badge/Go-1.24-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev/)
+[![Architecture](https://img.shields.io/badge/Architecture-Clean-blueviolet)](docs/adr/clean-architecture.md)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](docker/)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-326CE5?logo=kubernetes)](deploy/)
 
-[![Tests](https://img.shields.io/badge/Tests-Passing-success)](tests/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](docker/Dockerfile)
+Template production-ready para microserviços Go com Clean Architecture, cache Redis, observabilidade e deploy Kubernetes.
 
-Boilerplate genérico para microserviços Go com arquitetura Clean, cache Redis e deploy Kubernetes.
+---
 
-## 🚀 Quick Start
+## ✨ O que está incluído
 
-```bash
-# Clone e setup
-git clone <repo> && cd ms-boilerplate-go
-make setup
+| Feature | Tecnologia | Descrição |
+| ------- | ---------- | --------- |
+| **Arquitetura** | Clean Architecture | Separação de camadas, DI, testabilidade |
+| **API** | Gin + Swagger | REST API documentada |
+| **Banco** | PostgreSQL + sqlx | Migrations com Goose |
+| **Cache** | Redis (opcional) | Cache transparente com invalidação |
+| **Observabilidade** | OpenTelemetry | Traces, métricas, logs estruturados |
+| **Testes** | TestContainers + k6 | E2E com banco real, load testing |
+| **Deploy** | Docker + Kubernetes | Kustomize overlays por ambiente |
+| **DX** | Makefile + Air | Hot reload, git hooks, linters |
 
-# Desenvolvimento local (Docker)
-make docker-up
-make dev
+---
 
-# Desenvolvimento local (Kubernetes/Kind)
-make kind-up
-make kind-deploy
-curl http://entities.localhost/health
-```
+## 🚀 Começando um Novo Projeto
 
-## 📋 Pré-requisitos
-
-- Go 1.24+
-- Docker
-- Kind (opcional, para Kubernetes local)
-- K6 (opcional, para testes de carga)
-
-## 🛠️ Comandos
+### 1. Clone o template
 
 ```bash
-make help              # Lista todos os comandos
-
-# Desenvolvimento
-make setup             # Setup completo (tools + docker + migrations)
-make dev               # Servidor com hot reload
-make build             # Compila binário
-
-# Testes
-make test              # Todos os testes
-make test-unit         # Testes unitários
-make test-e2e          # Testes e2e com Postgres + Redis
-make test-coverage     # Gera relatório HTML
-
-# Docker
-make docker-up         # Sobe Postgres + Redis
-make docker-down       # Para containers
-make docker-build      # Build da imagem
-
-# Kubernetes (Kind)
-make kind-up           # Cria cluster local + Ingress + Postgres + Redis
-make kind-deploy       # Build + deploy + migrations
-make kind-logs         # Ver logs do serviço
-make kind-down         # Remove cluster
-
-# Banco de dados
-make migrate-up        # Roda migrations
-make migrate-down      # Reverte última migration
-make migrate-status    # Status das migrations
+git clone <repo> meu-novo-servico
+cd meu-novo-servico
+rm -rf .git && git init
 ```
+
+### 2. Renomeie o módulo
+
+```bash
+# Substitua em todos os arquivos
+find . -type f -name "*.go" -exec sed -i '' 's|bitbucket.org/appmax-space/ms-boilerplate-go|github.com/sua-org/meu-novo-servico|g' {} +
+sed -i '' 's|bitbucket.org/appmax-space/ms-boilerplate-go|github.com/sua-org/meu-novo-servico|g' go.mod
+```
+
+### 3. Customize o domínio
+
+O template vem com um domínio genérico `entity`. Substitua por seu domínio:
+
+```text
+internal/domain/entity/     → internal/domain/user/
+internal/usecases/entity/   → internal/usecases/user/
+```
+
+### 4. Setup e run
+
+```bash
+make setup    # Instala tools + sobe Docker + roda migrations
+make dev      # Hot reload
+```
+
+---
 
 ## 📁 Estrutura
 
 ```text
-ms-boilerplate-go/
-├── cmd/api/                          # Entrypoint (main.go, server.go)
-├── config/                           # Configuração (env vars)
-├── deploy/                           # Kubernetes manifests
-│   ├── base/                         # Manifests base (Kustomize)
+├── cmd/api/              # Entrypoint
+├── config/               # Configuração (Viper)
+├── deploy/               # Kubernetes manifests (Kustomize)
+│   ├── base/
 │   └── overlays/
-│       ├── dev-local/                # Kind (local)
-├── docker/                           # Dockerfile, docker-compose
-├── docs/                             # Swagger, documentação
+├── docker/               # Dockerfile + docker-compose
+├── docs/
+│   ├── adr/              # Decisões arquiteturais
+│   └── guides/           # Guias e diagramas
 ├── internal/
-│   ├── domain/entity/                # Entidades, Value Objects, Erros
-│   ├── infrastructure/
-│   │   ├── cache/                    # Redis client
-│   │   ├── db/postgres/              # Conexão, migrations, repository
-│   │   ├── telemetry/                # OpenTelemetry
-│   │   └── web/                      # HTTP Handlers, Middlewares, Router
-│   ├── pkg/apperror/                 # Erros de aplicação
-│   └── usecases/entity/              # Casos de uso (Create, Get, List, Update, Delete)
+│   ├── domain/           # 🟢 Entidades, VOs, Erros (puro)
+│   ├── usecases/         # 🟡 Casos de uso + interfaces
+│   └── infrastructure/   # 🔴 DB, Cache, HTTP, Telemetry
 └── tests/
-    ├── e2e/                          # Testes e2e (TestContainers)
-    └── load/                         # Testes de carga (k6)
+    ├── e2e/              # TestContainers
+    └── load/             # k6
 ```
+
+**Regra de dependência**: `domain` ← `usecases` ← `infrastructure`
+
+---
 
 ## ⚙️ Configuração
 
-### Docker Compose (`.env`)
+Hierarquia (maior prioridade primeiro):
 
-Para desenvolvimento local com Docker, crie um arquivo `.env`:
+1. **Variáveis de Ambiente** - Kubernetes, CI/CD
+2. **Arquivo `.env`** - Desenvolvimento local
+3. **Defaults no código** - Fallback seguro
 
 ```bash
+# .env (exemplo)
 SERVER_PORT=8080
-POSTGRES_USER=user
-POSTGRES_PASSWORD=password
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-POSTGRES_DB=entities
-REDIS_URL=redis://localhost:6379
-REDIS_TTL=5m
+DB_DSN=postgres://user:password@localhost:5432/mydb?sslmode=disable
 REDIS_ENABLED=true
-OTEL_SERVICE_NAME=entity-service
-OTEL_COLLECTOR_URL=
 ```
 
-### Kubernetes (ConfigMap)
+Ver: [docs/adr/config-strategy.md](docs/adr/config-strategy.md)
 
-Para Kubernetes (Kind/EKS), as variáveis ficam em:
+---
 
-- **dev-local**: `deploy/overlays/dev-local/configmap.yaml`
-- **homologação**: `deploy/overlays/homologacao/configmap.yaml`
-
-## 🔌 API
-
-```http
-### Health Check
-GET /health
-
-### Readiness (verifica DB)
-GET /ready
-
-### Criar Entity
-POST /entities
-Content-Type: application/json
-
-{
-  "name": "Nome da Entity",
-  "email": "entity@example.com"
-}
-
-### Listar Entities (paginado)
-GET /entities?page=1&limit=20
-
-### Buscar por ID
-GET /entities/:id
-
-### Atualizar Entity
-PUT /entities/:id
-
-### Deletar Entity (soft delete)
-DELETE /entities/:id
-```
-
-📚 Swagger: `http://localhost:8080/swagger/index.html`
-
-Veja [api.http](api.http) para mais exemplos.
-
-## 🧪 Testes
-
-| Tipo | Comando | Descrição |
-| --- | --- | --- |
-| Unit | `make test-unit` | Domínio, UseCases |
-| E2E | `make test-e2e` | API + Postgres + Redis (TestContainers) |
-| Coverage | `make test-coverage` | Gera relatório HTML |
-
-## 🐳 Deploy
-
-### Docker Compose
+## 🛠️ Comandos
 
 ```bash
-docker compose -f docker/docker-compose.yml up -d
+make help           # Lista todos os comandos
+
+# Desenvolvimento
+make setup          # Setup completo
+make dev            # Hot reload
+make lint           # Linters
+
+# Testes
+make test           # Todos
+make test-e2e       # E2E com TestContainers
+make test-coverage  # Relatório HTML
+
+# Deploy
+make docker-up      # Sobe infra local
+make kind-deploy    # Kubernetes local (Kind)
 ```
 
-### Kubernetes (Kind - local)
+---
 
-```bash
-# Setup inicial (uma vez)
-make kind-up
+## 📚 Documentação
 
-# Deploy (repetir a cada mudança)
-make kind-deploy
+### Decisões Arquiteturais (ADRs)
 
-# Acessar
-curl http://entities.localhost/health
-```
+| ADR | Sobre |
+| --- | ----- |
+| [clean-architecture.md](docs/adr/clean-architecture.md) | Estrutura de camadas e DI |
+| [config-strategy.md](docs/adr/config-strategy.md) | Viper + .env + Kubernetes |
+| [error-handling.md](docs/adr/error-handling.md) | Erros em camadas |
+| [ulid.md](docs/adr/ulid.md) | Por que ULID ao invés de UUID |
 
-### Kubernetes (EKS - produção)
+### Guias
 
-Os manifests estão em `deploy/overlays/homologacao/`. O deploy é feito via Bitbucket Pipelines + ArgoCD/Kustomize.
+| Guia | Sobre |
+| ---- | ----- |
+| [architecture.md](docs/guides/architecture.md) | Diagramas e visão geral |
+| [kubernetes.md](docs/guides/kubernetes.md) | Deploy e operação |
+
+### Para Agentes de IA
+
+Ver [AGENTS.md](AGENTS.md) para diretrizes de código e arquitetura.
+
+---
+
+## 🔧 Customização
+
+### Adicionar novo domínio
+
+1. Crie a entidade em `internal/domain/<nome>/`
+2. Crie os use cases em `internal/usecases/<nome>/`
+3. Crie o handler em `internal/infrastructure/web/handler/`
+4. Registre as rotas no router
+5. Crie a migration em `internal/infrastructure/db/postgres/migration/`
+
+### Adicionar novo ambiente K8s
+
+1. Copie `deploy/overlays/dev-local/` para novo overlay
+2. Ajuste `configmap.yaml` com as variáveis do ambiente
+3. Ajuste `kustomization.yaml` se necessário
+
+---
 
 ## 📊 Arquitetura
 
@@ -195,7 +178,7 @@ Os manifests estão em `deploy/overlays/homologacao/`. O deploy é feito via Bit
                              │
                     ┌────────▼────────┐
                     │   API Service   │
-                    │   (Go 1.24)     │
+                    │   (Go + Gin)    │
                     └────────┬────────┘
                              │
               ┌──────────────┼──────────────┐
