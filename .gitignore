@@ -28,8 +28,6 @@ Thumbs.db
 .env
 .env.local
 *.local
-docker/.env
-config.yaml
 
 # Logs
 *.log

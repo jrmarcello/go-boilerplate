@@ -121,11 +121,11 @@ clean: ## 🧹 Remove arquivos gerados
 # DOCKER
 # ============================================
 
-docker-up: ## 🐳 Sobe containers Docker (usando docker/.env)
-	docker compose --env-file docker/.env -f docker/docker-compose.yml up -d
+docker-up: ## 🐳 Sobe containers Docker
+	docker compose --env-file .env -f docker/docker-compose.yml up -d
 
 docker-down: ## 🐳 Para containers Docker
-	docker compose --env-file docker/.env -f docker/docker-compose.yml down
+	docker compose --env-file .env -f docker/docker-compose.yml down
 
 docker-build: ## 🐳 Cria a imagem de produção otimizada
 	docker build -f docker/Dockerfile -t entities-service-registry-api .

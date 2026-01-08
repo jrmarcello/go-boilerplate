@@ -46,10 +46,10 @@ func Load() (*Config, error) {
 	setDefaults(v)
 
 	// 2. Load from file (optional)
-	v.SetConfigName("config") // name of config file (without extension)
-	v.SetConfigType("yaml")   // proper format
-	v.AddConfigPath(".")      // optionally look for config in the working directory
-	_ = v.ReadInConfig()      // ignore error if config file not found
+	// 2. Load from file (optional)
+	v.SetConfigFile(".env") // explicit file path
+	v.SetConfigType("env")  // proper format
+	_ = v.ReadInConfig()    // ignore error if config file not found
 
 	// 3. Load from Environment Variables
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
