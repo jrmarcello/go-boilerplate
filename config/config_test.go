@@ -3,14 +3,18 @@ package config
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLoad(t *testing.T) {
-	// Setup env vars for test
+	// Setup env vars for test - Viper AutomaticEnv maps these!
+	// Struct structure: Server.Port -> SERVER_PORT
 	os.Setenv("SERVER_PORT", "9090")
-	os.Setenv("POSTGRES_DB", "test_db")
+	// DB.DSN -> DB_DSN
+	os.Setenv("DB_DSN", "postgres://test:test@localhost:5432/test_db?sslmode=disable")
+	// Redis.Enabled -> REDIS_ENABLED
 	os.Setenv("REDIS_ENABLED", "true")
 	defer os.Clearenv()
 
@@ -22,6 +26,7 @@ func TestLoad(t *testing.T) {
 	assert.Equal(t, "9090", cfg.Server.Port)
 	assert.Contains(t, cfg.DB.DSN, "test_db")
 	assert.True(t, cfg.Redis.Enabled)
+	assert.Equal(t, 5*time.Minute, cfg.GetRedisTTL())
 }
 
 func TestLoad_Defaults(t *testing.T) {

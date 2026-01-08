@@ -1,83 +1,90 @@
 package config
 
 import (
-	"fmt"
-	"os"
+	"strings"
+	"time"
 
-	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 )
 
 type Config struct {
-	Server ServerConfig
-	DB     DBConfig
-	Otel   OtelConfig
-	Redis  RedisConfig
+	Server ServerConfig `mapstructure:"server"`
+	DB     DBConfig     `mapstructure:"db"`
+	Otel   OtelConfig   `mapstructure:"otel"`
+	Redis  RedisConfig  `mapstructure:"redis"`
 }
 
 type ServerConfig struct {
-	Port string
+	Port string `mapstructure:"port"`
 }
 
 type DBConfig struct {
 	// Formato Postgres: postgres://user:password@host:port/database?sslmode=disable
-	DSN string
+	DSN string `mapstructure:"dsn"`
 }
 
 type OtelConfig struct {
-	ServiceName  string
-	CollectorURL string
+	ServiceName  string `mapstructure:"service_name"`
+	CollectorURL string `mapstructure:"collector_url"`
 }
 
 type RedisConfig struct {
-	URL     string
-	TTL     string // ex: "5m", "1h"
-	Enabled bool
+	URL     string `mapstructure:"url"`
+	TTL     string `mapstructure:"ttl"` // ex: "5m", "1h"
+	Enabled bool   `mapstructure:"enabled"`
 }
 
+// Load configurations using Viper.
+// Priority:
+// 1. Environment Variables
+// 2. Config File (config.yaml)
+// 3. Defaults
 func Load() (*Config, error) {
-	// godotenv.Load() carrega variáveis do arquivo .env para o ambiente.
-	// O underscore ignora o erro se o arquivo não existir (ok em produção).
-	_ = godotenv.Load()
+	v := viper.New()
 
-	return &Config{
-		Server: ServerConfig{
-			Port: getEnv("SERVER_PORT", "8080"),
-		},
-		DB: DBConfig{
-			DSN: buildDSN(),
-		},
-		Otel: OtelConfig{
-			ServiceName:  getEnv("OTEL_SERVICE_NAME", "entity-service"),
-			CollectorURL: getEnv("OTEL_COLLECTOR_URL", ""),
-		},
-		Redis: RedisConfig{
-			URL:     getEnv("REDIS_URL", "redis://localhost:6379"),
-			TTL:     getEnv("REDIS_TTL", "5m"),
-			Enabled: getEnv("REDIS_ENABLED", "false") == "true",
-		},
-	}, nil
-}
+	// 1. Set Defaults
+	setDefaults(v)
 
-// buildDSN constrói a connection string do Postgres.
-// Se DB_DSN estiver definida, usa ela diretamente.
-// Caso contrário, constrói a partir das variáveis POSTGRES_*.
-func buildDSN() string {
-	if dsn := os.Getenv("DB_DSN"); dsn != "" {
-		return dsn
+	// 2. Load from file (optional)
+	v.SetConfigName("config") // name of config file (without extension)
+	v.SetConfigType("yaml")   // proper format
+	v.AddConfigPath(".")      // optionally look for config in the working directory
+	_ = v.ReadInConfig()      // ignore error if config file not found
+
+	// 3. Load from Environment Variables
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v.AutomaticEnv()
+
+	// Unmarshal into struct
+	var cfg Config
+	if err := v.Unmarshal(&cfg); err != nil {
+		return nil, err
 	}
 
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		getEnv("POSTGRES_USER", "user"),
-		getEnv("POSTGRES_PASSWORD", "password"),
-		getEnv("POSTGRES_HOST", "localhost"),
-		getEnv("POSTGRES_PORT", "5432"),
-		getEnv("POSTGRES_DB", "entities"),
-	)
+	return &cfg, nil
 }
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
+func setDefaults(v *viper.Viper) {
+	// Server
+	v.SetDefault("server.port", "8080")
+
+	// DB
+	v.SetDefault("db.dsn", "postgres://user:password@localhost:5432/entities?sslmode=disable")
+
+	// Otel
+	v.SetDefault("otel.service_name", "entity-service")
+	v.SetDefault("otel.collector_url", "")
+
+	// Redis
+	v.SetDefault("redis.url", "redis://localhost:6379")
+	v.SetDefault("redis.ttl", "5m")
+	v.SetDefault("redis.enabled", false)
+}
+
+func (c *Config) GetRedisTTL() time.Duration {
+	d, err := time.ParseDuration(c.Redis.TTL)
+	if err != nil {
+		return 5 * time.Minute
 	}
-	return defaultValue
+	return d
 }
