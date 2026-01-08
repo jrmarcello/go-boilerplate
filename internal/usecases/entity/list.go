@@ -50,7 +50,7 @@ func (uc *ListUseCase) Execute(ctx context.Context, input dto.ListInput) (*dto.L
 		})
 	}
 
-	// Calcular total de páginas
+	// Calculate total pages
 	totalPages := int(math.Ceil(float64(result.Total) / float64(result.Limit)))
 
 	return &dto.ListOutput{

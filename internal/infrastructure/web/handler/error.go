@@ -4,13 +4,19 @@ import (
 	"errors"
 	"net/http"
 
-	"bitbucket.org/appmax-space/ms-boilerplate-go/internal/domain/person"
-	"bitbucket.org/appmax-space/ms-boilerplate-go/internal/domain/person/vo"
-	"bitbucket.org/appmax-space/ms-boilerplate-go/internal/usecases"
-	personuc "bitbucket.org/appmax-space/ms-boilerplate-go/internal/usecases/person"
+	"bitbucket.org/appmax-space/ms-boilerplate-go/internal/domain/entity"
+	"bitbucket.org/appmax-space/ms-boilerplate-go/internal/domain/entity/vo"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+)
+
+// Error codes
+const (
+	CodeInternalError = "INTERNAL_ERROR"
+	CodeNotFound      = "NOT_FOUND"
+	CodeInvalidEmail  = "INVALID_EMAIL"
+	CodeBadRequest    = "BAD_REQUEST"
 )
 
 // ErrorResponse é a estrutura padronizada de resposta de erro.
@@ -22,67 +28,39 @@ type ErrorResponse struct {
 }
 
 // HandleError trata erros de forma centralizada e consistente.
-// Traduz erros de domínio para AppErrors e retorna respostas HTTP apropriadas.
+// Traduz erros de domínio para respostas HTTP apropriadas.
 func HandleError(c *gin.Context, span trace.Span, err error) {
 	traceID := extractTraceID(span)
 
-	// 1. Tenta converter para AppError primeiro
-	var appErr *usecases.AppError
-	if errors.As(err, &appErr) {
-		respondWithAppError(c, span, appErr, traceID)
-		return
+	// Traduz erros de domínio
+	status, code, message := translateError(err)
+
+	span.SetStatus(codes.Error, code)
+	if status >= 500 {
+		span.RecordError(err)
 	}
 
-	// 2. Traduz erros de domínio para AppError
-	if translated := translateDomainError(err); translated != nil {
-		respondWithAppError(c, span, translated, traceID)
-		return
-	}
-
-	// 3. Erro desconhecido - retorna 500
-	span.SetStatus(codes.Error, "internal error")
-	span.RecordError(err)
-	c.JSON(http.StatusInternalServerError, ErrorResponse{
-		Error:   "Erro interno do servidor",
-		Code:    usecases.CodeInternalError,
+	c.JSON(status, ErrorResponse{
+		Error:   message,
+		Code:    code,
 		TraceID: traceID,
 	})
 }
 
-// translateDomainError mapeia erros de domínio puros para AppErrors.
-func translateDomainError(err error) *usecases.AppError {
+// translateError mapeia erros de domínio para códigos HTTP.
+func translateError(err error) (status int, code, message string) {
 	switch {
-	// Erros de Value Object
-	case errors.Is(err, vo.ErrInvalidCPF):
-		return personuc.ErrInvalidCPF
 	case errors.Is(err, vo.ErrInvalidEmail):
-		return personuc.ErrInvalidEmail
-	case errors.Is(err, vo.ErrInvalidPhone):
-		return personuc.ErrInvalidPhone
-	// Erros de entidade de domínio
-	case errors.Is(err, person.ErrPersonNotFound):
-		return personuc.ErrPersonNotFound
-	case errors.Is(err, person.ErrDuplicateCPF):
-		return personuc.ErrDuplicateCPF
-	case errors.Is(err, person.ErrDuplicateEmail):
-		return personuc.ErrDuplicateEmail
+		return http.StatusBadRequest, CodeInvalidEmail, "Email inválido"
+	case errors.Is(err, entity.ErrEntityNotFound):
+		return http.StatusNotFound, CodeNotFound, "Entity não encontrada"
 	default:
-		return nil
+		// Erro com mensagem "invalid ULID" do vo.ParseID
+		if err != nil && err.Error() == "invalid ULID" {
+			return http.StatusBadRequest, CodeBadRequest, "ID inválido"
+		}
+		return http.StatusInternalServerError, CodeInternalError, "Erro interno do servidor"
 	}
-}
-
-// respondWithAppError envia a resposta de erro e define o status do span.
-func respondWithAppError(c *gin.Context, span trace.Span, appErr *usecases.AppError, traceID string) {
-	span.SetStatus(codes.Error, appErr.Code)
-	if appErr.HTTPStatus >= 500 {
-		span.RecordError(appErr)
-	}
-	c.JSON(appErr.HTTPStatus, ErrorResponse{
-		Error:   appErr.Message,
-		Code:    appErr.Code,
-		Details: appErr.Details,
-		TraceID: traceID,
-	})
 }
 
 // extractTraceID extrai o trace ID do span OpenTelemetry.
