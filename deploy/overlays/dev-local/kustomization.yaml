@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - configmap.yaml
+  - secret.yaml
+  - kind-redis.yaml
+
+namespace: people-service-registry-dev
+
+images:
+  - name: 650155821999.dkr.ecr.sa-east-1.amazonaws.com/people-service-registry
+    newName: people-service-registry # Imagem local
+    newTag: dev
+
+patches:
+  - path: deployment-patch.yaml
+    target:
+      kind: Deployment
+      name: people-service-registry
+  - path: ingress-patch.yaml
+    target:
+      kind: Ingress
+      name: people-service-registry
+  - path: hpa-patch.yaml
+    target:
+      kind: HorizontalPodAutoscaler
+      name: people-service-registry

@@ -1,0 +1,92 @@
+services:
+  # ============================================
+  # API
+  # ============================================
+  people-service-registry-api:
+    container_name: people-api
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      - DB_DSN=postgres://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@people-service-registry-db:5432/${POSTGRES_DB:-dbname}?sslmode=disable
+      - SERVER_PORT=8080
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-people-service-registry}
+      - OTEL_COLLECTOR_URL=${OTEL_COLLECTOR_URL:-otel-collector:4317}
+    depends_on:
+      people-service-registry-db:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8080/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+
+  # ============================================
+  # DATABASE
+  # ============================================
+  people-service-registry-db:
+    container_name: people-db
+    image: postgres:16-alpine
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-dbname}
+    volumes:
+      - people-service-registry-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-dbname}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  # ============================================
+  # REDIS (Cache)
+  # ============================================
+  people-service-registry-redis:
+    container_name: people-redis
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - people-service-registry-redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 128M
+
+volumes:
+  people-service-registry-db-data:
+    name: people-service-registry-db-data
+  people-service-registry-redis-data:
+    name: people-service-registry-redis-data
+
+networks:
+  default:
+    name: people-service-registry-network

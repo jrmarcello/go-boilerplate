@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: people-service-registry
+spec:
+  replicas: 2 # 2 réplicas para melhor distribuição de carga
+  template:
+    spec:
+      # Remove affinity/topology constraints para kind (single node)
+      affinity: null
+      topologySpreadConstraints: null
+      tolerations: null
+      containers:
+        - name: people-service-registry
+          # Usa imagePullPolicy: Never para imagem local
+          imagePullPolicy: Never
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"

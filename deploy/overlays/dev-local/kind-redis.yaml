@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+data:
+  redis.conf: |
+    appendonly yes
+    maxmemory 256mb
+    maxmemory-policy allkeys-lru
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          command: ["redis-server", "/etc/redis/redis.conf"]
+          volumeMounts:
+            - name: redis-config
+              mountPath: /etc/redis
+            - name: redis-data
+              mountPath: /data
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+            requests:
+              cpu: "200m"
+              memory: "128Mi"
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 3
+            periodSeconds: 5
+      volumes:
+        - name: redis-config
+          configMap:
+            name: redis-config
+        - name: redis-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379

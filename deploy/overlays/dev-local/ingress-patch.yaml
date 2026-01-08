@@ -1,0 +1,8 @@
+- op: replace
+  path: /spec/rules/0/host
+  value: people.localhost
+- op: replace
+  path: /spec/ingressClassName
+  value: nginx
+- op: remove
+  path: /metadata/annotations/kubernetes.io~1ingress.class
