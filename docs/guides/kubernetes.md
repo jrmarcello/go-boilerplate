@@ -1,6 +1,6 @@
 # Kubernetes Deploy - Explicação dos Arquivos
 
-Este documento explica a estrutura de deploy do `people-service-registry` no EKS.
+Este documento explica a estrutura de deploy do `ms-boilerplate-go` no EKS.
 
 ## Estrutura de Diretórios
 
@@ -78,7 +78,7 @@ make kind-up
 make kind-deploy
 
 # Acessar
-curl http://people.localhost/health
+curl http://entities.localhost/health
 
 # Logs
 make kind-logs
@@ -90,7 +90,7 @@ make kind-down
 ### homologacao/
 
 Sobrescreve valores para ambiente de homologação AWS:
-- Namespace: `people-service-registry-homologacao`
+- Namespace: `ms-boilerplate-go-homologacao`
 - Host: `*.max-homolog.internal`
 - ExternalSecret do AWS Secrets Manager
 

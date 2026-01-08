@@ -2,20 +2,20 @@ services:
   # ============================================
   # API
   # ============================================
-  people-service-registry-api:
-    container_name: people-api
+  ms-boilerplate-go-api:
+    container_name: boilerplate-api
     build:
       context: ..
       dockerfile: docker/Dockerfile
     ports:
       - "${SERVER_PORT:-8080}:8080"
     environment:
-      - DB_DSN=postgres://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@people-service-registry-db:5432/${POSTGRES_DB:-dbname}?sslmode=disable
+      - DB_DSN=postgres://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@ms-boilerplate-go-db:5432/${POSTGRES_DB:-dbname}?sslmode=disable
       - SERVER_PORT=8080
-      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-people-service-registry}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-ms-boilerplate-go}
       - OTEL_COLLECTOR_URL=${OTEL_COLLECTOR_URL:-otel-collector:4317}
     depends_on:
-      people-service-registry-db:
+      ms-boilerplate-go-db:
         condition: service_healthy
     healthcheck:
       test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8080/health" ]
@@ -35,8 +35,8 @@ services:
   # ============================================
   # DATABASE
   # ============================================
-  people-service-registry-db:
-    container_name: people-db
+  ms-boilerplate-go-db:
+    container_name: boilerplate-db
     image: postgres:16-alpine
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -45,7 +45,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
       POSTGRES_DB: ${POSTGRES_DB:-dbname}
     volumes:
-      - people-service-registry-db-data:/var/lib/postgresql/data
+      - ms-boilerplate-go-db-data:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-dbname}" ]
       interval: 5s
@@ -61,14 +61,14 @@ services:
   # ============================================
   # REDIS (Cache)
   # ============================================
-  people-service-registry-redis:
-    container_name: people-redis
+  ms-boilerplate-go-redis:
+    container_name: boilerplate-redis
     image: redis:7-alpine
     ports:
       - "${REDIS_PORT:-6379}:6379"
     command: redis-server --appendonly yes
     volumes:
-      - people-service-registry-redis-data:/data
+      - ms-boilerplate-go-redis-data:/data
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
@@ -82,11 +82,11 @@ services:
           memory: 128M
 
 volumes:
-  people-service-registry-db-data:
-    name: people-service-registry-db-data
-  people-service-registry-redis-data:
-    name: people-service-registry-redis-data
+  ms-boilerplate-go-db-data:
+    name: ms-boilerplate-go-db-data
+  ms-boilerplate-go-redis-data:
+    name: ms-boilerplate-go-redis-data
 
 networks:
   default:
-    name: people-service-registry-network
+    name: ms-boilerplate-go-network

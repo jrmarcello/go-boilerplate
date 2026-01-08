@@ -10,9 +10,9 @@ const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 
 // Métricas customizadas
 const errorRate = new Rate('errors');
-const createPersonDuration = new Trend('create_person_duration');
-const getPersonDuration = new Trend('get_person_duration');
-// const listPersonsDuration = new Trend('list_persons_duration'); // DEPRECATED: endpoint returns 410 Gone
+const createEntityDuration = new Trend('create_entity_duration');
+const getEntityDuration = new Trend('get_entity_duration');
+// const listEntitiesDuration = new Trend('list_entities_duration'); // DEPRECATED: endpoint returns 410 Gone
 
 // ============================================
 // CENÁRIOS DE TESTE
@@ -92,9 +92,9 @@ export const options = {
   thresholds: {
     http_req_failed: ['rate<0.01'],        // Menos de 1% de erros
     http_req_duration: ['p(95)<500'],      // 95% das requests < 500ms
-    create_person_duration: ['p(95)<800'], // Create < 800ms
-    get_person_duration: ['p(95)<200'],    // Get < 200ms
-    // list_persons_duration: ['p(95)<300'],  // DEPRECATED: endpoint returns 410 Gone
+    create_entity_duration: ['p(95)<800'], // Create < 800ms
+    get_entity_duration: ['p(95)<200'],    // Get < 200ms
+    // list_entities_duration: ['p(95)<300'],  // DEPRECATED: endpoint returns 410 Gone
     errors: ['rate<0.01'],
   },
 };
@@ -178,7 +178,7 @@ const headers = { 'Content-Type': 'application/json' };
 // FUNÇÕES DE TESTE
 // ============================================
 
-function createPerson() {
+function createEntity() {
   const payload = JSON.stringify({
     name: `Load Test User ${Date.now()}`,
     document: generateCPF(),
@@ -187,9 +187,9 @@ function createPerson() {
     address: randomAddress(),
   });
 
-  const res = http.post(`${BASE_URL}/people`, payload, { headers });
+  const res = http.post(`${BASE_URL}/entities`, payload, { headers });
 
-  createPersonDuration.add(res.timings.duration);
+  createEntityDuration.add(res.timings.duration);
 
   const success = check(res, {
     'create: status is 201': (r) => r.status === 201,
@@ -201,10 +201,10 @@ function createPerson() {
   return res.json('id');
 }
 
-function getPerson(id) {
-  const res = http.get(`${BASE_URL}/people/${id}`, { headers });
+function getEntity(id) {
+  const res = http.get(`${BASE_URL}/entities/${id}`, { headers });
 
-  getPersonDuration.add(res.timings.duration);
+  getEntityDuration.add(res.timings.duration);
 
   const success = check(res, {
     'get: status is 200': (r) => r.status === 200,
@@ -215,7 +215,7 @@ function getPerson(id) {
   return success;
 }
 
-function updatePerson(id) {
+function updateEntity(id) {
   const payload = JSON.stringify({
     name: `Load Test User Updated ${Date.now()}`,
     phone: randomPhone(),
@@ -223,7 +223,7 @@ function updatePerson(id) {
     address: randomAddress(),
   });
 
-  const res = http.put(`${BASE_URL}/people/${id}`, payload, { headers });
+  const res = http.put(`${BASE_URL}/entities/${id}`, payload, { headers });
 
   const success = check(res, {
     'update: status is 200': (r) => r.status === 200,
@@ -233,8 +233,8 @@ function updatePerson(id) {
   return success;
 }
 
-function deletePerson(id) {
-  const res = http.del(`${BASE_URL}/people/${id}`, null, { headers });
+function deleteEntity(id) {
+  const res = http.del(`${BASE_URL}/entities/${id}`, null, { headers });
 
   const success = check(res, {
     'delete: status is 200': (r) => r.status === 200,
@@ -244,10 +244,10 @@ function deletePerson(id) {
   return success;
 }
 
-// function listPersons(page = 1, limit = 10) {
-//   const res = http.get(`${BASE_URL}/people?page=${page}&limit=${limit}`, { headers });
+// function listEntities(page = 1, limit = 10) {
+//   const res = http.get(`${BASE_URL}/entities?page=${page}&limit=${limit}`, { headers });
 
-//   listPersonsDuration.add(res.timings.duration);
+//   listEntitiesDuration.add(res.timings.duration);
 
 //   const success = check(res, {
 //     'list: status is 200': (r) => r.status === 200,
@@ -273,13 +273,13 @@ export function smokeTest() {
     healthCheck();
     sleep(0.5);
 
-    // listPersons(1, 10); // DEPRECATED: endpoint returns 410 Gone
+    // listEntities(1, 10); // DEPRECATED: endpoint returns 410 Gone
     // sleep(0.5);
 
-    const id = createPerson();
+    const id = createEntity();
     if (id) {
       sleep(0.3);
-      getPerson(id);
+      getEntity(id);
     }
   });
   sleep(1);
@@ -293,24 +293,24 @@ export function loadTest() {
 
     if (rand < 0.6) {
       // 60% - Create + Get (simulates read-heavy workload)
-      const id = createPerson();
+      const id = createEntity();
       if (id) {
         sleep(0.1);
-        getPerson(id);
+        getEntity(id);
       }
     } else if (rand < 0.85) {
       // 25% - Create + Update
-      const id = createPerson();
+      const id = createEntity();
       if (id) {
         sleep(0.1);
-        updatePerson(id);
+        updateEntity(id);
       }
     } else {
       // 15% - Create + Delete (simula ciclo de vida)
-      const id = createPerson();
+      const id = createEntity();
       if (id) {
         sleep(0.1);
-        deletePerson(id);
+        deleteEntity(id);
       }
     }
   });
@@ -323,13 +323,13 @@ export function stressTest() {
 
     if (rand < 0.7) {
       // 70% - Create (heavy write load)
-      createPerson();
+      createEntity();
     } else if (rand < 0.9) {
       // 20% - Create + Get
-      const id = createPerson();
+      const id = createEntity();
       if (id) {
         sleep(0.1);
-        getPerson(id);
+        getEntity(id);
       }
     } else {
       // 10% - Health check
@@ -341,11 +341,11 @@ export function stressTest() {
 
 export function spikeTest() {
   group('Spike Test - Sudden Load', () => {
-    const id = createPerson();
+    const id = createEntity();
     if (id) {
-      getPerson(id);
+      getEntity(id);
     }
-    // listPersons(1, 10); // DEPRECATED: endpoint returns 410 Gone
+    // listEntities(1, 10); // DEPRECATED: endpoint returns 410 Gone
   });
   sleep(0.3);
 }

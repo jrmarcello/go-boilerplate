@@ -1,8 +1,8 @@
 package main
 
-// @title           Appmax Person API
+// @title           Entity API
 // @version         1.0
-// @description     Microservice for person management with Clean Architecture.
+// @description     Microservice for entity management with Clean Architecture.
 // @termsOfService  http://swagger.io/terms/
 
 // @contact.name   API Support

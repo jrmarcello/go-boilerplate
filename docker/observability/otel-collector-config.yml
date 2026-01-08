@@ -41,7 +41,7 @@ exporters:
   # Prometheus metrics (opcional)
   prometheus:
     endpoint: "0.0.0.0:8889"
-    namespace: people_service
+    namespace: boilerplate_service
 
 extensions:
   health_check:

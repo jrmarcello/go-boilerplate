@@ -10,9 +10,9 @@ import (
 // Metrics contém as métricas de negócio da aplicação
 type Metrics struct {
 	// Counters
-	PeopleCreated metric.Int64Counter
-	PeopleUpdated metric.Int64Counter
-	PeopleDeleted metric.Int64Counter
+	EntitiesCreated metric.Int64Counter
+	EntitiesUpdated metric.Int64Counter
+	EntitiesDeleted metric.Int64Counter
 
 	// Histograms
 	OperationDuration metric.Float64Histogram
@@ -29,36 +29,36 @@ func GetMetrics() *Metrics {
 func setupMetrics(serviceName string) (*Metrics, error) {
 	meter := otel.Meter(serviceName)
 
-	peopleCreated, err := meter.Int64Counter(
-		"people_created_total",
-		metric.WithDescription("Total number of people created"),
-		metric.WithUnit("{person}"),
+	entitiesCreated, err := meter.Int64Counter(
+		"entities_created_total",
+		metric.WithDescription("Total number of entities created"),
+		metric.WithUnit("{entity}"),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	peopleUpdated, err := meter.Int64Counter(
-		"people_updated_total",
-		metric.WithDescription("Total number of people updated"),
-		metric.WithUnit("{person}"),
+	entitiesUpdated, err := meter.Int64Counter(
+		"entities_updated_total",
+		metric.WithDescription("Total number of entities updated"),
+		metric.WithUnit("{entity}"),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	peopleDeleted, err := meter.Int64Counter(
-		"people_deleted_total",
-		metric.WithDescription("Total number of people deleted (soft delete)"),
-		metric.WithUnit("{person}"),
+	entitiesDeleted, err := meter.Int64Counter(
+		"entities_deleted_total",
+		metric.WithDescription("Total number of entities deleted (soft delete)"),
+		metric.WithUnit("{entity}"),
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	operationDuration, err := meter.Float64Histogram(
-		"people_operation_duration_seconds",
-		metric.WithDescription("Duration of people operations in seconds"),
+		"entities_operation_duration_seconds",
+		metric.WithDescription("Duration of entities operations in seconds"),
 		metric.WithUnit("s"),
 	)
 	if err != nil {
@@ -66,9 +66,9 @@ func setupMetrics(serviceName string) (*Metrics, error) {
 	}
 
 	m := &Metrics{
-		PeopleCreated:     peopleCreated,
-		PeopleUpdated:     peopleUpdated,
-		PeopleDeleted:     peopleDeleted,
+		EntitiesCreated:     entitiesCreated,
+		EntitiesUpdated:     entitiesUpdated,
+		EntitiesDeleted:     entitiesDeleted,
 		OperationDuration: operationDuration,
 	}
 
@@ -78,22 +78,22 @@ func setupMetrics(serviceName string) (*Metrics, error) {
 
 // RecordCreate registra uma criação de pessoa
 func (m *Metrics) RecordCreate(ctx context.Context) {
-	if m != nil && m.PeopleCreated != nil {
-		m.PeopleCreated.Add(ctx, 1)
+	if m != nil && m.EntitiesCreated != nil {
+		m.EntitiesCreated.Add(ctx, 1)
 	}
 }
 
 // RecordUpdate registra uma atualização de pessoa
 func (m *Metrics) RecordUpdate(ctx context.Context) {
-	if m != nil && m.PeopleUpdated != nil {
-		m.PeopleUpdated.Add(ctx, 1)
+	if m != nil && m.EntitiesUpdated != nil {
+		m.EntitiesUpdated.Add(ctx, 1)
 	}
 }
 
 // RecordDelete registra uma deleção de pessoa
 func (m *Metrics) RecordDelete(ctx context.Context) {
-	if m != nil && m.PeopleDeleted != nil {
-		m.PeopleDeleted.Add(ctx, 1)
+	if m != nil && m.EntitiesDeleted != nil {
+		m.EntitiesDeleted.Add(ctx, 1)
 	}
 }
 

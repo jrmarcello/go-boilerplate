@@ -1,14 +1,14 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: people-service-registry
+  name: ms-boilerplate-go
   labels:
-    app: people-service-registry
+    app: ms-boilerplate-go
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: people-service-registry
+    name: ms-boilerplate-go
   minReplicas: 3
   maxReplicas: 9
   behavior:

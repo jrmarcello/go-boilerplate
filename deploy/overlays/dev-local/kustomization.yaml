@@ -7,23 +7,23 @@ resources:
   - secret.yaml
   - kind-redis.yaml
 
-namespace: people-service-registry-dev
+namespace: ms-boilerplate-go-dev
 
 images:
-  - name: 650155821999.dkr.ecr.sa-east-1.amazonaws.com/people-service-registry
-    newName: people-service-registry # Imagem local
+  - name: 650155821999.dkr.ecr.sa-east-1.amazonaws.com/ms-boilerplate-go
+    newName: ms-boilerplate-go # Imagem local
     newTag: dev
 
 patches:
   - path: deployment-patch.yaml
     target:
       kind: Deployment
-      name: people-service-registry
+      name: ms-boilerplate-go
   - path: ingress-patch.yaml
     target:
       kind: Ingress
-      name: people-service-registry
+      name: ms-boilerplate-go
   - path: hpa-patch.yaml
     target:
       kind: HorizontalPodAutoscaler
-      name: people-service-registry
+      name: ms-boilerplate-go

@@ -1,7 +1,7 @@
 # ELK Stack + OpenTelemetry Collector para observabilidade
 # Uso: docker compose -f docker/observability/docker-compose.yml up -d
 
-name: people-observability
+name: boilerplate-observability
 
 services:
   # ============================================
@@ -14,7 +14,7 @@ services:
       - discovery.type=single-node
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
-      - cluster.name=people-service-cluster
+      - cluster.name=boilerplate-cluster
     ports:
       - "9200:9200"
     volumes:

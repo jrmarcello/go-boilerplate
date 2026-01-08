@@ -44,11 +44,11 @@ Um boilerplate para ser usado como base para criar microservices em Go.
 - [x] Abilitar o endpoint de listagem (eu avia desabilitado)
 - [x] Add instrucoes sobre como contribuir e propor melhorias no projeto
 
-- [ ] Remover referencias a people registry, people e person do projeto
-- [ ] refatorar docs sobre o projeto
+- [x] Remover referencias a people registry, people e person do projeto
+- [x] refatorar docs sobre o projeto
 
 - [ ] criar uma estrategia de conexao com o banco desacoplada... vamos add uma conexao com banco de dados SQLite e novos repositorio para ele
-- [ ] Revisar estratgegia de cache
-- [ ] Criar estrategia para exemplo de idempotencia
+- [ ] Revisar estratgegia de cache (com redis)
+- [ ] Criar estrategia para exemplo de idempotencia (com redis)
 - [ ] Add exemplo de rate limiting
-- [ ] Add exemplo auth
+- [ ] Add exemplo de auth
