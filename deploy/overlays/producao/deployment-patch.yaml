@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-boilerplate-go
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: ms-boilerplate-go
+          resources:
+            requests:
+              cpu: "300m"
+              memory: "350Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

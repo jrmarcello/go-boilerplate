@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  - configmap.yaml
+  - secret.yaml
+namespace: ms-boilerplate-go-homologacao
+images:
+  - name: 409287786754.dkr.ecr.us-east-1.amazonaws.com/ms-boilerplate-go
+    newName: 409287786754.dkr.ecr.us-east-1.amazonaws.com/ms-boilerplate-go
+    newTag: go-1
+patches:
+  - path: ingress-host-patch.yaml
+    target:
+      kind: Ingress
+      name: ms-boilerplate-go
+  - path: deployment-patch.yaml
+    target:
+      kind: Deployment
+      name: ms-boilerplate-go
+  - path: hpa-patch.yaml
+    target:
+      kind: HorizontalPodAutoscaler
+      name: ms-boilerplate-go
