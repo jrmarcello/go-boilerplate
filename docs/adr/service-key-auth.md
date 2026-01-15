@@ -1,18 +1,11 @@
 # ADR: Autenticação entre Microserviços via Service Keys
 
 **Status**: Aceito  
-**Data**: 2026-01-13  
-**Autores**: Marcelo Jr
+**Data**: 2026-01-15
 
 ## Contexto
 
-O `people-service-registry` é um serviço interno que será consumido por outros microserviços da organização:
-
-- **banking-router** (primeiro consumidor - piloto)
-- **ledger** (próximo consumidor planejado)
-- Potencialmente 3-4 serviços no futuro
-
-Precisamos definir uma estratégia de autenticação que:
+O serviço será consumido por outros microserviços da organização. Precisamos definir uma estratégia de autenticação que:
 
 1. Proteja as rotas contra acessos não autorizados
 2. Permita auditoria granular (qual serviço fez qual operação)
@@ -21,7 +14,7 @@ Precisamos definir uma estratégia de autenticação que:
 
 ## Decisão
 
-Implementaremos **autenticação via Service Keys com suporte a múltiplas chaves**.
+Implementamos **autenticação via Service Keys com suporte a múltiplas chaves**.
 
 ### Mecanismo
 
@@ -40,27 +33,14 @@ As chaves são configuradas via variável de ambiente:
 SERVICE_KEYS="banking-router:sk_banking_...,ledger:sk_ledger_..."
 ```
 
-### Rotas Protegidas
+### Rotas
 
-- **Protegidas**: Todas as rotas de negócio (`/people/*`, `/companies/*`)
-- **Públicas**: `/health`, `/ready` (para probes do Kubernetes)
+- **Protegidas**: Todas as rotas de negócio (`/entities/*`)
+- **Públicas**: `/health`, `/ready`, `/swagger/*` (probes do Kubernetes e docs)
 
-## Alternativas Consideradas
+### Dev Mode
 
-### 1. Chave Única Compartilhada
-
-- **Prós**: Mais simples
-- **Contras**: Sem auditoria granular, revogação afeta todos
-
-### 2. JWT Interno
-
-- **Prós**: Pode carregar claims, padrão conhecido
-- **Contras**: Overhead de assinatura/verificação, complexidade desnecessária sem propagação de identidade
-
-### 3. mTLS via Service Mesh
-
-- **Prós**: Segurança máxima, sem código adicional
-- **Contras**: Requer Istio/Linkerd, overhead operacional significativo
+Se `SERVICE_KEYS` estiver vazio ou não configurado, o middleware permite todas as requisições. Isso facilita o desenvolvimento local.
 
 ## Consequências
 
@@ -68,8 +48,8 @@ SERVICE_KEYS="banking-router:sk_banking_...,ledger:sk_ledger_..."
 
 - **Auditoria**: Logs incluem `caller_service` identificando o chamador
 - **Revogação Granular**: Pode revogar acesso de um serviço sem afetar outros
-- **Simplicidade**: Implementação em ~50 linhas de código
-- **Preparação**: Base para futura feature de Auditoria completa
+- **Simplicidade**: Implementação em ~100 linhas de código
+- **Dev-friendly**: Sem auth em desenvolvimento local
 
 ### Negativas
 
@@ -85,9 +65,9 @@ SERVICE_KEYS="banking-router:sk_banking_...,ledger:sk_ledger_..."
 
 ### Componentes
 
-1. **Middleware** `ServiceKeyAuth` em `internal/infrastructure/web/middleware/`
-2. **Configuração** parseada no bootstrap da aplicação
-3. **Contexto** com `caller_service` para logging
+1. **Middleware** `ServiceKeyAuth` em `internal/infrastructure/web/middleware/service_key.go`
+2. **Configuração** `Auth.ServiceKeys` em `config/config.go`
+3. **Router** aplica middleware em grupo protegido
 
 ### Formato da Chave
 
@@ -96,8 +76,3 @@ sk_<service-name>_<random-32-chars>
 ```
 
 Exemplo: `sk_banking_router_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6`
-
-## Referências
-
-- [Zero Trust Architecture - NIST](https://www.nist.gov/publications/zero-trust-architecture)
-- [API Key Best Practices](https://cloud.google.com/docs/authentication/api-keys)

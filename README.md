@@ -98,9 +98,32 @@ Hierarquia (maior prioridade primeiro):
 SERVER_PORT=8080
 DB_DSN=postgres://user:password@localhost:5432/mydb?sslmode=disable
 REDIS_ENABLED=true
+SERVICE_KEYS=myservice:sk_myservice_abc123  # opcional, vazio = dev mode
 ```
 
 Ver: [docs/adr/config-strategy.md](docs/adr/config-strategy.md)
+
+---
+
+## 🔐 Autenticação
+
+Rotas protegidas requerem headers `X-Service-Name` e `X-Service-Key`:
+
+```bash
+curl -X GET http://localhost:8080/entities \
+  -H "X-Service-Name: myservice" \
+  -H "X-Service-Key: sk_myservice_abc123"
+```
+
+**Dev Mode**: Se `SERVICE_KEYS` estiver vazio, todas as requisições são permitidas.
+
+| Rota | Proteção |
+|------|----------|
+| `/health`, `/ready` | Pública |
+| `/swagger/*` | Pública |
+| `/entities/*` | Protegida |
+
+Ver: [docs/adr/service-key-auth.md](docs/adr/service-key-auth.md)
 
 ---
 

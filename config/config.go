@@ -13,6 +13,13 @@ type Config struct {
 	DB     DBConfig
 	Otel   OtelConfig
 	Redis  RedisConfig
+	Auth   AuthConfig
+}
+
+type AuthConfig struct {
+	// ServiceKeys no formato "service1:key1,service2:key2"
+	// Se vazio, auth é desabilitada (dev mode)
+	ServiceKeys string
 }
 
 type ServerConfig struct {
@@ -59,6 +66,9 @@ func Load() (*Config, error) {
 			URL:     getEnv("REDIS_URL", "redis://localhost:6379"),
 			TTL:     getEnv("REDIS_TTL", "5m"),
 			Enabled: getEnvBool("REDIS_ENABLED", false),
+		},
+		Auth: AuthConfig{
+			ServiceKeys: getEnv("SERVICE_KEYS", ""),
 		},
 	}, nil
 }

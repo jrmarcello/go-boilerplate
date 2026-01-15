@@ -3,8 +3,13 @@
 @baseUrl = http://localhost:8080
 @entityId = 01KE2MQK8DENP9WWK1RT5B2PNE
 
+# Authentication Headers (required if SERVICE_KEYS is configured)
+# In dev mode (SERVICE_KEYS empty), these headers are optional
+@serviceName = myservice
+@serviceKey = sk_myservice_abc123
+
 ### ============================================
-### Health Checks
+### Health Checks (Public - no auth required)
 ### ============================================
 
 ### Liveness Probe
@@ -14,12 +19,14 @@ GET {{baseUrl}}/health
 GET {{baseUrl}}/ready
 
 ### ============================================
-### Entities - CRUD
+### Entities - CRUD (Protected - auth required)
 ### ============================================
 
 ### Criar Entity
 POST {{baseUrl}}/entities
 Content-Type: application/json
+X-Service-Name: {{serviceName}}
+X-Service-Key: {{serviceKey}}
 
 {
   "name": "João da Silva",
@@ -29,6 +36,8 @@ Content-Type: application/json
 ### Criar Entity (outro exemplo)
 POST {{baseUrl}}/entities
 Content-Type: application/json
+X-Service-Name: {{serviceName}}
+X-Service-Key: {{serviceKey}}
 
 {
   "name": "Maria Santos",
@@ -37,16 +46,24 @@ Content-Type: application/json
 
 ### Listar Entities (paginado)
 GET {{baseUrl}}/entities?page=1&limit=20
+X-Service-Name: {{serviceName}}
+X-Service-Key: {{serviceKey}}
 
 ### Listar Entities (com filtros)
 GET {{baseUrl}}/entities?name=maria&active_only=true&page=1&limit=20
+X-Service-Name: {{serviceName}}
+X-Service-Key: {{serviceKey}}
 
 ### Buscar Entity por ID
 GET {{baseUrl}}/entities/{{entityId}}
+X-Service-Name: {{serviceName}}
+X-Service-Key: {{serviceKey}}
 
 ### Atualizar Entity
 PUT {{baseUrl}}/entities/{{entityId}}
 Content-Type: application/json
+X-Service-Name: {{serviceName}}
+X-Service-Key: {{serviceKey}}
 
 {
   "name": "João da Silva Updated",
@@ -55,6 +72,8 @@ Content-Type: application/json
 
 ### Deletar Entity (Soft Delete)
 DELETE {{baseUrl}}/entities/{{entityId}}
+X-Service-Name: {{serviceName}}
+X-Service-Key: {{serviceKey}}
 
 ### ============================================
 ### Casos de Erro
@@ -63,6 +82,8 @@ DELETE {{baseUrl}}/entities/{{entityId}}
 ### Email Inválido
 POST {{baseUrl}}/entities
 Content-Type: application/json
+X-Service-Name: {{serviceName}}
+X-Service-Key: {{serviceKey}}
 
 {
   "name": "Teste Email",
@@ -71,6 +92,8 @@ Content-Type: application/json
 
 ### Entity não encontrada
 GET {{baseUrl}}/entities/01XXXXXXXXXXXXXXXXXXXXXX
+X-Service-Name: {{serviceName}}
+X-Service-Key: {{serviceKey}}
 
 ### ============================================
 ### Com Idempotency Key (evita duplicação)
@@ -80,8 +103,34 @@ GET {{baseUrl}}/entities/01XXXXXXXXXXXXXXXXXXXXXX
 POST {{baseUrl}}/entities
 Content-Type: application/json
 X-Idempotency-Key: unique-key-123
+X-Service-Name: {{serviceName}}
+X-Service-Key: {{serviceKey}}
 
 {
   "name": "Entity Idempotente",
   "email": "idempotent@example.com"
+}
+
+### ============================================
+### Casos de Erro de Autenticação
+### ============================================
+
+### Sem headers de auth (retorna 401 se SERVICE_KEYS configurada)
+POST {{baseUrl}}/entities
+Content-Type: application/json
+
+{
+  "name": "Sem Auth",
+  "email": "noauth@example.com"
+}
+
+### Chave inválida (retorna 401)
+POST {{baseUrl}}/entities
+Content-Type: application/json
+X-Service-Name: {{serviceName}}
+X-Service-Key: wrong_key
+
+{
+  "name": "Chave Errada",
+  "email": "wrongkey@example.com"
 }

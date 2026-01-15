@@ -1,0 +1,110 @@
+package middleware
+
+import (
+	"net/http"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+)
+
+// ServiceKeyConfig contém a configuração de autenticação por Service Key.
+type ServiceKeyConfig struct {
+	// Keys é um mapa de service-name → key autorizado.
+	// Formato de entrada (env): "service1:key1,service2:key2"
+	Keys map[string]string
+
+	// ServiceNameHeader é o header que contém o nome do serviço chamador.
+	// Default: "X-Service-Name"
+	ServiceNameHeader string
+
+	// ServiceKeyHeader é o header que contém a chave do serviço.
+	// Default: "X-Service-Key"
+	ServiceKeyHeader string
+}
+
+// ParseServiceKeys converte uma string no formato "service1:key1,service2:key2"
+// para um mapa de chaves.
+func ParseServiceKeys(raw string) map[string]string {
+	keys := make(map[string]string)
+	if raw == "" {
+		return keys
+	}
+
+	pairs := strings.Split(raw, ",")
+	for _, pair := range pairs {
+		parts := strings.SplitN(strings.TrimSpace(pair), ":", 2)
+		if len(parts) == 2 {
+			serviceName := strings.TrimSpace(parts[0])
+			serviceKey := strings.TrimSpace(parts[1])
+			if serviceName != "" && serviceKey != "" {
+				keys[serviceName] = serviceKey
+			}
+		}
+	}
+	return keys
+}
+
+// DefaultServiceKeyConfig retorna a configuração padrão.
+func DefaultServiceKeyConfig() ServiceKeyConfig {
+	return ServiceKeyConfig{
+		Keys:              make(map[string]string),
+		ServiceNameHeader: "X-Service-Name",
+		ServiceKeyHeader:  "X-Service-Key",
+	}
+}
+
+// ServiceKeyAuth retorna um middleware que valida a autenticação via Service Key.
+// Se nenhuma chave estiver configurada (Keys vazio), o middleware permite todas as requisições.
+// Isso permite usar o serviço sem auth em desenvolvimento.
+func ServiceKeyAuth(config ServiceKeyConfig) gin.HandlerFunc {
+	// Define headers padrão se não configurados
+	if config.ServiceNameHeader == "" {
+		config.ServiceNameHeader = "X-Service-Name"
+	}
+	if config.ServiceKeyHeader == "" {
+		config.ServiceKeyHeader = "X-Service-Key"
+	}
+
+	return func(c *gin.Context) {
+		// Se não há chaves configuradas, permite tudo (dev mode)
+		if len(config.Keys) == 0 {
+			c.Next()
+			return
+		}
+
+		serviceName := c.GetHeader(config.ServiceNameHeader)
+		serviceKey := c.GetHeader(config.ServiceKeyHeader)
+
+		// Validate headers present
+		if serviceName == "" || serviceKey == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "Missing authentication headers",
+				"code":  "MISSING_AUTH_HEADERS",
+			})
+			return
+		}
+
+		// Validar chave do serviço
+		expectedKey, exists := config.Keys[serviceName]
+		if !exists {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "Unknown service",
+				"code":  "UNKNOWN_SERVICE",
+			})
+			return
+		}
+
+		if expectedKey != serviceKey {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "Invalid service key",
+				"code":  "INVALID_SERVICE_KEY",
+			})
+			return
+		}
+
+		// Armazena o nome do serviço chamador no contexto para logging/auditoria
+		c.Set("caller_service", serviceName)
+
+		c.Next()
+	}
+}

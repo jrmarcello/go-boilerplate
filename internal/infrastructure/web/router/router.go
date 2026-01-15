@@ -18,6 +18,7 @@ import (
 // Config contém configurações do router
 type Config struct {
 	ServiceName string
+	ServiceKeys string // "service1:key1,service2:key2"
 }
 
 // Dependencies agrupa todas as dependências necessárias para o router
@@ -44,7 +45,7 @@ func Setup(deps Dependencies) *gin.Engine {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID", "X-Idempotency-Key"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID", "X-Idempotency-Key", "X-Service-Name", "X-Service-Key"},
 		ExposeHeaders:    []string{"Content-Length", "X-Request-ID"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
@@ -53,10 +54,17 @@ func Setup(deps Dependencies) *gin.Engine {
 	// Idempotency
 	r.Use(middleware.Idempotency(middleware.DefaultIdempotencyConfig()))
 
-	// Register all routes
+	// Public routes (no auth required)
 	registerSwaggerRoutes(r)
 	registerHealthRoutes(r, deps)
-	RegisterEntityRoutes(r, deps.EntityHandler)
+
+	// Protected routes (auth required if SERVICE_KEYS is configured)
+	authConfig := middleware.ServiceKeyConfig{
+		Keys: middleware.ParseServiceKeys(deps.Config.ServiceKeys),
+	}
+	protected := r.Group("")
+	protected.Use(middleware.ServiceKeyAuth(authConfig))
+	RegisterEntityRoutes(protected, deps.EntityHandler)
 
 	return r
 }

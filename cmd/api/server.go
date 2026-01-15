@@ -103,6 +103,7 @@ func buildDependencies(conn *sqlx.DB, cfg *config.Config) router.Dependencies {
 		EntityHandler: entityHandler,
 		Config: router.Config{
 			ServiceName: cfg.Otel.ServiceName,
+			ServiceKeys: cfg.Auth.ServiceKeys,
 		},
 	}
 }
