@@ -71,6 +71,34 @@ internal/
 
 ---
 
+## 🤔 Cenários de Dúvida
+
+> **Regra fundamental**: Na dúvida, **PERGUNTE ao usuário** antes de prosseguir.
+
+### Quando perguntar
+
+- [ ] Mudanças de arquitetura: "Isso afeta a estrutura do projeto? Devo criar um ADR?"
+- [ ] Múltiplas abordagens válidas: "Posso usar X ou Y. Qual você prefere?"
+- [ ] Escopo indefinido: "Você quer que eu também faça Z ou só X?"
+- [ ] Breaking changes: "Isso vai quebrar a API. Devo prosseguir?"
+- [ ] Convenções não documentadas: "Não encontrei uma convenção para isso. Como devo proceder?"
+
+### O que NÃO assumir
+
+- [ ] **Nunca** assumir que o usuário quer uma solução complexa quando uma simples resolve
+- [ ] **Nunca** adicionar dependências sem perguntar
+- [ ] **Nunca** mudar padrões estabelecidos sem discutir primeiro
+- [ ] **Nunca** ignorar inconsistências no código - pergunte como resolver
+
+### Exemplo
+
+```text
+❌ Errado: "Vou adicionar Redis para cache porque é melhor."
+
+✅ Correto: "O cache atual usa X. Posso usar Redis para performance,
+            mas adiciona complexidade. Qual abordagem você prefere?"
+```
+
 ## Padrões de Código
 
 ### Erros
@@ -130,6 +158,7 @@ make lint          # Verificar código
 make test          # Rodar todos os testes
 make dev           # Hot reload local
 make docker-up     # Subir infraestrutura
+make kind-setup    # Setup completo Kind (cluster + db + migrate + deploy)
 make help          # Ver todos os comandos
 ```
 
@@ -144,6 +173,8 @@ make help          # Ver todos os comandos
 | `docs/adr/clean-architecture.md` | Estrutura de camadas e DI |
 | `docs/adr/config-strategy.md` | godotenv + .env + K8s |
 | `docs/adr/error-handling.md` | Tratamento de erros em camadas |
+| `docs/adr/migration-strategy.md` | ArgoCD PreSync + binário separado |
+| `docs/adr/service-key-auth.md` | Autenticação via Service Key |
 | `docs/adr/ulid.md` | Por que ULID ao invés de UUID |
 
 ### Guias

@@ -1,6 +1,6 @@
 # Go Microservice Boilerplate
 
-[![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
 [![Architecture](https://img.shields.io/badge/Architecture-Clean-blueviolet)](docs/adr/clean-architecture.md)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](docker/)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-326CE5?logo=kubernetes)](deploy/)
@@ -63,7 +63,9 @@ make dev      # Hot reload
 ## 📁 Estrutura
 
 ```text
-├── cmd/api/              # Entrypoint
+├── cmd/
+│   ├── api/              # Entrypoint HTTP server
+│   └── migrate/          # Binário para migrations (K8s Job)
 ├── config/               # Configuração (godotenv)
 ├── deploy/               # Kubernetes manifests (Kustomize)
 │   ├── base/
@@ -118,7 +120,7 @@ curl -X GET http://localhost:8080/entities \
 **Dev Mode**: Se `SERVICE_KEYS` estiver vazio, todas as requisições são permitidas.
 
 | Rota | Proteção |
-|------|----------|
+| ------ | ---------- |
 | `/health`, `/ready` | Pública |
 | `/swagger/*` | Pública |
 | `/entities/*` | Protegida |
@@ -144,7 +146,8 @@ make test-coverage  # Relatório HTML
 
 # Deploy
 make docker-up      # Sobe infra local
-make kind-deploy    # Kubernetes local (Kind)
+make kind-setup     # Setup completo Kind (cluster + db + migrate + deploy)
+make kind-logs      # Ver logs no Kind
 ```
 
 ---
@@ -158,6 +161,8 @@ make kind-deploy    # Kubernetes local (Kind)
 | [clean-architecture.md](docs/adr/clean-architecture.md) | Estrutura de camadas e DI |
 | [config-strategy.md](docs/adr/config-strategy.md) | godotenv + .env + Kubernetes |
 | [error-handling.md](docs/adr/error-handling.md) | Erros em camadas |
+| [migration-strategy.md](docs/adr/migration-strategy.md) | ArgoCD PreSync + binário separado |
+| [service-key-auth.md](docs/adr/service-key-auth.md) | Autenticação via Service Key |
 | [ulid.md](docs/adr/ulid.md) | Por que ULID ao invés de UUID |
 
 ### Guias
@@ -185,8 +190,8 @@ Ver [AGENTS.md](AGENTS.md) para diretrizes de código e arquitetura.
 
 ### Adicionar novo ambiente K8s
 
-1. Copie `deploy/overlays/dev-local/` para novo overlay
-2. Ajuste `configmap.yaml` com as variáveis do ambiente
+1. Copie `deploy/overlays/develop/` para novo overlay
+2. Ajuste `configmap.yaml` e `secret.yaml` com as variáveis do ambiente
 3. Ajuste `kustomization.yaml` se necessário
 
 ---
