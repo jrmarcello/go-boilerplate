@@ -1,12 +1,22 @@
-# Decisão de Arquitetura: Tratamento de Erros
+# ADR-004: Error Handling Layered Translation
+
+**Status**: Aceito  
+**Data**: 2026-01-16  
+**Autor**: Marcelo Jr
+
+---
 
 ## Contexto
 
 Em APIs Go, é comum misturar lógica de domínio com códigos HTTP (ex: retornar `400 Bad Request` de dentro de uma entidade), o que viola a Clean Architecture. Precisamos de um sistema que mantenha o domínio puro mas garanta respostas HTTP consistentes.
 
+---
+
 ## Decisão
 
-Adotamos um sistema de **Tratamento de Erros com Tradução em Camadas**, onde cada camada tem responsabilidades claras:
+Adotamos um sistema de **Tratamento de Erros com Tradução em Camadas**, onde cada camada tem responsabilidades claras.
+
+### Responsabilidades
 
 | Camada | Responsabilidade | Conhece HTTP? |
 | ------ | ---------------- | ------------- |
@@ -20,21 +30,39 @@ Adotamos um sistema de **Tratamento de Erros com Tradução em Camadas**, onde c
 2. **Use Case**: Propaga ou enriquece erros com contexto.
 3. **Handler**: Intercepta, traduz para HTTP e responde com formato padronizado.
 
+---
+
+## Alternativas Consideradas
+
+| Estratégia | Veredicto | Motivo |
+| ---------- | --------- | ------ |
+| Erros HTTP em Domain (echo/gin errors) | ❌ Rejeitado | Acopla domínio a framework web e infraestrutura |
+| Panic/Recover | ❌ Rejeitado | Não idiomático em Go para validações de negócio, difícil de controlar fluxo |
+| **Layered Translation** | ✅ **Escolhido** | Entidades puras, conversão explícita na borda (handler) |
+
+---
+
 ## Justificativa
 
 1. **Pureza do Domínio**: Entidades não dependem de bibliotecas HTTP.
 2. **Consistência**: Toda resposta de erro segue o mesmo formato JSON.
 3. **Simplicidade**: Handlers delegam tratamento para função única `HandleError`.
 
+---
+
 ## Consequências
 
-- **Positivas**:
-  - Domínio 100% testável sem mocks HTTP.
-  - Formato de erro padronizado com `trace_id` para debug.
-  - Código de handler limpo e enxuto.
+### Positivas
 
-- **Negativas**:
-  - Necessidade de manter o `translator` atualizado com novos erros.
+- Domínio 100% testável sem mocks HTTP.
+- Formato de erro padronizado com `trace_id` para debug.
+- Código de handler limpo e enxuto.
+
+### Negativas
+
+- Necessidade de manter o `translator` atualizado com novos erros.
+
+---
 
 ## Implementação
 

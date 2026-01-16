@@ -1,7 +1,10 @@
-# ADR: Autenticação entre Microserviços via Service Keys
+# ADR-005: Service Key Auth
 
 **Status**: Aceito  
-**Data**: 2026-01-15
+**Data**: 2026-01-16  
+**Autor**: Marcelo Jr
+
+---
 
 ## Contexto
 
@@ -11,6 +14,8 @@ O serviço será consumido por outros microserviços da organização. Precisamo
 2. Permita auditoria granular (qual serviço fez qual operação)
 3. Seja simples de implementar e manter
 4. Escale para múltiplos consumidores
+
+---
 
 ## Decisão
 
@@ -42,6 +47,19 @@ SERVICE_KEYS="banking-router:sk_banking_...,ledger:sk_ledger_..."
 
 Se `SERVICE_KEYS` estiver vazio ou não configurado, o middleware permite todas as requisições. Isso facilita o desenvolvimento local.
 
+---
+
+## Alternativas Consideradas
+
+| Estratégia | Veredicto | Motivo |
+| ---------- | --------- | ------ |
+| OAuth2 / JWT (Keycloak) | ❌ Rejeitado | Complexidade alta de infraestrutura para o estágio atual |
+| Basic Auth | ❌ Rejeitado | Menos flexível para auditoria e rotação granular |
+| mTLS (Service Mesh) | ❌ Rejeitado | Complexidade operacional excessiva sem time de SRE dedicado |
+| **Service Keys** | ✅ **Escolhido** | Simples, auditável, fácil de rotacionar (redesploi ou configmap) |
+
+---
+
 ## Consequências
 
 ### Positivas
@@ -60,6 +78,8 @@ Se `SERVICE_KEYS` estiver vazio ou não configurado, o middleware permite todas 
 
 - Chaves armazenadas em Kubernetes Secrets (não em ConfigMap)
 - Futura integração com AWS Secrets Manager para rotação
+
+---
 
 ## Implementação
 

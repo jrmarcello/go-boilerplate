@@ -1,8 +1,16 @@
-# Decisão de Arquitetura: Estratégia de Configuração
+# ADR-003: Config Strategy
+
+**Status**: Aceito  
+**Data**: 2026-01-16  
+**Autor**: Marcelo Jr
+
+---
 
 ## Contexto
 
 A aplicação precisa ser configurável em múltiplos ambientes: **Desenvolvimento Local**, **Infraestrutura Docker** e **Produção (Kubernetes)**. Precisamos de uma estratégia unificada que evite duplicidade e mantenha a conformidade com o 12-Factor App.
+
+---
 
 ## Decisão
 
@@ -19,6 +27,18 @@ Adotamos **godotenv + pacote nativo `os`** como estratégia de configuração co
 | 🥈 Média | Arquivo `.env` | Desenvolvimento local |
 | 🥉 Baixa | Defaults no Código | Fallback seguro (`localhost`) |
 
+---
+
+## Alternativas Consideradas
+
+| Estratégia | Veredicto | Motivo |
+| ---------- | --------- | ------ |
+| Viper (spf13) | ❌ Rejeitado | Pesado (muitas deps transitivas), overkill apenas para envs |
+| Flags (cli) | ❌ Rejeitado | Verborragia no deploy (k8s args ficariam enormes) |
+| **Godotenv + os** | ✅ **Escolhido** | Simples, leve e segue 12-factor app nativamente |
+
+---
+
 ## Justificativa
 
 1. **Single Source of Truth (Local)**: O arquivo `.env` na raiz é consumido simultaneamente pelo Docker Compose, Go Application e Makefile.
@@ -26,17 +46,23 @@ Adotamos **godotenv + pacote nativo `os`** como estratégia de configuração co
 3. **Simplicidade (DX)**: O desenvolvedor precisa apenas criar um arquivo `.env`.
 4. **Leveza**: Sem dependências pesadas como Viper (~10 dependências transitivas).
 
+---
+
 ## Consequências
 
-- **Positivas**:
-  - Eliminamos arquivos duplicados (`docker/.env`, `config.yaml`).
-  - `make dev` e `make docker-up` funcionam em harmonia.
-  - Comportamento determinístico em produção.
-  - Binário menor (~3-5MB a menos).
+### Positivas
 
-- **Negativas**:
-  - Sem suporte nativo a múltiplos formatos (YAML, TOML, JSON).
-  - Sem hot reload de configuração.
+- Eliminamos arquivos duplicados (`docker/.env`, `config.yaml`).
+- `make dev` e `make docker-up` funcionam em harmonia.
+- Comportamento determinístico em produção.
+- Binário menor (~3-5MB a menos).
+
+### Negativas
+
+- Sem suporte nativo a múltiplos formatos (YAML, TOML, JSON).
+- Sem hot reload de configuração.
+
+---
 
 ## Implementação
 

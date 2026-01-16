@@ -1,8 +1,16 @@
-# Decisão de Arquitetura: Uso de ULID
+# ADR-006: ULID (Universally Unique Lexicographically Sortable Identifier)
+
+**Status**: Aceito  
+**Data**: 2026-01-16  
+**Autor**: Marcelo Jr
+
+---
 
 ## Contexto
 
 A escolha do formato de Identificador Único é crítica para sistemas distribuídos e bancos de dados. Precisamos de IDs que sejam únicos, performáticos e práticos de usar.
+
+---
 
 ## Decisão
 
@@ -17,6 +25,19 @@ Utilizar **ULID (Universally Unique Lexicographically Sortable Identifier)** par
    (48 bits)     (80 bits)
 ```
 
+---
+
+## Alternativas Consideradas
+
+| Estratégia | Veredicto | Motivo |
+| ---------- | --------- | ------ |
+| UUID v4 | ❌ Rejeitado | Completamente aleatório, causa fragmentação de índices B-Tree |
+| UUID v7 | ⚠️ Alternativa | Bom e ordenável, mas suporte de bibliotecas/drivers ainda amadurecendo |
+| Auto-increment (Integer) | ❌ Rejeitado | Expose business metrics, difícil de sharding/merge de DBs |
+| **ULID** | ✅ **Escolhido** | Ordenável, URL-safe (Base32), curto (26 chars) e maduro em Go |
+
+---
+
 ## Justificativa
 
 1. **Ordenação Lexicográfica**: ULIDs são ordenáveis por tempo, melhorando performance de inserção em índices B-Tree.
@@ -24,26 +45,22 @@ Utilizar **ULID (Universally Unique Lexicographically Sortable Identifier)** par
 3. **Compatibilidade**: 128-bit compatíveis com colunas `UUID` no Postgres.
 4. **Timestamp Embutido**: Permite saber quando o registro foi criado pelo ID.
 
+---
+
 ## Consequências
 
-- **Positivas**:
-  - Menor fragmentação de índices comparado a UUID v4.
-  - IDs mais curtos e legíveis em logs e URLs.
-  - Geração descentralizada (não precisa de sequência no DB).
+### Positivas
 
-- **Negativas**:
-  - Biblioteca adicional (`oklog/ulid`).
-  - Menos comum que UUID (curva de aprendizado para equipe).
+- Menor fragmentação de índices comparado a UUID v4.
+- IDs mais curtos e legíveis em logs e URLs.
+- Geração descentralizada (não precisa de sequência no DB).
 
-## Comparação
+### Negativas
 
-| Característica | UUID v4 | UUID v7 | ULID |
-| -------------- | ------- | ------- | ---- |
-| Ordenável | ❌ Não | ✅ Sim | ✅ Sim |
-| Colisão | Rara | Rara | Rara |
-| Tamanho (String) | 36 chars | 36 chars | 26 chars |
-| Indexação DB | Ruim | Ótima | Ótima |
-| URL Safe | ❌ Não | ❌ Não | ✅ Sim |
+- Biblioteca adicional (`oklog/ulid`).
+- Menos comum que UUID (curva de aprendizado para equipe).
+
+---
 
 ## Implementação
 

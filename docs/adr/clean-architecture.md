@@ -1,8 +1,16 @@
-# Decisão de Arquitetura: Clean Architecture
+# ADR-001: Clean Architecture
+
+**Status**: Aceito  
+**Data**: 2026-01-16  
+**Autor**: Marcelo Jr
+
+---
 
 ## Contexto
 
 Aplicações complexas tendem a se tornar difíceis de manter, testar e evoluir quando as regras de negócio estão acopladas a detalhes de implementação (frameworks, banco de dados, UI). Buscamos uma arquitetura que garanta longevidade ao projeto e facilite a manutenção.
+
+---
 
 ## Decisão
 
@@ -13,13 +21,17 @@ Adotamos a **Clean Architecture** proposta por Robert C. Martin, focando em seus
 3. **Casos de Uso**: Orquestram o fluxo de dados e aplicam regras de negócio específicas da aplicação.
 4. **Inversão de Dependência**: Camadas internas definem **interfaces**; camadas externas as implementam.
 
-### Camadas
+---
 
-| Camada | Responsabilidade | Exemplo |
-| -------- | ------------------ | --------- |
-| **Domain** | Entidades e Value Objects puros | `Entity`, `ID`, `Email` |
-| **Usecases** | Lógica de aplicação, DTOs, interfaces de repositório | `CreateUseCase`, `Repository` (interface) |
-| **Infrastructure** | Implementações concretas (DB, Web, Cache) | `PostgresRepository`, `GinHandler` |
+## Alternativas Consideradas
+
+| Estratégia | Veredicto | Motivo |
+| ---------- | --------- | ------ |
+| MVC (Layered) | ❌ Rejeitado | Tende a acoplar lógica de negócio em Controllers ou Models "gordos" |
+| Hexagonal (Ports & Adapters) | ⚠️ Alternativa | Muito similar à Clean, princípios compatíveis |
+| **Clean Architecture** | ✅ **Escolhido** | Definição mais rigorosa de fronteiras e regra de dependência |
+
+---
 
 ## Justificativa
 
@@ -28,18 +40,37 @@ Adotamos a **Clean Architecture** proposta por Robert C. Martin, focando em seus
 3. **Independência de Banco de Dados**: O DB é um detalhe. Podemos trocar Postgres por Mongo ou In-Memory sem tocar nas regras de negócio.
 4. **Independência de Interface**: A UI (Web, CLI, Mobile) pode mudar sem afetar o core.
 
+---
+
 ## Consequências
 
-- **Positivas**:
-  - Padronização do projeto.
-  - Testes unitários triviais (mocks fáceis).
-  - Evolução flexível (ex: começar com repositório em memória).
+### Positivas
 
-- **Negativas**:
-  - Setup inicial mais verboso (mais arquivos e camadas).
-  - Curva de aprendizado inicial para quem vem de MVC tradicional.
+- Padronização do projeto.
+- Testes unitários triviais (mocks fáceis).
+- Evolução flexível (ex: começar com repositório em memória).
+
+### Negativas
+
+- Setup inicial mais verboso (mais arquivos e camadas).
+- Curva de aprendizado inicial para quem vem de MVC tradicional.
+
+### Mitigações
+
+- Uso de boilerplate/template para reduzir setup inicial.
+- Documentação rica (este ADR e guias).
+
+---
 
 ## Implementação
+
+### Estrutura de Camadas
+
+| Camada | Responsabilidade | Exemplo |
+| ------ | ---------------- | ------- |
+| **Domain** | Entidades e Value Objects puros | `Entity`, `ID`, `Email` |
+| **Usecases** | Lógica de aplicação, DTOs, interfaces de repositório | `CreateUseCase`, `Repository` (interface) |
+| **Infrastructure** | Implementações concretas (DB, Web, Cache) | `PostgresRepository`, `GinHandler` |
 
 ### Estrutura de Pastas
 
