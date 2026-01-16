@@ -1,7 +1,7 @@
 # Go Microservice Boilerplate
 
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
-[![Architecture](https://img.shields.io/badge/Architecture-Clean-blueviolet)](docs/adr/clean-architecture.md)
+[![Architecture](https://img.shields.io/badge/Architecture-Clean-blueviolet)](docs/adr/001-clean-architecture.md)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](docker/)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-326CE5?logo=kubernetes)](deploy/)
 
@@ -158,12 +158,12 @@ make kind-logs      # Ver logs no Kind
 
 | ADR | Sobre |
 | --- | ----- |
-| [clean-architecture.md](docs/adr/clean-architecture.md) | Estrutura de camadas e DI |
-| [config-strategy.md](docs/adr/config-strategy.md) | godotenv + .env + Kubernetes |
-| [error-handling.md](docs/adr/error-handling.md) | Erros em camadas |
-| [migration-strategy.md](docs/adr/migration-strategy.md) | ArgoCD PreSync + binário separado |
-| [service-key-auth.md](docs/adr/service-key-auth.md) | Autenticação via Service Key |
-| [ulid.md](docs/adr/ulid.md) | Por que ULID ao invés de UUID |
+| [ADR-001: Clean Architecture](docs/adr/001-clean-architecture.md) | Estrutura de camadas e DI |
+| [ADR-002: ULID](docs/adr/002-ulid.md) | Por que ULID ao invés de UUID |
+| [ADR-003: Config Strategy](docs/adr/003-config-strategy.md) | godotenv + .env + Kubernetes |
+| [ADR-004: Error Handling](docs/adr/004-error-handling.md) | Erros em camadas |
+| [ADR-005: Service Key Auth](docs/adr/005-service-key-auth.md) | Autenticação via Service Key |
+| [ADR-006: Migration Strategy](docs/adr/006-migration-strategy.md) | ArgoCD PreSync + binário separado |
 
 ### Guias
 

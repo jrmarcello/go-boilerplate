@@ -170,12 +170,12 @@ make help          # Ver todos os comandos
 
 | Arquivo | Sobre |
 | ------- | ----- |
-| `docs/adr/clean-architecture.md` | Estrutura de camadas e DI |
-| `docs/adr/config-strategy.md` | godotenv + .env + K8s |
-| `docs/adr/error-handling.md` | Tratamento de erros em camadas |
-| `docs/adr/migration-strategy.md` | ArgoCD PreSync + binário separado |
-| `docs/adr/service-key-auth.md` | Autenticação via Service Key |
-| `docs/adr/ulid.md` | Por que ULID ao invés de UUID |
+| `docs/adr/001-clean-architecture.md` | Estrutura de camadas e DI |
+| `docs/adr/002-ulid.md` | Por que ULID ao invés de UUID |
+| `docs/adr/003-config-strategy.md` | godotenv + .env + K8s |
+| `docs/adr/004-error-handling.md` | Tratamento de erros em camadas |
+| `docs/adr/005-service-key-auth.md` | Autenticação via Service Key |
+| `docs/adr/006-migration-strategy.md` | ArgoCD PreSync + binário separado |
 
 ### Guias
 

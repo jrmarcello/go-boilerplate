@@ -1,4 +1,4 @@
-# ADR-006: ULID (Universally Unique Lexicographically Sortable Identifier)
+# ADR-002: ULID (Universally Unique Lexicographically Sortable Identifier)
 
 **Status**: Aceito  
 **Data**: 2026-01-16  

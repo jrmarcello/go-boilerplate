@@ -1,4 +1,4 @@
-# ADR-002: Estratégia de Execução de Migrations
+# ADR-006: Estratégia de Execução de Migrations
 
 **Status**: Aceito  
 **Data**: 2026-01-16  
