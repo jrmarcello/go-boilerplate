@@ -20,7 +20,7 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/telemetry"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/handler"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/router"
-	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity"
+	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example"
 )
 
 // Start inicializa a aplicação seguindo o padrão de composição:

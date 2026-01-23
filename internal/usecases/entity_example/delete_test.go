@@ -1,13 +1,13 @@
-package entity
+package entity_example
 
 import (
 	"context"
 	"errors"
 	"testing"
 
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity/vo"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity/dto"
+	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

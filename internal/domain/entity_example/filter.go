@@ -1,4 +1,4 @@
-package entity
+package entity_example
 
 // ListFilter contém os parâmetros para filtrar a listagem de entities.
 type ListFilter struct {

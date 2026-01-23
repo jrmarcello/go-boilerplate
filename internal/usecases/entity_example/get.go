@@ -1,13 +1,13 @@
-package entity
+package entity_example
 
 import (
 	"context"
 	"log/slog"
 	"time"
 
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity/vo"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity/dto"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity/interfaces"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/interfaces"
 )
 
 // GetUseCase implementa o caso de uso de buscar entity por ID.

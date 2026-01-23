@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity/vo"
+	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
 	"github.com/stretchr/testify/assert"
 )
 

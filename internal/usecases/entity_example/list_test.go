@@ -1,4 +1,4 @@
-package entity
+package entity_example
 
 import (
 	"context"
@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity/vo"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity/dto"
+	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -44,7 +44,7 @@ func TestListUseCase_Execute_Success(t *testing.T) {
 		Limit: 20,
 	}
 
-	mockRepo.On("List", mock.Anything, mock.AnythingOfType("entity.ListFilter")).Return(expectedResult, nil)
+	mockRepo.On("List", mock.Anything, mock.AnythingOfType("entity_example.ListFilter")).Return(expectedResult, nil)
 
 	uc := NewListUseCase(mockRepo)
 	input := dto.ListInput{Page: 1, Limit: 20}
@@ -82,7 +82,7 @@ func TestListUseCase_Execute_WithFilters(t *testing.T) {
 		Limit: 20,
 	}
 
-	mockRepo.On("List", mock.Anything, mock.AnythingOfType("entity.ListFilter")).Return(expectedResult, nil)
+	mockRepo.On("List", mock.Anything, mock.AnythingOfType("entity_example.ListFilter")).Return(expectedResult, nil)
 
 	uc := NewListUseCase(mockRepo)
 	input := dto.ListInput{
@@ -105,7 +105,7 @@ func TestListUseCase_Execute_WithFilters(t *testing.T) {
 func TestListUseCase_Execute_RepositoryError(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockRepository)
-	mockRepo.On("List", mock.Anything, mock.AnythingOfType("entity.ListFilter")).
+	mockRepo.On("List", mock.Anything, mock.AnythingOfType("entity_example.ListFilter")).
 		Return(nil, errors.New("database error"))
 
 	uc := NewListUseCase(mockRepo)
@@ -132,7 +132,7 @@ func TestListUseCase_Execute_EmptyResult(t *testing.T) {
 		Limit:    20,
 	}
 
-	mockRepo.On("List", mock.Anything, mock.AnythingOfType("entity.ListFilter")).Return(expectedResult, nil)
+	mockRepo.On("List", mock.Anything, mock.AnythingOfType("entity_example.ListFilter")).Return(expectedResult, nil)
 
 	uc := NewListUseCase(mockRepo)
 	input := dto.ListInput{Page: 1, Limit: 20}

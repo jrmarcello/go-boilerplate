@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/telemetry"
-	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity/dto"
+	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"

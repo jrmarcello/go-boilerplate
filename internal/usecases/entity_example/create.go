@@ -1,13 +1,13 @@
-package entity
+package entity_example
 
 import (
 	"context"
 	"time"
 
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity/vo"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity/dto"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity/interfaces"
+	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/interfaces"
 )
 
 // CreateUseCase implementa o caso de uso de criação de entity.

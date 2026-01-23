@@ -1,9 +1,9 @@
-package entity
+package entity_example
 
 import (
 	"testing"
 
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
 	"github.com/stretchr/testify/assert"
 )
 

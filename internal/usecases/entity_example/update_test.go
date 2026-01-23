@@ -1,4 +1,4 @@
-package entity
+package entity_example
 
 import (
 	"context"
@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity/vo"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity/dto"
+	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -29,7 +29,7 @@ func TestUpdateUseCase_Execute_Success(t *testing.T) {
 	}
 
 	mockRepo.On("FindByID", mock.Anything, id).Return(existingEntity, nil)
-	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*entity.Entity")).Return(nil)
+	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*entity_example.Entity")).Return(nil)
 
 	uc := NewUpdateUseCase(mockRepo, nil)
 	newName := "João Silva Updated"
@@ -142,7 +142,7 @@ func TestUpdateUseCase_Execute_CacheInvalidation(t *testing.T) {
 	}
 
 	mockRepo.On("FindByID", mock.Anything, id).Return(existingEntity, nil)
-	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*entity.Entity")).Return(nil)
+	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*entity_example.Entity")).Return(nil)
 	mockCache.On("Delete", mock.Anything, cacheKey).Return(nil)
 
 	uc := NewUpdateUseCase(mockRepo, mockCache)

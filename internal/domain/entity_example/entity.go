@@ -1,9 +1,9 @@
-package entity
+package entity_example
 
 import (
 	"time"
 
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
 )
 
 // Entity é a Entidade principal (Aggregate Root) do domínio.

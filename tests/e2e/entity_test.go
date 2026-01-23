@@ -15,7 +15,7 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/db/postgres/repository"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/handler"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/middleware"
-	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity"
+	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example"
 )
 
 // setupTestRouter configura o router para testes e2e
