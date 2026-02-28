@@ -126,15 +126,57 @@ if err := repo.Save(ctx, e); err != nil { return err }
 ### Injeção de Dependência
 
 ```go
-// ✅ Correto - recebe interface
-func NewCreateUseCase(repo interfaces.Repository) *CreateUseCase {
-    return &CreateUseCase{repo: repo}
+// ✅ Correto - recebe interface, dependências opcionais via builder
+func NewGetUseCase(repo interfaces.Repository) *GetUseCase {
+    return &GetUseCase{Repo: repo}
 }
+func (uc *GetUseCase) WithCache(cache interfaces.Cache) *GetUseCase {
+    uc.Cache = cache
+    return uc
+}
+// Uso: NewGetUseCase(repo).WithCache(cache)
 
 // ❌ Errado - instancia dependência internamente
 func NewCreateUseCase() *CreateUseCase {
     return &CreateUseCase{repo: postgres.NewRepository()}
 }
+```
+
+### Respostas da API
+
+Todas as respostas HTTP **devem** usar os helpers de `pkg/httputil`:
+
+```go
+// ✅ Correto - resposta padronizada
+httputil.SendSuccess(c, http.StatusOK, data)            // {"data": ...}
+httputil.SendSuccessWithMeta(c, http.StatusOK, data, meta, links) // {"data": ..., "meta": ..., "links": ...}
+httputil.SendError(c, http.StatusBadRequest, "invalid")  // {"errors": {"message": "invalid"}}
+
+// ❌ Errado - c.JSON direto
+c.JSON(http.StatusOK, data)
+c.JSON(http.StatusBadRequest, gin.H{"error": "invalid"})
+```
+
+### Pacotes Reutilizáveis (pkg/)
+
+O diretório `pkg/` contém pacotes **reutilizáveis entre serviços**:
+
+| Pacote | Uso |
+| ------ | --- |
+| `pkg/apperror` | Erros estruturados com código, mensagem e HTTP status |
+| `pkg/httputil` | Helpers de resposta HTTP padronizada |
+| `pkg/ctxkeys` | Chaves tipadas para context.Value |
+| `pkg/logutil` | Logging estruturado com propagação de contexto |
+| `pkg/telemetry` | Setup OpenTelemetry + HTTP metrics + DB pool metrics |
+| `pkg/cache` | Interface de cache + implementação Redis |
+| `pkg/database` | Conexão PostgreSQL com Writer/Reader cluster |
+
+```go
+// ✅ Correto - usar pkg/ para código reutilizável
+import "bitbucket.org/appmax-space/go-boilerplate/pkg/apperror"
+
+// ❌ Errado - usar internal para código que deveria ser reutilizável
+import "bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/cache"
 ```
 
 ---
@@ -176,12 +218,15 @@ make help          # Ver todos os comandos
 | `docs/adr/004-error-handling.md` | Tratamento de erros em camadas |
 | `docs/adr/005-service-key-auth.md` | Autenticação via Service Key |
 | `docs/adr/006-migration-strategy.md` | ArgoCD PreSync + binário separado |
+| `docs/adr/007-pkg-reusable-packages.md` | Pacotes reutilizáveis em pkg/ |
+| `docs/adr/008-api-response-format.md` | Formato padronizado de resposta HTTP |
 
 ### Guias
 
 | Arquivo | Sobre |
 | ------- | ----- |
 | `docs/guides/architecture.md` | Diagramas e visão geral |
+| `docs/guides/cache.md` | Cache com Redis e builder pattern |
 | `docs/guides/kubernetes.md` | Deploy e operação |
 
 ---

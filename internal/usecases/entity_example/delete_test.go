@@ -19,7 +19,7 @@ func TestDeleteUseCase_Execute_Success(t *testing.T) {
 
 	mockRepo.On("Delete", mock.Anything, id).Return(nil)
 
-	uc := NewDeleteUseCase(mockRepo, nil)
+	uc := NewDeleteUseCase(mockRepo)
 	input := dto.DeleteInput{ID: id.String()}
 
 	// Act
@@ -39,7 +39,7 @@ func TestDeleteUseCase_Execute_NotFound(t *testing.T) {
 	mockRepo.On("Delete", mock.Anything, mock.AnythingOfType("vo.ID")).
 		Return(entity.ErrEntityNotFound)
 
-	uc := NewDeleteUseCase(mockRepo, nil)
+	uc := NewDeleteUseCase(mockRepo)
 	input := dto.DeleteInput{ID: "01ARZ3NDEKTSV4RRFFQ69G5FAV"}
 
 	// Act
@@ -55,7 +55,7 @@ func TestDeleteUseCase_Execute_NotFound(t *testing.T) {
 func TestDeleteUseCase_Execute_InvalidID(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockRepository)
-	uc := NewDeleteUseCase(mockRepo, nil)
+	uc := NewDeleteUseCase(mockRepo)
 	input := dto.DeleteInput{ID: "invalid-id"}
 
 	// Act
@@ -77,7 +77,7 @@ func TestDeleteUseCase_Execute_CacheInvalidation(t *testing.T) {
 	mockRepo.On("Delete", mock.Anything, id).Return(nil)
 	mockCache.On("Delete", mock.Anything, cacheKey).Return(nil)
 
-	uc := NewDeleteUseCase(mockRepo, mockCache)
+	uc := NewDeleteUseCase(mockRepo).WithCache(mockCache)
 	input := dto.DeleteInput{ID: id.String()}
 
 	// Act
@@ -97,7 +97,7 @@ func TestDeleteUseCase_Execute_RepositoryError(t *testing.T) {
 	mockRepo.On("Delete", mock.Anything, mock.AnythingOfType("vo.ID")).
 		Return(errors.New("database error"))
 
-	uc := NewDeleteUseCase(mockRepo, nil)
+	uc := NewDeleteUseCase(mockRepo)
 	input := dto.DeleteInput{ID: "01ARZ3NDEKTSV4RRFFQ69G5FAV"}
 
 	// Act

@@ -17,11 +17,16 @@ type UpdateUseCase struct {
 }
 
 // NewUpdateUseCase cria uma nova instância do UpdateUseCase.
-func NewUpdateUseCase(repo interfaces.Repository, cache interfaces.Cache) *UpdateUseCase {
+func NewUpdateUseCase(repo interfaces.Repository) *UpdateUseCase {
 	return &UpdateUseCase{
-		Repo:  repo,
-		Cache: cache,
+		Repo: repo,
 	}
+}
+
+// WithCache sets an optional cache for the use case (builder pattern).
+func (uc *UpdateUseCase) WithCache(cache interfaces.Cache) *UpdateUseCase {
+	uc.Cache = cache
+	return uc
 }
 
 // Execute atualiza uma entity existente.

@@ -30,7 +30,7 @@ func TestGetUseCase_Execute_Success(t *testing.T) {
 
 	mockRepo.On("FindByID", mock.Anything, id).Return(expectedEntity, nil)
 
-	uc := NewGetUseCase(mockRepo, nil)
+	uc := NewGetUseCase(mockRepo)
 	input := dto.GetInput{ID: id.String()}
 
 	// Act
@@ -51,7 +51,7 @@ func TestGetUseCase_Execute_NotFound(t *testing.T) {
 	mockRepo.On("FindByID", mock.Anything, mock.AnythingOfType("vo.ID")).
 		Return(nil, entity.ErrEntityNotFound)
 
-	uc := NewGetUseCase(mockRepo, nil)
+	uc := NewGetUseCase(mockRepo)
 	input := dto.GetInput{ID: "01ARZ3NDEKTSV4RRFFQ69G5FAV"}
 
 	// Act
@@ -67,7 +67,7 @@ func TestGetUseCase_Execute_NotFound(t *testing.T) {
 func TestGetUseCase_Execute_InvalidID(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockRepository)
-	uc := NewGetUseCase(mockRepo, nil)
+	uc := NewGetUseCase(mockRepo)
 	input := dto.GetInput{ID: "invalid-id"}
 
 	// Act
@@ -102,7 +102,7 @@ func TestGetUseCase_Execute_CacheHit(t *testing.T) {
 		}).
 		Return(nil)
 
-	uc := NewGetUseCase(mockRepo, mockCache)
+	uc := NewGetUseCase(mockRepo).WithCache(mockCache)
 	input := dto.GetInput{ID: id}
 
 	// Act
@@ -148,7 +148,7 @@ func TestGetUseCase_Execute_CacheMiss_ThenSet(t *testing.T) {
 	mockCache.On("Set", mock.Anything, cacheKey, mock.AnythingOfType("*dto.GetOutput")).
 		Return(nil)
 
-	uc := NewGetUseCase(mockRepo, mockCache)
+	uc := NewGetUseCase(mockRepo).WithCache(mockCache)
 	input := dto.GetInput{ID: id.String()}
 
 	// Act
@@ -193,7 +193,7 @@ func TestGetUseCase_Execute_CacheSetError_StillReturnsData(t *testing.T) {
 	mockCache.On("Set", mock.Anything, cacheKey, mock.AnythingOfType("*dto.GetOutput")).
 		Return(errors.New("redis connection failed"))
 
-	uc := NewGetUseCase(mockRepo, mockCache)
+	uc := NewGetUseCase(mockRepo).WithCache(mockCache)
 	input := dto.GetInput{ID: id.String()}
 
 	// Act

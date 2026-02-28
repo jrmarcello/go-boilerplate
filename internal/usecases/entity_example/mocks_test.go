@@ -84,3 +84,8 @@ func (m *MockCache) Ping(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
+
+func (m *MockCache) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}

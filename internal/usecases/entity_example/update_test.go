@@ -31,7 +31,7 @@ func TestUpdateUseCase_Execute_Success(t *testing.T) {
 	mockRepo.On("FindByID", mock.Anything, id).Return(existingEntity, nil)
 	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*entity_example.Entity")).Return(nil)
 
-	uc := NewUpdateUseCase(mockRepo, nil)
+	uc := NewUpdateUseCase(mockRepo)
 	newName := "João Silva Updated"
 	input := dto.UpdateInput{
 		ID:   id.String(),
@@ -54,7 +54,7 @@ func TestUpdateUseCase_Execute_NotFound(t *testing.T) {
 	mockRepo.On("FindByID", mock.Anything, mock.AnythingOfType("vo.ID")).
 		Return(nil, entity.ErrEntityNotFound)
 
-	uc := NewUpdateUseCase(mockRepo, nil)
+	uc := NewUpdateUseCase(mockRepo)
 	newName := "Updated Name"
 	input := dto.UpdateInput{
 		ID:   "01ARZ3NDEKTSV4RRFFQ69G5FAV",
@@ -88,7 +88,7 @@ func TestUpdateUseCase_Execute_InvalidEmail(t *testing.T) {
 
 	mockRepo.On("FindByID", mock.Anything, id).Return(existingEntity, nil)
 
-	uc := NewUpdateUseCase(mockRepo, nil)
+	uc := NewUpdateUseCase(mockRepo)
 	invalidEmail := "invalid-email"
 	input := dto.UpdateInput{
 		ID:    id.String(),
@@ -108,7 +108,7 @@ func TestUpdateUseCase_Execute_InvalidEmail(t *testing.T) {
 func TestUpdateUseCase_Execute_InvalidID(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockRepository)
-	uc := NewUpdateUseCase(mockRepo, nil)
+	uc := NewUpdateUseCase(mockRepo)
 	newName := "Updated Name"
 	input := dto.UpdateInput{
 		ID:   "invalid-id",
@@ -145,7 +145,7 @@ func TestUpdateUseCase_Execute_CacheInvalidation(t *testing.T) {
 	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*entity_example.Entity")).Return(nil)
 	mockCache.On("Delete", mock.Anything, cacheKey).Return(nil)
 
-	uc := NewUpdateUseCase(mockRepo, mockCache)
+	uc := NewUpdateUseCase(mockRepo).WithCache(mockCache)
 	newName := "João Silva Updated"
 	input := dto.UpdateInput{
 		ID:   id.String(),

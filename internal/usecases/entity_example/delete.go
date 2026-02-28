@@ -17,11 +17,16 @@ type DeleteUseCase struct {
 }
 
 // NewDeleteUseCase cria uma nova instância do DeleteUseCase.
-func NewDeleteUseCase(repo interfaces.Repository, cache interfaces.Cache) *DeleteUseCase {
+func NewDeleteUseCase(repo interfaces.Repository) *DeleteUseCase {
 	return &DeleteUseCase{
-		Repo:  repo,
-		Cache: cache,
+		Repo: repo,
 	}
+}
+
+// WithCache sets an optional cache for the use case (builder pattern).
+func (uc *DeleteUseCase) WithCache(cache interfaces.Cache) *DeleteUseCase {
+	uc.Cache = cache
+	return uc
 }
 
 // Execute realiza soft delete de uma entity.

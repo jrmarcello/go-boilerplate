@@ -10,20 +10,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jmoiron/sqlx"
-
 	"bitbucket.org/appmax-space/go-boilerplate/config"
 	docs "bitbucket.org/appmax-space/go-boilerplate/docs"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/cache"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/db/postgres"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/db/postgres/repository"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/telemetry"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/handler"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/router"
 	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example"
+	pkgcache "bitbucket.org/appmax-space/go-boilerplate/pkg/cache"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/database"
+	pkgtelemetry "bitbucket.org/appmax-space/go-boilerplate/pkg/telemetry"
 )
 
-// Start inicializa a aplicação seguindo o padrão de composição:
+// Start initializes the application following the composition pattern:
 // Config → Logger → Telemetry → Database → Dependencies → Router → Server
 func Start(ctx context.Context, cfg *config.Config) error {
 	// 1. Logger
@@ -31,36 +29,49 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	slog.SetDefault(logger)
 
 	// 2. Telemetry (OpenTelemetry Traces + Metrics)
-	tp, err := telemetry.Setup(ctx, telemetry.Config{
+	tp, tpErr := pkgtelemetry.Setup(ctx, pkgtelemetry.Config{
 		ServiceName:  cfg.Otel.ServiceName,
 		CollectorURL: cfg.Otel.CollectorURL,
 		Enabled:      cfg.Otel.CollectorURL != "",
 	})
-	if err != nil {
-		return err
+	if tpErr != nil {
+		return tpErr
 	}
 	defer shutdownTelemetry(tp, logger)
 
-	// 3. Database
-	conn, err := postgres.NewPostgres(cfg.DB.DSN)
-	if err != nil {
-		return err
+	// 3. Database (Writer/Reader Cluster)
+	cluster, clusterErr := database.NewDBCluster(
+		database.Config{
+			DSN:             cfg.DB.DSN,
+			MaxOpenConns:    cfg.DB.MaxOpenConns,
+			MaxIdleConns:    cfg.DB.MaxIdleConns,
+			ConnMaxLifetime: cfg.DB.ConnMaxLifetime,
+		},
+		cfg.DB.ReaderConfig(),
+	)
+	if clusterErr != nil {
+		return clusterErr
 	}
-	defer conn.Close()
+	defer cluster.Close()
 
-	// 4. Dependencies (Dependency Injection)
-	deps := buildDependencies(conn, cfg)
+	// 4. Register DB Pool Metrics
+	if regErr := pkgtelemetry.RegisterDBPoolMetrics(ctx, cfg.Otel.ServiceName, cluster.Writer().DB, "writer"); regErr != nil {
+		slog.Warn("Failed to register DB pool metrics", "error", regErr)
+	}
+
+	// 5. Dependencies (Dependency Injection)
+	deps := buildDependencies(cluster, cfg, tp.HTTPMetrics())
 
 	// Swagger Dynamic Config
 	docs.SwaggerInfo.Host = "localhost:" + cfg.Server.Port
 
-	// 5. Router
+	// 6. Router
 	r := router.Setup(deps)
 
-	// 6. Server
+	// 7. Server
 	srv := newServer(cfg.Server.Port, r)
 
-	// 7. Graceful Shutdown
+	// 8. Graceful Shutdown
 	return runWithGracefulShutdown(srv, logger)
 }
 
@@ -68,42 +79,44 @@ func setupLogger() *slog.Logger {
 	return slog.New(slog.NewJSONHandler(os.Stdout, nil))
 }
 
-func shutdownTelemetry(tp *telemetry.Provider, logger *slog.Logger) {
-	if err := tp.Shutdown(context.Background()); err != nil {
-		logger.Error("failed to shutdown telemetry", "error", err)
+func shutdownTelemetry(tp *pkgtelemetry.Provider, logger *slog.Logger) {
+	if shutdownErr := tp.Shutdown(context.Background()); shutdownErr != nil {
+		logger.Error("failed to shutdown telemetry", "error", shutdownErr)
 	}
 }
 
-func buildDependencies(conn *sqlx.DB, cfg *config.Config) router.Dependencies {
-	// Repositories
-	repo := &repository.EntityRepository{DB: conn}
+func buildDependencies(cluster *database.DBCluster, cfg *config.Config, httpMetrics *pkgtelemetry.HTTPMetrics) router.Dependencies {
+	// Repositories (use writer for mutations, reader for queries)
+	repo := &repository.EntityRepository{DB: cluster.Writer()}
 
 	// Cache (optional)
-	redisClient, err := cache.NewRedisClient(cache.Config{
+	redisClient, cacheErr := pkgcache.NewRedisClient(pkgcache.RedisConfig{
 		URL:     cfg.Redis.URL,
 		TTL:     cfg.Redis.TTL,
 		Enabled: cfg.Redis.Enabled,
 	})
-	if err != nil {
-		slog.Warn("Redis cache disabled", "error", err)
+	if cacheErr != nil {
+		slog.Warn("Redis cache disabled", "error", cacheErr)
 	}
 
-	// Use Cases (with optional cache)
+	// Use Cases (with optional cache via builder pattern)
 	createUC := entityuc.NewCreateUseCase(repo)
-	getUC := entityuc.NewGetUseCase(repo, redisClient)
+	getUC := entityuc.NewGetUseCase(repo).WithCache(redisClient)
 	listUC := entityuc.NewListUseCase(repo)
-	updateUC := entityuc.NewUpdateUseCase(repo, redisClient)
-	deleteUC := entityuc.NewDeleteUseCase(repo, redisClient)
+	updateUC := entityuc.NewUpdateUseCase(repo).WithCache(redisClient)
+	deleteUC := entityuc.NewDeleteUseCase(repo).WithCache(redisClient)
 
 	// Handlers
 	entityHandler := handler.NewEntityHandler(createUC, getUC, listUC, updateUC, deleteUC)
 
 	return router.Dependencies{
-		DB:            conn,
+		DB:            cluster.Writer(),
 		EntityHandler: entityHandler,
+		HTTPMetrics:   httpMetrics,
 		Config: router.Config{
-			ServiceName: cfg.Otel.ServiceName,
-			ServiceKeys: cfg.Auth.ServiceKeys,
+			ServiceName:    cfg.Otel.ServiceName,
+			ServiceKeys:    cfg.Auth.ServiceKeys,
+			SwaggerEnabled: cfg.Swagger.Enabled,
 		},
 	}
 }

@@ -1,7 +1,6 @@
 package interfaces
 
-import sharedinterfaces "bitbucket.org/appmax-space/go-boilerplate/internal/domain/shared/interfaces"
+import pkgcache "bitbucket.org/appmax-space/go-boilerplate/pkg/cache"
 
-// Cache é um alias para a interface compartilhada de cache.
-// Mantido para backward compatibility com código existente.
-type Cache = sharedinterfaces.Cache
+// Cache is an alias for the reusable cache interface from pkg/cache.
+type Cache = pkgcache.Cache

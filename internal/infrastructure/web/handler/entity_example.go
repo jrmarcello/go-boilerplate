@@ -6,6 +6,7 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/telemetry"
 	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -55,12 +56,9 @@ func (h *EntityHandler) Create(c *gin.Context) {
 	defer span.End()
 
 	var req dto.CreateInput
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		span.SetStatus(codes.Error, "invalid request body")
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid request body",
-			"details": err.Error(),
-		})
+		httputil.SendError(c, http.StatusBadRequest, "invalid request body: "+bindErr.Error())
 		return
 	}
 
@@ -69,9 +67,9 @@ func (h *EntityHandler) Create(c *gin.Context) {
 		attribute.String("entity.email", req.Email),
 	)
 
-	res, err := h.CreateUC.Execute(ctx, req)
-	if err != nil {
-		HandleError(c, span, err)
+	res, execErr := h.CreateUC.Execute(ctx, req)
+	if execErr != nil {
+		HandleError(c, span, execErr)
 		return
 	}
 
@@ -82,7 +80,7 @@ func (h *EntityHandler) Create(c *gin.Context) {
 		m.RecordCreate(ctx)
 	}
 
-	c.JSON(http.StatusCreated, res)
+	httputil.SendSuccess(c, http.StatusCreated, res)
 }
 
 // GetByID godoc
@@ -102,13 +100,13 @@ func (h *EntityHandler) GetByID(c *gin.Context) {
 	id := c.Param("id")
 	span.SetAttributes(attribute.String("entity.id", id))
 
-	res, err := h.GetUC.Execute(ctx, dto.GetInput{ID: id})
-	if err != nil {
-		HandleError(c, span, err)
+	res, execErr := h.GetUC.Execute(ctx, dto.GetInput{ID: id})
+	if execErr != nil {
+		HandleError(c, span, execErr)
 		return
 	}
 
-	c.JSON(http.StatusOK, res)
+	httputil.SendSuccess(c, http.StatusOK, res)
 }
 
 // List godoc
@@ -129,8 +127,8 @@ func (h *EntityHandler) List(c *gin.Context) {
 	defer span.End()
 
 	var req dto.ListInput
-	if err := c.ShouldBindQuery(&req); err != nil {
-		HandleError(c, span, err)
+	if bindErr := c.ShouldBindQuery(&req); bindErr != nil {
+		HandleError(c, span, bindErr)
 		return
 	}
 
@@ -139,14 +137,14 @@ func (h *EntityHandler) List(c *gin.Context) {
 		attribute.Int("filter.limit", req.Limit),
 	)
 
-	res, err := h.ListUC.Execute(ctx, req)
-	if err != nil {
-		HandleError(c, span, err)
+	res, execErr := h.ListUC.Execute(ctx, req)
+	if execErr != nil {
+		HandleError(c, span, execErr)
 		return
 	}
 
 	span.SetAttributes(attribute.Int("result.total", res.Pagination.Total))
-	c.JSON(http.StatusOK, res)
+	httputil.SendSuccessWithMeta(c, http.StatusOK, res.Data, res.Pagination, nil)
 }
 
 // Update godoc
@@ -170,19 +168,16 @@ func (h *EntityHandler) Update(c *gin.Context) {
 	span.SetAttributes(attribute.String("entity.id", id))
 
 	var req dto.UpdateInput
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		span.SetStatus(codes.Error, "invalid request body")
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid request body",
-			"details": err.Error(),
-		})
+		httputil.SendError(c, http.StatusBadRequest, "invalid request body: "+bindErr.Error())
 		return
 	}
 	req.ID = id // ID vem da URL
 
-	res, err := h.UpdateUC.Execute(ctx, req)
-	if err != nil {
-		HandleError(c, span, err)
+	res, execErr := h.UpdateUC.Execute(ctx, req)
+	if execErr != nil {
+		HandleError(c, span, execErr)
 		return
 	}
 
@@ -191,7 +186,7 @@ func (h *EntityHandler) Update(c *gin.Context) {
 		m.RecordUpdate(ctx)
 	}
 
-	c.JSON(http.StatusOK, res)
+	httputil.SendSuccess(c, http.StatusOK, res)
 }
 
 // Delete godoc
@@ -211,9 +206,9 @@ func (h *EntityHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 	span.SetAttributes(attribute.String("entity.id", id))
 
-	res, err := h.DeleteUC.Execute(ctx, dto.DeleteInput{ID: id})
-	if err != nil {
-		HandleError(c, span, err)
+	res, execErr := h.DeleteUC.Execute(ctx, dto.DeleteInput{ID: id})
+	if execErr != nil {
+		HandleError(c, span, execErr)
 		return
 	}
 
@@ -222,5 +217,5 @@ func (h *EntityHandler) Delete(c *gin.Context) {
 		m.RecordDelete(ctx)
 	}
 
-	c.JSON(http.StatusOK, res)
+	httputil.SendSuccess(c, http.StatusOK, res)
 }

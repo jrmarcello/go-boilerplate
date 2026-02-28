@@ -20,7 +20,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/redis"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/cache"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/cache"
 )
 
 var testDB *sqlx.DB
@@ -134,7 +134,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Criar cliente Redis para testes
-	testCache, err = cache.NewRedisClient(cache.Config{
+	testCache, err = cache.NewRedisClient(cache.RedisConfig{
 		URL:     redisConnStr,
 		TTL:     "5m",
 		Enabled: true,

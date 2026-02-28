@@ -13,18 +13,22 @@ import (
 
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/handler"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/middleware"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/telemetry"
 )
 
 // Config contém configurações do router
 type Config struct {
-	ServiceName string
-	ServiceKeys string // "service1:key1,service2:key2"
+	ServiceName    string
+	ServiceKeys    string // "service1:key1,service2:key2"
+	SwaggerEnabled bool
 }
 
 // Dependencies agrupa todas as dependências necessárias para o router
 type Dependencies struct {
 	DB            *sqlx.DB
 	EntityHandler *handler.EntityHandler
+	HTTPMetrics   *telemetry.HTTPMetrics
 	Config        Config
 }
 
@@ -37,6 +41,9 @@ func Setup(deps Dependencies) *gin.Engine {
 
 	// OpenTelemetry (must be before Logger to populate trace_id)
 	r.Use(otelgin.Middleware(deps.Config.ServiceName))
+
+	// HTTP Metrics (count, duration, Apdex)
+	r.Use(middleware.Metrics(deps.HTTPMetrics))
 
 	// Custom structured logger
 	r.Use(middleware.Logger())
@@ -55,7 +62,9 @@ func Setup(deps Dependencies) *gin.Engine {
 	r.Use(middleware.Idempotency(middleware.DefaultIdempotencyConfig()))
 
 	// Public routes (no auth required)
-	registerSwaggerRoutes(r)
+	if deps.Config.SwaggerEnabled {
+		registerSwaggerRoutes(r)
+	}
 	registerHealthRoutes(r, deps)
 
 	// Protected routes (auth required if SERVICE_KEYS is configured)
@@ -77,20 +86,17 @@ func registerSwaggerRoutes(r *gin.Engine) {
 // registerHealthRoutes registra rotas de health check
 func registerHealthRoutes(r *gin.Engine, deps Dependencies) {
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
+		httputil.SendSuccess(c, http.StatusOK, gin.H{
 			"status":  "ok",
 			"service": deps.Config.ServiceName,
 		})
 	})
 
 	r.GET("/ready", func(c *gin.Context) {
-		if err := deps.DB.Ping(); err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"status": "not ready",
-				"error":  "database connection failed",
-			})
+		if pingErr := deps.DB.Ping(); pingErr != nil {
+			httputil.SendError(c, http.StatusServiceUnavailable, "database connection failed")
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"status": "ready"})
+		httputil.SendSuccess(c, http.StatusOK, gin.H{"status": "ready"})
 	})
 }

@@ -114,7 +114,7 @@ test: ## 🧪 Roda todos os testes
 	go test ./... -v
 
 test-unit: ## 🧪 Roda apenas testes unitários
-	go test ./internal/... -v
+	go test ./pkg/... ./config/... ./internal/... -v
 
 test-e2e: ## 🧪 Roda testes e2e (requer Docker)
 	go test ./tests/e2e/... -v -count=1

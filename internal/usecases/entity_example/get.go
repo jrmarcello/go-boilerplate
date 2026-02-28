@@ -13,15 +13,20 @@ import (
 // GetUseCase implementa o caso de uso de buscar entity por ID.
 type GetUseCase struct {
 	Repo  interfaces.Repository
-	Cache interfaces.Cache // opcional, pode ser nil
+	Cache interfaces.Cache // optional, set via WithCache()
 }
 
 // NewGetUseCase cria uma nova instância do GetUseCase.
-func NewGetUseCase(repo interfaces.Repository, cache interfaces.Cache) *GetUseCase {
+func NewGetUseCase(repo interfaces.Repository) *GetUseCase {
 	return &GetUseCase{
-		Repo:  repo,
-		Cache: cache,
+		Repo: repo,
 	}
+}
+
+// WithCache sets an optional cache for the use case (builder pattern).
+func (uc *GetUseCase) WithCache(cache interfaces.Cache) *GetUseCase {
+	uc.Cache = cache
+	return uc
 }
 
 // Execute busca uma entity pelo ID.

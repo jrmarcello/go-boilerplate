@@ -16,6 +16,7 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/handler"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/middleware"
 	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil"
 )
 
 // setupTestRouter configura o router para testes e2e
@@ -28,10 +29,10 @@ func setupTestRouter() *gin.Engine {
 
 	// Use Cases (with cache)
 	createUC := entityuc.NewCreateUseCase(repo)
-	getUC := entityuc.NewGetUseCase(repo, cache)
+	getUC := entityuc.NewGetUseCase(repo).WithCache(cache)
 	listUC := entityuc.NewListUseCase(repo)
-	updateUC := entityuc.NewUpdateUseCase(repo, cache)
-	deleteUC := entityuc.NewDeleteUseCase(repo, cache)
+	updateUC := entityuc.NewUpdateUseCase(repo).WithCache(cache)
+	deleteUC := entityuc.NewDeleteUseCase(repo).WithCache(cache)
 
 	h := handler.NewEntityHandler(createUC, getUC, listUC, updateUC, deleteUC)
 
@@ -40,18 +41,15 @@ func setupTestRouter() *gin.Engine {
 
 	// Public routes
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		httputil.SendSuccess(c, http.StatusOK, gin.H{"status": "ok"})
 	})
 
 	r.GET("/ready", func(c *gin.Context) {
-		if err := db.Ping(); err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"status": "not ready",
-				"error":  "database connection failed",
-			})
+		if pingErr := db.Ping(); pingErr != nil {
+			httputil.SendError(c, http.StatusServiceUnavailable, "database connection failed")
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"status": "ready"})
+		httputil.SendSuccess(c, http.StatusOK, gin.H{"status": "ready"})
 	})
 
 	// CRUD Routes (without auth for backward compatibility)
@@ -73,10 +71,10 @@ func setupTestRouterWithAuth() *gin.Engine {
 	repo := &repository.EntityRepository{DB: db}
 
 	createUC := entityuc.NewCreateUseCase(repo)
-	getUC := entityuc.NewGetUseCase(repo, cache)
+	getUC := entityuc.NewGetUseCase(repo).WithCache(cache)
 	listUC := entityuc.NewListUseCase(repo)
-	updateUC := entityuc.NewUpdateUseCase(repo, cache)
-	deleteUC := entityuc.NewDeleteUseCase(repo, cache)
+	updateUC := entityuc.NewUpdateUseCase(repo).WithCache(cache)
+	deleteUC := entityuc.NewDeleteUseCase(repo).WithCache(cache)
 
 	h := handler.NewEntityHandler(createUC, getUC, listUC, updateUC, deleteUC)
 
@@ -92,7 +90,7 @@ func setupTestRouterWithAuth() *gin.Engine {
 
 	// Public routes
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		httputil.SendSuccess(c, http.StatusOK, gin.H{"status": "ok"})
 	})
 
 	// Protected routes
@@ -111,6 +109,18 @@ func setupTestRouterWithAuth() *gin.Engine {
 func addAuthHeaders(req *http.Request) {
 	req.Header.Set("X-Service-Name", "test-service")
 	req.Header.Set("X-Service-Key", "sk_test_service_key_12345")
+}
+
+// extractData is a helper that parses the standard API response {"data": ...}
+// and returns the inner data as a map.
+func extractData(t *testing.T, body []byte) map[string]interface{} {
+	t.Helper()
+	var envelope map[string]interface{}
+	parseErr := json.Unmarshal(body, &envelope)
+	require.NoError(t, parseErr)
+	data, ok := envelope["data"].(map[string]interface{})
+	require.True(t, ok, "expected 'data' key with object value, got: %s", string(body))
+	return data
 }
 
 // =============================================================================
@@ -134,17 +144,15 @@ func TestE2E_CreateEntity_Success(t *testing.T) {
 
 	assert.Equal(t, http.StatusCreated, w.Code)
 
-	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	require.NoError(t, err)
+	response := extractData(t, w.Body.Bytes())
 
 	assert.NotEmpty(t, response["id"])
 	assert.NotEmpty(t, response["created_at"])
 
 	// Verificar no banco de dados
 	var count int
-	err = GetTestDB().Get(&count, "SELECT COUNT(*) FROM entities WHERE email = $1", "test@example.com")
-	require.NoError(t, err)
+	dbErr := GetTestDB().Get(&count, "SELECT COUNT(*) FROM entities WHERE email = $1", "test@example.com")
+	require.NoError(t, dbErr)
 	assert.Equal(t, 1, count)
 }
 
@@ -167,16 +175,15 @@ func TestE2E_EntityFullCycle(t *testing.T) {
 	var created map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &created)
 	require.NoError(t, err)
-	id := created["id"].(string)
+	createdData := created["data"].(map[string]interface{})
+	id := createdData["id"].(string)
 
 	// 2. Get By ID
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest("GET", "/entities/"+id, nil)
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
-	var fetched map[string]interface{}
-	err = json.Unmarshal(w.Body.Bytes(), &fetched)
-	require.NoError(t, err)
+	fetched := extractData(t, w.Body.Bytes())
 	assert.Equal(t, "Cycle Test", fetched["name"])
 
 	// 3. Update
@@ -193,8 +200,7 @@ func TestE2E_EntityFullCycle(t *testing.T) {
 	req = httptest.NewRequest("GET", "/entities/"+id, nil)
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
-	err = json.Unmarshal(w.Body.Bytes(), &fetched)
-	require.NoError(t, err)
+	fetched = extractData(t, w.Body.Bytes())
 	assert.Equal(t, "Cycle Update", fetched["name"])
 
 	// 5. List
@@ -216,8 +222,7 @@ func TestE2E_EntityFullCycle(t *testing.T) {
 	// Soft delete pode retornar 200 com active=false ou 404, depende da implementação
 	// Vamos verificar se ainda existe mas está inativo
 	if w.Code == http.StatusOK {
-		err = json.Unmarshal(w.Body.Bytes(), &fetched)
-		require.NoError(t, err)
+		fetched = extractData(t, w.Body.Bytes())
 		assert.False(t, fetched["active"].(bool), "Entity should be inactive after delete")
 	}
 }
@@ -241,7 +246,7 @@ func TestE2E_CreateEntity_InvalidEmail(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), "INVALID_EMAIL")
+	assert.Contains(t, w.Body.String(), "Email inválido")
 }
 
 func TestE2E_CreateEntity_EmptyRequest(t *testing.T) {
@@ -313,7 +318,8 @@ func TestE2E_UpdateEntity_InvalidEmail(t *testing.T) {
 	var created map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &created)
 	require.NoError(t, err)
-	id := created["id"].(string)
+	createdData := created["data"].(map[string]interface{})
+	id := createdData["id"].(string)
 
 	// 2. Update with invalid email
 	update := map[string]string{"email": "invalid-email"}
@@ -352,9 +358,7 @@ func TestE2E_HealthCheck(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	require.NoError(t, err)
+	response := extractData(t, w.Body.Bytes())
 	assert.Equal(t, "ok", response["status"])
 }
 
@@ -368,9 +372,7 @@ func TestE2E_ReadinessProbe(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	require.NoError(t, err)
+	response := extractData(t, w.Body.Bytes())
 	assert.Equal(t, "ready", response["status"])
 }
 
@@ -466,7 +468,7 @@ func TestE2E_ListEntities_Pagination(t *testing.T) {
 	require.NoError(t, err)
 
 	data := response["data"].([]interface{})
-	pagination := response["pagination"].(map[string]interface{})
+	pagination := response["meta"].(map[string]interface{})
 
 	assert.Len(t, data, 2)
 	assert.Equal(t, float64(5), pagination["total"])
@@ -497,7 +499,8 @@ func TestE2E_CacheBehavior(t *testing.T) {
 	var created map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &created)
 	require.NoError(t, err)
-	id := created["id"].(string)
+	createdData := created["data"].(map[string]interface{})
+	id := createdData["id"].(string)
 
 	// 2. First GET - should be cache miss, fetches from DB
 	start1 := time.Now()
@@ -507,9 +510,7 @@ func TestE2E_CacheBehavior(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	duration1 := time.Since(start1)
 
-	var fetched1 map[string]interface{}
-	err = json.Unmarshal(w.Body.Bytes(), &fetched1)
-	require.NoError(t, err)
+	fetched1 := extractData(t, w.Body.Bytes())
 	assert.Equal(t, "Cache Test Entity", fetched1["name"])
 
 	// 3. Second GET - should be cache hit (typically faster)
@@ -520,9 +521,7 @@ func TestE2E_CacheBehavior(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	duration2 := time.Since(start2)
 
-	var fetched2 map[string]interface{}
-	err = json.Unmarshal(w.Body.Bytes(), &fetched2)
-	require.NoError(t, err)
+	fetched2 := extractData(t, w.Body.Bytes())
 	assert.Equal(t, "Cache Test Entity", fetched2["name"])
 
 	// Log performance (cache hit should be similar or faster)
@@ -544,9 +543,7 @@ func TestE2E_CacheBehavior(t *testing.T) {
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
 
-	var fetched3 map[string]interface{}
-	err = json.Unmarshal(w.Body.Bytes(), &fetched3)
-	require.NoError(t, err)
+	fetched3 := extractData(t, w.Body.Bytes())
 	assert.Equal(t, "Updated Cache Entity", fetched3["name"], "Cache should be invalidated after update")
 }
 
