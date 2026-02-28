@@ -27,11 +27,13 @@ make help           # See all available make targets
 ```
 
 Run a single test file or function:
+
 ```bash
 go test ./internal/usecases/entity_example/ -run TestCreateUseCase -v
 ```
 
 Generate Swagger docs (required before CI lint passes):
+
 ```bash
 swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
 ```
@@ -83,6 +85,26 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
 ## CI Pipeline (Bitbucket)
 
 PRs run: `swag init` -> `golangci-lint run` -> `go test ./internal/...` with coverage. Branch pushes to `develop`/`main` build Docker image, push to ECR, and update Kustomize image tags.
+
+## Agent Toolkit (`.agent/`)
+
+This project has a comprehensive AI agent toolkit in `.agent/`. **Read `.agent/ARCHITECTURE.md` for the full index.** Before starting any task, check if there is a relevant workflow, skill, or agent definition.
+
+### Key resources
+
+- **Rules**: `.agent/rules/RULES.md` — Governance rules, request classification, agent routing
+- **Workflows**: `.agent/workflows/` — Step-by-step guides for common tasks (debug, enhance, deploy, test, plan, brainstorm, orchestrate, status)
+- **Skills**: `.agent/skills/` — Reusable knowledge modules (go-patterns, clean-code, api-patterns, testing-patterns, database-design, architecture, etc.)
+- **Agents**: `.agent/agents/` — Specialized agent definitions (backend-specialist, test-engineer, debugger, database-architect, etc.)
+- **Scripts**: `.agent/scripts/checklist.py` (quality gate), `.agent/scripts/verify_all.py` (full verification suite)
+
+### How to use
+
+1. For feature work → read `.agent/workflows/enhance.md`
+2. For debugging → read `.agent/workflows/debug.md`
+3. For testing → read `.agent/workflows/test.md`
+4. For deployment → read `.agent/workflows/deploy.md`
+5. Load relevant skills as needed (e.g., `go-patterns`, `api-patterns`)
 
 ## Agent Workflow
 
