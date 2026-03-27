@@ -147,7 +147,14 @@ func (r *EntityRepository) List(ctx context.Context, filter entity.ListFilter) (
 		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
 
-	reader := r.cluster.Reader()
+	// Wrap COUNT + SELECT in a read-only transaction for consistent pagination.
+	// Without a transaction, rows could be inserted/deleted between the two queries,
+	// causing total count to be inconsistent with the returned data.
+	tx, txErr := r.cluster.Reader().BeginTxx(ctx, &sql.TxOptions{ReadOnly: true})
+	if txErr != nil {
+		return nil, fmt.Errorf("beginning read transaction: %w", txErr)
+	}
+	defer func() { _ = tx.Rollback() }()
 
 	// Count query
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM entities %s", whereClause)
@@ -157,9 +164,9 @@ func (r *EntityRepository) List(ctx context.Context, filter entity.ListFilter) (
 	if namedErr != nil {
 		return nil, namedErr
 	}
-	countQuery = reader.Rebind(countQuery)
+	countQuery = tx.Rebind(countQuery)
 
-	countErr := reader.GetContext(ctx, &total, countQuery, countArgs...)
+	countErr := tx.GetContext(ctx, &total, countQuery, countArgs...)
 	if countErr != nil {
 		return nil, countErr
 	}
@@ -180,12 +187,19 @@ func (r *EntityRepository) List(ctx context.Context, filter entity.ListFilter) (
 	if dataNamedErr != nil {
 		return nil, dataNamedErr
 	}
-	dataQuery = reader.Rebind(dataQuery)
+	dataQuery = tx.Rebind(dataQuery)
 
 	var dbModels []entityDB
-	selectErr := reader.SelectContext(ctx, &dbModels, dataQuery, dataArgs...)
+	selectErr := tx.SelectContext(ctx, &dbModels, dataQuery, dataArgs...)
 	if selectErr != nil {
 		return nil, selectErr
+	}
+
+	// Commit the read-only transaction (also valid to let defer Rollback handle it,
+	// but explicit commit is cleaner for read-only transactions).
+	commitErr := tx.Commit()
+	if commitErr != nil {
+		return nil, fmt.Errorf("committing read transaction: %w", commitErr)
 	}
 
 	// Convert to domain entities

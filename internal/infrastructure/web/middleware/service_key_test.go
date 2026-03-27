@@ -123,7 +123,7 @@ func TestServiceKeyAuth_InvalidKey(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
-	assert.Contains(t, w.Body.String(), "INVALID_SERVICE_KEY")
+	assert.Contains(t, w.Body.String(), "unauthorized")
 }
 
 func TestServiceKeyAuth_MissingHeaders(t *testing.T) {
@@ -145,7 +145,7 @@ func TestServiceKeyAuth_MissingHeaders(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
-	assert.Contains(t, w.Body.String(), "MISSING_AUTH_HEADERS")
+	assert.Contains(t, w.Body.String(), "unauthorized")
 }
 
 func TestServiceKeyAuth_UnknownService(t *testing.T) {
@@ -168,5 +168,5 @@ func TestServiceKeyAuth_UnknownService(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
-	assert.Contains(t, w.Body.String(), "UNKNOWN_SERVICE")
+	assert.Contains(t, w.Body.String(), "unauthorized")
 }

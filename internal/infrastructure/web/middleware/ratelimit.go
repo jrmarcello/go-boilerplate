@@ -1,10 +1,14 @@
 package middleware
 
 import (
+	"context"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
 
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/logutil"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/time/rate"
 )
@@ -56,17 +60,28 @@ func (i *IPRateLimiter) getLimiter(ip string) *rate.Limiter {
 	return limiter
 }
 
-// RateLimit retorna um middleware de rate limiting por IP
-func RateLimit(config RateLimiterConfig) gin.HandlerFunc {
+// RateLimit retorna um middleware de rate limiting por IP.
+// The ctx parameter controls the lifetime of the background cleanup goroutine;
+// pass the server's shutdown context so the goroutine stops on graceful shutdown.
+func RateLimit(ctx context.Context, config RateLimiterConfig) gin.HandlerFunc {
 	limiter := NewIPRateLimiter(config)
 
-	// Goroutine para limpar limiters antigos periodicamente
+	// Goroutine para limpar limiters antigos periodicamente.
+	// Exits when ctx is canceled (graceful shutdown).
 	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+
 		for {
-			time.Sleep(5 * time.Minute)
-			limiter.mu.Lock()
-			limiter.limiters = make(map[string]*rate.Limiter)
-			limiter.mu.Unlock()
+			select {
+			case <-ctx.Done():
+				slog.Info("rate limiter cleanup goroutine stopped")
+				return
+			case <-ticker.C:
+				limiter.mu.Lock()
+				limiter.limiters = make(map[string]*rate.Limiter)
+				limiter.mu.Unlock()
+			}
 		}
 	}()
 
@@ -75,10 +90,16 @@ func RateLimit(config RateLimiterConfig) gin.HandlerFunc {
 		l := limiter.getLimiter(ip)
 
 		if !l.Allow() {
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":       "rate limit exceeded",
-				"retry_after": "1s",
-			})
+			// logutil extracts LogContext from request context when available
+			// (e.g., request_id, trace_id injected by upstream middleware),
+			// providing richer structured logs for rate-limit events.
+			logutil.LogWarn(c.Request.Context(), "rate limit exceeded",
+				"ip", ip,
+				"requests_per_second", config.RequestsPerSecond,
+				"burst_size", config.BurstSize,
+			)
+
+			httputil.SendError(c, http.StatusTooManyRequests, "rate limit exceeded")
 			c.Abort()
 			return
 		}

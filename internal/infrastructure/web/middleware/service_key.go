@@ -1,12 +1,14 @@
 package middleware
 
 import (
+	"crypto/subtle"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/ctxkeys"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil"
 )
 
 // ServiceKeyConfig contém a configuração de autenticação por Service Key.
@@ -79,28 +81,22 @@ func ServiceKeyAuth(config ServiceKeyConfig) gin.HandlerFunc {
 
 		// Validate headers present
 		if serviceName == "" || serviceKey == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "Missing authentication headers",
-				"code":  "MISSING_AUTH_HEADERS",
-			})
+			httputil.SendError(c, http.StatusUnauthorized, "unauthorized")
+			c.Abort()
 			return
 		}
 
 		// Validar chave do serviço
 		expectedKey, exists := config.Keys[serviceName]
 		if !exists {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "Unknown service",
-				"code":  "UNKNOWN_SERVICE",
-			})
+			httputil.SendError(c, http.StatusUnauthorized, "unauthorized")
+			c.Abort()
 			return
 		}
 
-		if expectedKey != serviceKey {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "Invalid service key",
-				"code":  "INVALID_SERVICE_KEY",
-			})
+		if subtle.ConstantTimeCompare([]byte(expectedKey), []byte(serviceKey)) != 1 {
+			httputil.SendError(c, http.StatusUnauthorized, "unauthorized")
+			c.Abort()
 			return
 		}
 

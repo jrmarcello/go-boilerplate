@@ -35,7 +35,7 @@ func setupTestRouter() *gin.Engine {
 	updateUC := entityuc.NewUpdateUseCase(repo).WithCache(cache)
 	deleteUC := entityuc.NewDeleteUseCase(repo).WithCache(cache)
 
-	h := handler.NewEntityHandler(createUC, getUC, listUC, updateUC, deleteUC)
+	h := handler.NewEntityHandler(createUC, getUC, listUC, updateUC, deleteUC, nil)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -77,7 +77,7 @@ func setupTestRouterWithAuth() *gin.Engine {
 	updateUC := entityuc.NewUpdateUseCase(repo).WithCache(cache)
 	deleteUC := entityuc.NewDeleteUseCase(repo).WithCache(cache)
 
-	h := handler.NewEntityHandler(createUC, getUC, listUC, updateUC, deleteUC)
+	h := handler.NewEntityHandler(createUC, getUC, listUC, updateUC, deleteUC, nil)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -391,7 +391,7 @@ func TestE2E_ServiceKeyAuth_Errors(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
-		assert.Contains(t, w.Body.String(), "MISSING_AUTH_HEADERS")
+		assert.Contains(t, w.Body.String(), "unauthorized")
 	})
 
 	t.Run("invalid key returns 401", func(t *testing.T) {
@@ -402,7 +402,7 @@ func TestE2E_ServiceKeyAuth_Errors(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
-		assert.Contains(t, w.Body.String(), "INVALID_SERVICE_KEY")
+		assert.Contains(t, w.Body.String(), "unauthorized")
 	})
 
 	t.Run("unknown service returns 401", func(t *testing.T) {
@@ -413,7 +413,7 @@ func TestE2E_ServiceKeyAuth_Errors(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
-		assert.Contains(t, w.Body.String(), "UNKNOWN_SERVICE")
+		assert.Contains(t, w.Body.String(), "unauthorized")
 	})
 
 	t.Run("valid key allows access", func(t *testing.T) {

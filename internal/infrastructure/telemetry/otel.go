@@ -19,6 +19,7 @@ type Config struct {
 	ServiceName  string
 	CollectorURL string
 	Enabled      bool
+	Insecure     bool
 }
 
 // Provider encapsula os providers de tracing e métricas
@@ -46,19 +47,19 @@ func Setup(ctx context.Context, cfg Config) (*Provider, error) {
 	}
 
 	// Traces
-	tp, err := setupTracer(ctx, cfg.CollectorURL, res)
+	tp, err := setupTracer(ctx, cfg.CollectorURL, cfg.Insecure, res)
 	if err != nil {
 		return nil, err
 	}
 
 	// Metrics
-	mp, err := setupMeter(ctx, cfg.CollectorURL, res)
+	mp, err := setupMeter(ctx, cfg.CollectorURL, cfg.Insecure, res)
 	if err != nil {
 		return nil, err
 	}
 
 	// Business Metrics
-	metrics, err := setupMetrics(cfg.ServiceName)
+	metrics, err := NewMetrics(otel.Meter(cfg.ServiceName))
 	if err != nil {
 		return nil, err
 	}
@@ -71,11 +72,15 @@ func Setup(ctx context.Context, cfg Config) (*Provider, error) {
 	return &Provider{tp: tp, mp: mp, metrics: metrics}, nil
 }
 
-func setupTracer(ctx context.Context, collectorURL string, res *resource.Resource) (*sdktrace.TracerProvider, error) {
-	exporter, err := otlptracegrpc.New(ctx,
+func setupTracer(ctx context.Context, collectorURL string, insecure bool, res *resource.Resource) (*sdktrace.TracerProvider, error) {
+	traceOpts := []otlptracegrpc.Option{
 		otlptracegrpc.WithEndpoint(collectorURL),
-		otlptracegrpc.WithInsecure(),
-	)
+	}
+	if insecure {
+		traceOpts = append(traceOpts, otlptracegrpc.WithInsecure())
+	}
+
+	exporter, err := otlptracegrpc.New(ctx, traceOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -94,11 +99,15 @@ func setupTracer(ctx context.Context, collectorURL string, res *resource.Resourc
 	return tp, nil
 }
 
-func setupMeter(ctx context.Context, collectorURL string, res *resource.Resource) (*sdkmetric.MeterProvider, error) {
-	exporter, err := otlpmetricgrpc.New(ctx,
+func setupMeter(ctx context.Context, collectorURL string, insecure bool, res *resource.Resource) (*sdkmetric.MeterProvider, error) {
+	metricOpts := []otlpmetricgrpc.Option{
 		otlpmetricgrpc.WithEndpoint(collectorURL),
-		otlpmetricgrpc.WithInsecure(),
-	)
+	}
+	if insecure {
+		metricOpts = append(metricOpts, otlpmetricgrpc.WithInsecure())
+	}
+
+	exporter, err := otlpmetricgrpc.New(ctx, metricOpts...)
 	if err != nil {
 		return nil, err
 	}

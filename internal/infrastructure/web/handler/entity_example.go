@@ -15,12 +15,19 @@ import (
 
 // EntityHandler agrupa todos os handlers relacionados a Entity.
 // Segue o padrão de injeção de dependência (UseCases injetados via struct).
+//
+// Design choice: this handler depends on concrete use case types for simplicity.
+// In a boilerplate/template context, adding handler-level interfaces for each use case
+// adds ceremony without clear benefit — handlers are validated via E2E tests, not unit
+// tests with mocked use cases. Teams needing handler-level unit tests should define
+// interfaces (e.g., Creator, Getter) and accept them here instead.
 type EntityHandler struct {
 	CreateUC *entityuc.CreateUseCase
 	GetUC    *entityuc.GetUseCase
 	ListUC   *entityuc.ListUseCase
 	UpdateUC *entityuc.UpdateUseCase
 	DeleteUC *entityuc.DeleteUseCase
+	Metrics  *telemetry.Metrics
 }
 
 // NewEntityHandler cria um novo EntityHandler com todos os use cases.
@@ -30,6 +37,7 @@ func NewEntityHandler(
 	listUC *entityuc.ListUseCase,
 	updateUC *entityuc.UpdateUseCase,
 	deleteUC *entityuc.DeleteUseCase,
+	metrics *telemetry.Metrics,
 ) *EntityHandler {
 	return &EntityHandler{
 		CreateUC: createUC,
@@ -37,6 +45,7 @@ func NewEntityHandler(
 		ListUC:   listUC,
 		UpdateUC: updateUC,
 		DeleteUC: deleteUC,
+		Metrics:  metrics,
 	}
 }
 
@@ -76,8 +85,8 @@ func (h *EntityHandler) Create(c *gin.Context) {
 	span.SetAttributes(attribute.String("entity.id", res.ID))
 
 	// Record metric
-	if m := telemetry.GetMetrics(); m != nil {
-		m.RecordCreate(ctx)
+	if h.Metrics != nil {
+		h.Metrics.RecordCreate(ctx)
 	}
 
 	httputil.SendSuccess(c, http.StatusCreated, res)
@@ -182,8 +191,8 @@ func (h *EntityHandler) Update(c *gin.Context) {
 	}
 
 	// Record metric
-	if m := telemetry.GetMetrics(); m != nil {
-		m.RecordUpdate(ctx)
+	if h.Metrics != nil {
+		h.Metrics.RecordUpdate(ctx)
 	}
 
 	httputil.SendSuccess(c, http.StatusOK, res)
@@ -213,8 +222,8 @@ func (h *EntityHandler) Delete(c *gin.Context) {
 	}
 
 	// Record metric
-	if m := telemetry.GetMetrics(); m != nil {
-		m.RecordDelete(ctx)
+	if h.Metrics != nil {
+		h.Metrics.RecordDelete(ctx)
 	}
 
 	httputil.SendSuccess(c, http.StatusOK, res)

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
 
@@ -16,6 +17,7 @@ func RegisterDBPoolMetrics(ctx context.Context, serviceName string, db *sql.DB, 
 	}
 
 	meter := otel.Meter(serviceName)
+	poolAttr := metric.WithAttributes(attribute.String("db.pool.name", poolName))
 
 	_, openErr := meter.Int64ObservableGauge(
 		"db_pool_open_connections",
@@ -23,7 +25,7 @@ func RegisterDBPoolMetrics(ctx context.Context, serviceName string, db *sql.DB, 
 		metric.WithUnit("{connection}"),
 		metric.WithInt64Callback(func(_ context.Context, o metric.Int64Observer) error {
 			stats := db.Stats()
-			o.Observe(int64(stats.OpenConnections))
+			o.Observe(int64(stats.OpenConnections), poolAttr)
 			return nil
 		}),
 	)
@@ -37,7 +39,7 @@ func RegisterDBPoolMetrics(ctx context.Context, serviceName string, db *sql.DB, 
 		metric.WithUnit("{connection}"),
 		metric.WithInt64Callback(func(_ context.Context, o metric.Int64Observer) error {
 			stats := db.Stats()
-			o.Observe(int64(stats.InUse))
+			o.Observe(int64(stats.InUse), poolAttr)
 			return nil
 		}),
 	)
@@ -51,7 +53,7 @@ func RegisterDBPoolMetrics(ctx context.Context, serviceName string, db *sql.DB, 
 		metric.WithUnit("{connection}"),
 		metric.WithInt64Callback(func(_ context.Context, o metric.Int64Observer) error {
 			stats := db.Stats()
-			o.Observe(int64(stats.Idle))
+			o.Observe(int64(stats.Idle), poolAttr)
 			return nil
 		}),
 	)
@@ -65,7 +67,7 @@ func RegisterDBPoolMetrics(ctx context.Context, serviceName string, db *sql.DB, 
 		metric.WithUnit("{connection}"),
 		metric.WithInt64Callback(func(_ context.Context, o metric.Int64Observer) error {
 			stats := db.Stats()
-			o.Observe(int64(stats.MaxOpenConnections))
+			o.Observe(int64(stats.MaxOpenConnections), poolAttr)
 			return nil
 		}),
 	)
@@ -79,7 +81,7 @@ func RegisterDBPoolMetrics(ctx context.Context, serviceName string, db *sql.DB, 
 		metric.WithUnit("{connection}"),
 		metric.WithInt64Callback(func(_ context.Context, o metric.Int64Observer) error {
 			stats := db.Stats()
-			o.Observe(stats.WaitCount)
+			o.Observe(stats.WaitCount, poolAttr)
 			return nil
 		}),
 	)

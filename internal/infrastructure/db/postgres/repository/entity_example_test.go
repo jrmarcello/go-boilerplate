@@ -347,6 +347,8 @@ func TestEntityRepository_List(t *testing.T) {
 	testID := vo.NewID()
 
 	t.Run("success with results", func(t *testing.T) {
+		mock.ExpectBegin()
+
 		countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
 		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM entities").
 			WillReturnRows(countRows)
@@ -355,6 +357,8 @@ func TestEntityRepository_List(t *testing.T) {
 			AddRow(testID.String(), "Test Entity", "test@example.com", true, now, now)
 		mock.ExpectQuery("SELECT .+ FROM entities").
 			WillReturnRows(dataRows)
+
+		mock.ExpectCommit()
 
 		filter := entity.ListFilter{Page: 1, Limit: 20}
 		result, listErr := repo.List(context.Background(), filter)
@@ -371,6 +375,8 @@ func TestEntityRepository_List(t *testing.T) {
 	})
 
 	t.Run("empty result", func(t *testing.T) {
+		mock.ExpectBegin()
+
 		countRows := sqlmock.NewRows([]string{"count"}).AddRow(0)
 		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM entities").
 			WillReturnRows(countRows)
@@ -378,6 +384,8 @@ func TestEntityRepository_List(t *testing.T) {
 		dataRows := sqlmock.NewRows([]string{"id", "name", "email", "active", "created_at", "updated_at"})
 		mock.ExpectQuery("SELECT .+ FROM entities").
 			WillReturnRows(dataRows)
+
+		mock.ExpectCommit()
 
 		filter := entity.ListFilter{Page: 1, Limit: 20}
 		result, listErr := repo.List(context.Background(), filter)
@@ -390,6 +398,8 @@ func TestEntityRepository_List(t *testing.T) {
 	})
 
 	t.Run("with name filter", func(t *testing.T) {
+		mock.ExpectBegin()
+
 		countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
 		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM entities WHERE name ILIKE").
 			WillReturnRows(countRows)
@@ -398,6 +408,8 @@ func TestEntityRepository_List(t *testing.T) {
 			AddRow(testID.String(), "Test Entity", "test@example.com", true, now, now)
 		mock.ExpectQuery("SELECT .+ FROM entities.+WHERE name ILIKE").
 			WillReturnRows(dataRows)
+
+		mock.ExpectCommit()
 
 		filter := entity.ListFilter{Page: 1, Limit: 20, Name: "Test"}
 		result, listErr := repo.List(context.Background(), filter)
@@ -410,6 +422,8 @@ func TestEntityRepository_List(t *testing.T) {
 	})
 
 	t.Run("with email filter", func(t *testing.T) {
+		mock.ExpectBegin()
+
 		countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
 		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM entities WHERE email ILIKE").
 			WillReturnRows(countRows)
@@ -418,6 +432,8 @@ func TestEntityRepository_List(t *testing.T) {
 			AddRow(testID.String(), "Test Entity", "test@example.com", true, now, now)
 		mock.ExpectQuery("SELECT .+ FROM entities.+WHERE email ILIKE").
 			WillReturnRows(dataRows)
+
+		mock.ExpectCommit()
 
 		filter := entity.ListFilter{Page: 1, Limit: 20, Email: "test@"}
 		result, listErr := repo.List(context.Background(), filter)
@@ -430,6 +446,8 @@ func TestEntityRepository_List(t *testing.T) {
 	})
 
 	t.Run("with active only filter", func(t *testing.T) {
+		mock.ExpectBegin()
+
 		countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
 		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM entities WHERE active = true").
 			WillReturnRows(countRows)
@@ -438,6 +456,8 @@ func TestEntityRepository_List(t *testing.T) {
 			AddRow(testID.String(), "Active Entity", "active@example.com", true, now, now)
 		mock.ExpectQuery("SELECT .+ FROM entities.+WHERE active = true").
 			WillReturnRows(dataRows)
+
+		mock.ExpectCommit()
 
 		filter := entity.ListFilter{Page: 1, Limit: 20, ActiveOnly: true}
 		result, listErr := repo.List(context.Background(), filter)
@@ -449,9 +469,25 @@ func TestEntityRepository_List(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
+	t.Run("transaction begin error", func(t *testing.T) {
+		mock.ExpectBegin().WillReturnError(sql.ErrConnDone)
+
+		filter := entity.ListFilter{Page: 1, Limit: 20}
+		result, listErr := repo.List(context.Background(), filter)
+
+		assert.Nil(t, result)
+		assert.Error(t, listErr)
+		assert.Contains(t, listErr.Error(), "beginning read transaction")
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
 	t.Run("database error on count query", func(t *testing.T) {
+		mock.ExpectBegin()
+
 		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM entities").
 			WillReturnError(sql.ErrConnDone)
+
+		mock.ExpectRollback()
 
 		filter := entity.ListFilter{Page: 1, Limit: 20}
 		result, listErr := repo.List(context.Background(), filter)
@@ -463,12 +499,16 @@ func TestEntityRepository_List(t *testing.T) {
 	})
 
 	t.Run("database error on data query", func(t *testing.T) {
+		mock.ExpectBegin()
+
 		countRows := sqlmock.NewRows([]string{"count"}).AddRow(5)
 		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM entities").
 			WillReturnRows(countRows)
 
 		mock.ExpectQuery("SELECT .+ FROM entities").
 			WillReturnError(sql.ErrConnDone)
+
+		mock.ExpectRollback()
 
 		filter := entity.ListFilter{Page: 1, Limit: 20}
 		result, listErr := repo.List(context.Background(), filter)

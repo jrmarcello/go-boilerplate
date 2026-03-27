@@ -11,7 +11,7 @@ data:
   DB_HOST: "postgres-service"
   DB_PORT: "5432"
   DB_NAME: "entities"
-  DB_SSLMODE: "disable"
+  DB_SSLMODE: "require"
   DB_MAX_OPEN_CONNS: "25"
   DB_MAX_IDLE_CONNS: "10"
   DB_CONN_MAX_LIFETIME: "5m"

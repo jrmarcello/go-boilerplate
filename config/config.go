@@ -100,6 +100,7 @@ func (c *DBConfig) GetReaderDSN() string {
 type OtelConfig struct {
 	ServiceName  string
 	CollectorURL string
+	Insecure     bool
 }
 
 type RedisConfig struct {
@@ -153,6 +154,7 @@ func Load() (*Config, error) {
 		Otel: OtelConfig{
 			ServiceName:  getEnv("OTEL_SERVICE_NAME", "entity-service"),
 			CollectorURL: getEnv("OTEL_COLLECTOR_URL", ""),
+			Insecure:     getEnvBool("OTEL_INSECURE", true),
 		},
 		Redis: RedisConfig{
 			URL:     getEnv("REDIS_URL", "redis://localhost:6379"),
@@ -163,7 +165,7 @@ func Load() (*Config, error) {
 			ServiceKeys: getEnv("SERVICE_KEYS", ""),
 		},
 		Swagger: SwaggerConfig{
-			Enabled: getEnvBool("SWAGGER_ENABLED", true),
+			Enabled: getEnvBool("SWAGGER_ENABLED", false),
 		},
 	}, nil
 }

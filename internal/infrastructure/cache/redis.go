@@ -55,7 +55,7 @@ func NewRedisClient(cfg Config) (*RedisClient, error) {
 	}
 
 	slog.Info("Redis cache initialized",
-		"url", cfg.URL,
+		"addr", opts.Addr,
 		"ttl", ttl,
 	)
 

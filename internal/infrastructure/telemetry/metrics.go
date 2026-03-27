@@ -3,7 +3,7 @@ package telemetry
 import (
 	"context"
 
-	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
 
@@ -18,17 +18,8 @@ type Metrics struct {
 	OperationDuration metric.Float64Histogram
 }
 
-var globalMetrics *Metrics
-
-// GetMetrics retorna a instância global de métricas
-func GetMetrics() *Metrics {
-	return globalMetrics
-}
-
-// setupMetrics inicializa as métricas de negócio
-func setupMetrics(serviceName string) (*Metrics, error) {
-	meter := otel.Meter(serviceName)
-
+// NewMetrics creates business metrics instruments using the provided meter.
+func NewMetrics(meter metric.Meter) (*Metrics, error) {
 	entitiesCreated, err := meter.Int64Counter(
 		"entities_created_total",
 		metric.WithDescription("Total number of entities created"),
@@ -65,15 +56,12 @@ func setupMetrics(serviceName string) (*Metrics, error) {
 		return nil, err
 	}
 
-	m := &Metrics{
+	return &Metrics{
 		EntitiesCreated:   entitiesCreated,
 		EntitiesUpdated:   entitiesUpdated,
 		EntitiesDeleted:   entitiesDeleted,
 		OperationDuration: operationDuration,
-	}
-
-	globalMetrics = m
-	return m, nil
+	}, nil
 }
 
 // RecordCreate registra uma criação de pessoa
@@ -100,6 +88,8 @@ func (m *Metrics) RecordDelete(ctx context.Context) {
 // RecordDuration registra a duração de uma operação
 func (m *Metrics) RecordDuration(ctx context.Context, durationSeconds float64, operation string) {
 	if m != nil && m.OperationDuration != nil {
-		m.OperationDuration.Record(ctx, durationSeconds)
+		m.OperationDuration.Record(ctx, durationSeconds,
+			metric.WithAttributes(attribute.String("operation", operation)),
+		)
 	}
 }

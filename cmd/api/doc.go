@@ -12,7 +12,12 @@ package main
 // @host      localhost:8080
 // @BasePath  /
 
-// @securityDefinitions.basic  BasicAuth
+// @securityDefinitions.apikey ServiceName
+// @in header
+// @name X-Service-Name
+// @securityDefinitions.apikey ServiceKey
+// @in header
+// @name X-Service-Key
 
 // @externalDocs.description  OpenAPI
 // @externalDocs.url          https://swagger.io/resources/open-api/

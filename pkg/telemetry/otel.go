@@ -19,6 +19,7 @@ type Config struct {
 	ServiceName  string
 	CollectorURL string
 	Enabled      bool
+	Insecure     bool
 }
 
 // Provider encapsulates tracing and metrics providers.
@@ -47,13 +48,13 @@ func Setup(ctx context.Context, cfg Config) (*Provider, error) {
 	}
 
 	// Traces
-	tp, tpErr := setupTracer(ctx, cfg.CollectorURL, res)
+	tp, tpErr := setupTracer(ctx, cfg.CollectorURL, cfg.Insecure, res)
 	if tpErr != nil {
 		return nil, tpErr
 	}
 
 	// Metrics
-	mp, mpErr := setupMeter(ctx, cfg.CollectorURL, res)
+	mp, mpErr := setupMeter(ctx, cfg.CollectorURL, cfg.Insecure, res)
 	if mpErr != nil {
 		return nil, mpErr
 	}
@@ -72,11 +73,15 @@ func Setup(ctx context.Context, cfg Config) (*Provider, error) {
 	return &Provider{tp: tp, mp: mp, httpMetrics: httpMetrics}, nil
 }
 
-func setupTracer(ctx context.Context, collectorURL string, res *resource.Resource) (*sdktrace.TracerProvider, error) {
-	exporter, exporterErr := otlptracegrpc.New(ctx,
+func setupTracer(ctx context.Context, collectorURL string, insecure bool, res *resource.Resource) (*sdktrace.TracerProvider, error) {
+	traceOpts := []otlptracegrpc.Option{
 		otlptracegrpc.WithEndpoint(collectorURL),
-		otlptracegrpc.WithInsecure(),
-	)
+	}
+	if insecure {
+		traceOpts = append(traceOpts, otlptracegrpc.WithInsecure())
+	}
+
+	exporter, exporterErr := otlptracegrpc.New(ctx, traceOpts...)
 	if exporterErr != nil {
 		return nil, exporterErr
 	}
@@ -95,11 +100,15 @@ func setupTracer(ctx context.Context, collectorURL string, res *resource.Resourc
 	return tp, nil
 }
 
-func setupMeter(ctx context.Context, collectorURL string, res *resource.Resource) (*sdkmetric.MeterProvider, error) {
-	exporter, exporterErr := otlpmetricgrpc.New(ctx,
+func setupMeter(ctx context.Context, collectorURL string, insecure bool, res *resource.Resource) (*sdkmetric.MeterProvider, error) {
+	metricOpts := []otlpmetricgrpc.Option{
 		otlpmetricgrpc.WithEndpoint(collectorURL),
-		otlpmetricgrpc.WithInsecure(),
-	)
+	}
+	if insecure {
+		metricOpts = append(metricOpts, otlpmetricgrpc.WithInsecure())
+	}
+
+	exporter, exporterErr := otlpmetricgrpc.New(ctx, metricOpts...)
 	if exporterErr != nil {
 		return nil, exporterErr
 	}

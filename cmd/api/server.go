@@ -13,6 +13,7 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/config"
 	docs "bitbucket.org/appmax-space/go-boilerplate/docs"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/db/postgres/repository"
+	infratelemetry "bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/telemetry"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/handler"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/router"
 	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example"
@@ -20,6 +21,7 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/database"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/idempotency"
 	pkgtelemetry "bitbucket.org/appmax-space/go-boilerplate/pkg/telemetry"
+	"go.opentelemetry.io/otel"
 )
 
 // Start initializes the application following the composition pattern:
@@ -34,6 +36,7 @@ func Start(ctx context.Context, cfg *config.Config) error {
 		ServiceName:  cfg.Otel.ServiceName,
 		CollectorURL: cfg.Otel.CollectorURL,
 		Enabled:      cfg.Otel.CollectorURL != "",
+		Insecure:     cfg.Otel.Insecure,
 	})
 	if tpErr != nil {
 		return tpErr
@@ -71,19 +74,25 @@ func Start(ctx context.Context, cfg *config.Config) error {
 		slog.Warn("Failed to register DB pool metrics", "error", regErr)
 	}
 
-	// 5. Dependencies (Dependency Injection)
-	deps := buildDependencies(cluster, cfg, tp.HTTPMetrics())
+	// 5. Business Metrics (injected into handlers, not global)
+	businessMetrics, metricsErr := infratelemetry.NewMetrics(otel.Meter(cfg.Otel.ServiceName))
+	if metricsErr != nil {
+		slog.Warn("Failed to create business metrics", "error", metricsErr)
+	}
+
+	// 6. Dependencies (Dependency Injection)
+	deps := buildDependencies(cluster, cfg, tp.HTTPMetrics(), businessMetrics)
 
 	// Swagger Dynamic Config
 	docs.SwaggerInfo.Host = "localhost:" + cfg.Server.Port
 
-	// 6. Router
+	// 7. Router
 	r := router.Setup(deps)
 
-	// 7. Server
+	// 8. Server
 	srv := newServer(cfg.Server.Port, r)
 
-	// 8. Graceful Shutdown
+	// 9. Graceful Shutdown
 	return runWithGracefulShutdown(srv, logger)
 }
 
@@ -97,7 +106,7 @@ func shutdownTelemetry(tp *pkgtelemetry.Provider, logger *slog.Logger) {
 	}
 }
 
-func buildDependencies(cluster *database.DBCluster, cfg *config.Config, httpMetrics *pkgtelemetry.HTTPMetrics) router.Dependencies {
+func buildDependencies(cluster *database.DBCluster, cfg *config.Config, httpMetrics *pkgtelemetry.HTTPMetrics, businessMetrics *infratelemetry.Metrics) router.Dependencies {
 	// Repositories (cluster handles Writer/Reader routing internally)
 	repo := repository.NewEntityRepository(cluster)
 
@@ -125,7 +134,7 @@ func buildDependencies(cluster *database.DBCluster, cfg *config.Config, httpMetr
 	}
 
 	// Handlers
-	entityHandler := handler.NewEntityHandler(createUC, getUC, listUC, updateUC, deleteUC)
+	entityHandler := handler.NewEntityHandler(createUC, getUC, listUC, updateUC, deleteUC, businessMetrics)
 
 	return router.Dependencies{
 		DB:               cluster.Writer(),
@@ -152,19 +161,25 @@ func newServer(port string, handler http.Handler) *http.Server {
 }
 
 func runWithGracefulShutdown(srv *http.Server, logger *slog.Logger) error {
-	// Start server in goroutine
+	// Error channel to capture server startup failures without os.Exit in goroutine
+	errCh := make(chan error, 1)
 	go func() {
 		logger.Info("Starting server", "port", srv.Addr)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("server failed", "error", err)
-			os.Exit(1)
+		if listenErr := srv.ListenAndServe(); listenErr != nil && !errors.Is(listenErr, http.ErrServerClosed) {
+			errCh <- listenErr
 		}
 	}()
 
-	// Wait for interrupt signal
+	// Wait for interrupt signal or server error
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+
+	select {
+	case listenErr := <-errCh:
+		return listenErr
+	case <-quit:
+		// proceed to graceful shutdown
+	}
 
 	logger.Info("shutting down server...")
 
@@ -172,8 +187,8 @@ func runWithGracefulShutdown(srv *http.Server, logger *slog.Logger) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		return err
+	if shutdownErr := srv.Shutdown(shutdownCtx); shutdownErr != nil {
+		return shutdownErr
 	}
 
 	logger.Info("server exited properly")
