@@ -26,6 +26,7 @@ type AuthConfig struct {
 
 type ServerConfig struct {
 	Port string
+	Env  string
 }
 
 // DBConfig contém a configuração do banco de dados.
@@ -111,6 +112,7 @@ type RedisConfig struct {
 
 type SwaggerConfig struct {
 	Enabled bool
+	Host    string
 }
 
 // Load configura a aplicação lendo do ambiente.
@@ -125,6 +127,7 @@ func Load() (*Config, error) {
 	return &Config{
 		Server: ServerConfig{
 			Port: getEnv("SERVER_PORT", "8080"),
+			Env:  getEnv("APP_ENV", "development"),
 		},
 		DB: DBConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -166,6 +169,7 @@ func Load() (*Config, error) {
 		},
 		Swagger: SwaggerConfig{
 			Enabled: getEnvBool("SWAGGER_ENABLED", false),
+			Host:    getEnv("SWAGGER_HOST", ""),
 		},
 	}, nil
 }
@@ -213,13 +217,4 @@ func getEnvDuration(key string, fallback time.Duration) time.Duration {
 		return parsed
 	}
 	return fallback
-}
-
-// GetRedisTTL retorna o TTL do Redis como time.Duration.
-func (c *Config) GetRedisTTL() time.Duration {
-	d, parseErr := time.ParseDuration(c.Redis.TTL)
-	if parseErr != nil {
-		return 5 * time.Minute
-	}
-	return d
 }

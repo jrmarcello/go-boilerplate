@@ -69,9 +69,20 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	}
 	defer cluster.Close()
 
+	// SSL mode warning for non-development environments
+	if cfg.DB.SSLMode == "disable" && cfg.Server.Env != "development" {
+		slog.Warn("database connection using sslmode=disable in non-development environment")
+	}
+
 	// 4. Register DB Pool Metrics
 	if regErr := pkgtelemetry.RegisterDBPoolMetrics(ctx, cfg.Otel.ServiceName, cluster.Writer().DB, "writer"); regErr != nil {
 		slog.Warn("Failed to register DB pool metrics", "error", regErr)
+	}
+
+	if cluster.HasSeparateReader() {
+		if regErr := pkgtelemetry.RegisterDBPoolMetrics(ctx, cfg.Otel.ServiceName, cluster.Reader().DB, "reader"); regErr != nil {
+			slog.Warn("Failed to register reader DB pool metrics", "error", regErr)
+		}
 	}
 
 	// 5. Business Metrics (injected into handlers, not global)
@@ -84,7 +95,11 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	deps := buildDependencies(cluster, cfg, tp.HTTPMetrics(), businessMetrics)
 
 	// Swagger Dynamic Config
-	docs.SwaggerInfo.Host = "localhost:" + cfg.Server.Port
+	if cfg.Swagger.Host != "" {
+		docs.SwaggerInfo.Host = cfg.Swagger.Host
+	} else {
+		docs.SwaggerInfo.Host = "localhost:" + cfg.Server.Port
+	}
 
 	// 7. Router
 	r := router.Setup(deps)

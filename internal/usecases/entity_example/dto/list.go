@@ -6,11 +6,11 @@ package dto
 
 // ListInput representa os dados de entrada para listar entities.
 type ListInput struct {
-	Page       int    `form:"page"`        // Página atual (1-indexed)
-	Limit      int    `form:"limit"`       // Itens por página
-	Name       string `form:"name"`        // Filtro por nome
-	Email      string `form:"email"`       // Filtro por email
-	ActiveOnly bool   `form:"active_only"` // Apenas ativos
+	Page       int    `form:"page"`                    // Página atual (1-indexed)
+	Limit      int    `form:"limit"`                   // Itens por página
+	Name       string `form:"name" binding:"max=255"`  // Filtro por nome
+	Email      string `form:"email" binding:"max=255"` // Filtro por email
+	ActiveOnly bool   `form:"active_only"`             // Apenas ativos
 }
 
 // ListOutput representa os dados de saída da listagem.

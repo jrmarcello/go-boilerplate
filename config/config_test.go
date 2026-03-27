@@ -49,7 +49,11 @@ func TestLoad(t *testing.T) {
 	assert.Equal(t, "5434", cfg.DB.ReplicaPort)
 	assert.True(t, cfg.Redis.Enabled)
 	assert.False(t, cfg.Swagger.Enabled)
-	assert.Equal(t, 5*time.Minute, cfg.GetRedisTTL())
+
+	// Verify Redis TTL is parseable (previously tested via GetRedisTTL)
+	redisTTL, parseErr := time.ParseDuration(cfg.Redis.TTL)
+	assert.NoError(t, parseErr)
+	assert.Equal(t, 5*time.Minute, redisTTL)
 
 	// Verify DSN methods
 	writerDSN := cfg.DB.GetWriterDSN()

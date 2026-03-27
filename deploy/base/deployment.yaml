@@ -57,6 +57,11 @@ spec:
       containers:
         - name: go-boilerplate
           image: 650155821999.dkr.ecr.sa-east-1.amazonaws.com/go-boilerplate:latest
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 8080
           envFrom:

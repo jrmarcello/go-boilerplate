@@ -67,13 +67,12 @@ func (h *EntityHandler) Create(c *gin.Context) {
 	var req dto.CreateInput
 	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		span.SetStatus(codes.Error, "invalid request body")
-		httputil.SendError(c, http.StatusBadRequest, "invalid request body: "+bindErr.Error())
+		httputil.SendError(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	span.SetAttributes(
 		attribute.String("entity.name", req.Name),
-		attribute.String("entity.email", req.Email),
 	)
 
 	res, execErr := h.CreateUC.Execute(ctx, req)
@@ -137,7 +136,8 @@ func (h *EntityHandler) List(c *gin.Context) {
 
 	var req dto.ListInput
 	if bindErr := c.ShouldBindQuery(&req); bindErr != nil {
-		HandleError(c, span, bindErr)
+		span.SetStatus(codes.Error, "invalid query parameters")
+		httputil.SendError(c, http.StatusBadRequest, "invalid query parameters")
 		return
 	}
 
@@ -179,7 +179,7 @@ func (h *EntityHandler) Update(c *gin.Context) {
 	var req dto.UpdateInput
 	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		span.SetStatus(codes.Error, "invalid request body")
-		httputil.SendError(c, http.StatusBadRequest, "invalid request body: "+bindErr.Error())
+		httputil.SendError(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	req.ID = id // ID vem da URL

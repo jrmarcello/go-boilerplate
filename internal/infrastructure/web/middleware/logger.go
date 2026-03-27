@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"log/slog"
+	"regexp"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -10,6 +11,11 @@ import (
 
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/ctxkeys"
 )
+
+const requestIDMaxLen = 64
+
+// validRequestID matches strings containing only alphanumeric characters and hyphens.
+var validRequestID = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
 
 const (
 	// RequestIDHeader é o header usado para o Request ID
@@ -21,9 +27,9 @@ func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 
-		// Gerar ou usar Request ID existente
+		// Gerar ou usar Request ID existente (sanitized)
 		requestID := c.GetHeader(RequestIDHeader)
-		if requestID == "" {
+		if requestID == "" || len(requestID) > requestIDMaxLen || !validRequestID.MatchString(requestID) {
 			requestID = uuid.New().String()
 		}
 		c.Set(ctxkeys.RequestID, requestID)

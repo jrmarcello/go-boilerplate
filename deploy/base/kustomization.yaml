@@ -5,3 +5,4 @@ resources:
   - hpa.yaml
   - serviceaccount.yaml
   - migration-job.yaml
+  - networkpolicy.yaml

@@ -387,6 +387,9 @@ sandbox: sandbox-build ## Open sandbox shell (firewall enabled)
 	docker run $(SANDBOX_RUN_ARGS) $(SANDBOX_IMAGE) \
 		bash -c "$(SANDBOX_INIT) && exec zsh"
 
+# WARNING: --dangerously-skip-permissions should ONLY be used inside the sandboxed
+# container with the firewall active (init-firewall.sh). Never use this flag on a
+# host machine or in any environment without network-level isolation.
 sandbox-claude: sandbox-build ## Launch Claude in sandbox directly
 	docker run $(SANDBOX_RUN_ARGS) $(SANDBOX_IMAGE) \
 		bash -c "$(SANDBOX_INIT) && claude --dangerously-skip-permissions"

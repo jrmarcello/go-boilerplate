@@ -21,9 +21,15 @@ type RateLimiterConfig struct {
 	BurstSize int
 }
 
+// limiterEntry holds a rate limiter and the last time it was accessed.
+type limiterEntry struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
+}
+
 // IPRateLimiter gerencia rate limiters por IP
 type IPRateLimiter struct {
-	limiters map[string]*rate.Limiter
+	limiters map[string]*limiterEntry
 	mu       sync.RWMutex
 	config   RateLimiterConfig
 }
@@ -31,33 +37,43 @@ type IPRateLimiter struct {
 // NewIPRateLimiter cria um novo rate limiter por IP
 func NewIPRateLimiter(config RateLimiterConfig) *IPRateLimiter {
 	return &IPRateLimiter{
-		limiters: make(map[string]*rate.Limiter),
+		limiters: make(map[string]*limiterEntry),
 		config:   config,
 	}
 }
 
 // getLimiter retorna o limiter para um IP específico
 func (i *IPRateLimiter) getLimiter(ip string) *rate.Limiter {
+	now := time.Now()
+
 	i.mu.RLock()
-	limiter, exists := i.limiters[ip]
+	entry, exists := i.limiters[ip]
 	i.mu.RUnlock()
 
 	if exists {
-		return limiter
+		// Update lastSeen under write lock
+		i.mu.Lock()
+		entry.lastSeen = now
+		i.mu.Unlock()
+		return entry.limiter
 	}
 
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
 	// Double check após adquirir lock exclusivo
-	if limiter, exists = i.limiters[ip]; exists {
-		return limiter
+	if entry, exists = i.limiters[ip]; exists {
+		entry.lastSeen = now
+		return entry.limiter
 	}
 
-	limiter = rate.NewLimiter(rate.Limit(i.config.RequestsPerSecond), i.config.BurstSize)
-	i.limiters[ip] = limiter
+	entry = &limiterEntry{
+		limiter:  rate.NewLimiter(rate.Limit(i.config.RequestsPerSecond), i.config.BurstSize),
+		lastSeen: now,
+	}
+	i.limiters[ip] = entry
 
-	return limiter
+	return entry.limiter
 }
 
 // RateLimit retorna um middleware de rate limiting por IP.
@@ -66,9 +82,11 @@ func (i *IPRateLimiter) getLimiter(ip string) *rate.Limiter {
 func RateLimit(ctx context.Context, config RateLimiterConfig) gin.HandlerFunc {
 	limiter := NewIPRateLimiter(config)
 
-	// Goroutine para limpar limiters antigos periodicamente.
+	// Goroutine para limpar limiters inativos periodicamente.
+	// Evicts entries not seen for 10+ minutes instead of replacing the entire map.
 	// Exits when ctx is canceled (graceful shutdown).
 	go func() {
+		const idleThreshold = 10 * time.Minute
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
 
@@ -78,8 +96,13 @@ func RateLimit(ctx context.Context, config RateLimiterConfig) gin.HandlerFunc {
 				slog.Info("rate limiter cleanup goroutine stopped")
 				return
 			case <-ticker.C:
+				now := time.Now()
 				limiter.mu.Lock()
-				limiter.limiters = make(map[string]*rate.Limiter)
+				for ip, entry := range limiter.limiters {
+					if now.Sub(entry.lastSeen) > idleThreshold {
+						delete(limiter.limiters, ip)
+					}
+				}
 				limiter.mu.Unlock()
 			}
 		}
