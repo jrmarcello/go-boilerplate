@@ -127,17 +127,25 @@ func buildDependencies(cluster *database.DBCluster, cfg *config.Config, httpMetr
 
 	// Cache (optional)
 	redisClient, cacheErr := pkgcache.NewRedisClient(pkgcache.RedisConfig{
-		URL:     cfg.Redis.URL,
-		TTL:     cfg.Redis.TTL,
-		Enabled: cfg.Redis.Enabled,
+		URL:          cfg.Redis.URL,
+		TTL:          cfg.Redis.TTL,
+		Enabled:      cfg.Redis.Enabled,
+		PoolSize:     cfg.Redis.PoolSize,
+		MinIdleConns: cfg.Redis.MinIdleConns,
+		DialTimeout:  cfg.Redis.DialTimeout,
+		ReadTimeout:  cfg.Redis.ReadTimeout,
+		WriteTimeout: cfg.Redis.WriteTimeout,
 	})
 	if cacheErr != nil {
 		slog.Warn("Redis cache disabled", "error", cacheErr)
 	}
 
+	// Singleflight protection (prevents cache stampede on concurrent reads)
+	flightGroup := entityuc.NewFlightGroup()
+
 	// Use Cases (with optional cache via builder pattern)
 	createUC := entityuc.NewCreateUseCase(repo)
-	getUC := entityuc.NewGetUseCase(repo).WithCache(redisClient)
+	getUC := entityuc.NewGetUseCase(repo).WithCache(redisClient).WithFlight(flightGroup)
 	listUC := entityuc.NewListUseCase(repo)
 	updateUC := entityuc.NewUpdateUseCase(repo).WithCache(redisClient)
 	deleteUC := entityuc.NewDeleteUseCase(repo).WithCache(redisClient)

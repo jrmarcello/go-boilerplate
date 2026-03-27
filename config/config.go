@@ -105,9 +105,14 @@ type OtelConfig struct {
 }
 
 type RedisConfig struct {
-	URL     string
-	TTL     string // ex: "5m", "1h"
-	Enabled bool
+	URL          string
+	TTL          string // ex: "5m", "1h"
+	Enabled      bool
+	PoolSize     int
+	MinIdleConns int
+	DialTimeout  time.Duration
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
 }
 
 type SwaggerConfig struct {
@@ -160,9 +165,14 @@ func Load() (*Config, error) {
 			Insecure:     getEnvBool("OTEL_INSECURE", true),
 		},
 		Redis: RedisConfig{
-			URL:     getEnv("REDIS_URL", "redis://localhost:6379"),
-			TTL:     getEnv("REDIS_TTL", "5m"),
-			Enabled: getEnvBool("REDIS_ENABLED", false),
+			URL:          getEnv("REDIS_URL", "redis://localhost:6379"),
+			TTL:          getEnv("REDIS_TTL", "5m"),
+			Enabled:      getEnvBool("REDIS_ENABLED", false),
+			PoolSize:     getEnvInt("REDIS_POOL_SIZE", 30),
+			MinIdleConns: getEnvInt("REDIS_MIN_IDLE_CONNS", 5),
+			DialTimeout:  getEnvDuration("REDIS_DIAL_TIMEOUT", 500*time.Millisecond),
+			ReadTimeout:  getEnvDuration("REDIS_READ_TIMEOUT", 200*time.Millisecond),
+			WriteTimeout: getEnvDuration("REDIS_WRITE_TIMEOUT", 200*time.Millisecond),
 		},
 		Auth: AuthConfig{
 			ServiceKeys: getEnv("SERVICE_KEYS", ""),

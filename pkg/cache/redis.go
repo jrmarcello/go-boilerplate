@@ -15,9 +15,14 @@ var ErrCacheMiss = errors.New("cache miss")
 
 // RedisConfig holds Redis connection configuration.
 type RedisConfig struct {
-	URL     string
-	TTL     string
-	Enabled bool
+	URL          string
+	TTL          string
+	Enabled      bool
+	PoolSize     int
+	MinIdleConns int
+	DialTimeout  time.Duration
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
 }
 
 // RedisClient implements the Cache interface using Redis.
@@ -37,6 +42,22 @@ func NewRedisClient(cfg RedisConfig) (*RedisClient, error) {
 	opts, parseErr := redis.ParseURL(cfg.URL)
 	if parseErr != nil {
 		return nil, parseErr
+	}
+
+	if cfg.PoolSize > 0 {
+		opts.PoolSize = cfg.PoolSize
+	}
+	if cfg.MinIdleConns > 0 {
+		opts.MinIdleConns = cfg.MinIdleConns
+	}
+	if cfg.DialTimeout > 0 {
+		opts.DialTimeout = cfg.DialTimeout
+	}
+	if cfg.ReadTimeout > 0 {
+		opts.ReadTimeout = cfg.ReadTimeout
+	}
+	if cfg.WriteTimeout > 0 {
+		opts.WriteTimeout = cfg.WriteTimeout
 	}
 
 	client := redis.NewClient(opts)

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/interfaces"
@@ -12,8 +13,9 @@ import (
 
 // GetUseCase implementa o caso de uso de buscar entity por ID.
 type GetUseCase struct {
-	Repo  interfaces.Repository
-	Cache interfaces.Cache // optional, set via WithCache()
+	Repo   interfaces.Repository
+	Cache  interfaces.Cache // optional, set via WithCache()
+	Flight *FlightGroup     // optional, prevents cache stampede
 }
 
 // NewGetUseCase cria uma nova instância do GetUseCase.
@@ -26,6 +28,12 @@ func NewGetUseCase(repo interfaces.Repository) *GetUseCase {
 // WithCache sets an optional cache for the use case (builder pattern).
 func (uc *GetUseCase) WithCache(cache interfaces.Cache) *GetUseCase {
 	uc.Cache = cache
+	return uc
+}
+
+// WithFlight adds singleflight protection against cache stampede (thundering herd).
+func (uc *GetUseCase) WithFlight(fg *FlightGroup) *GetUseCase {
+	uc.Flight = fg
 	return uc
 }
 
@@ -53,10 +61,23 @@ func (uc *GetUseCase) Execute(ctx context.Context, input dto.GetInput) (*dto.Get
 		}
 	}
 
-	// 2. Buscar no repositório (cache miss)
-	e, err := uc.Repo.FindByID(ctx, id)
-	if err != nil {
-		return nil, err
+	// 2. Buscar no repositório (cache miss — with singleflight if configured)
+	var e *entity.Entity
+
+	if uc.Flight != nil {
+		val, flightErr, _ := uc.Flight.byID.Do(input.ID, func() (any, error) {
+			return uc.Repo.FindByID(ctx, id)
+		})
+		if flightErr != nil {
+			return nil, flightErr
+		}
+		e = val.(*entity.Entity)
+	} else {
+		var findErr error
+		e, findErr = uc.Repo.FindByID(ctx, id)
+		if findErr != nil {
+			return nil, findErr
+		}
 	}
 
 	// 3. Converter para DTO de saída
