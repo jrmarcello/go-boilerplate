@@ -16,22 +16,33 @@ ifeq ($(GOBIN),)
 	GOBIN := $(shell go env GOPATH)/bin
 endif
 
+# Carrega variáveis do .env (se existir)
+-include .env
+export
+
 # Fallback defaults (match config.go defaults for local dev)
-DB_DSN ?= postgres://user:password@localhost:5432/$(DB_NAME)?sslmode=disable
+DB_HOST ?= localhost
+DB_PORT ?= 5432
+DB_USER ?= user
+DB_PASSWORD ?= password
+DB_SSLMODE ?= disable
+DB_DSN ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSLMODE)
 MIGRATIONS_DIR := internal/infrastructure/db/postgres/migration
 
-# Docker env file (optional)
+# Docker Compose
+COMPOSE := docker compose -f docker/docker-compose.yml
 ENV_FILE := $(shell test -f .env && echo "--env-file .env" || echo "")
 
 # Declara todos os targets que não são arquivos
-.PHONY: help setup tools dev run build clean lint lint-full security \
+.PHONY: help setup tools dev run build clean lint security vulncheck swagger \
         test test-unit test-e2e test-coverage \
-        load-smoke load-test load-stress load-spike load-clean \
+        load-smoke load-test load-stress load-spike load-kind load-clean \
         docker-up docker-down docker-build \
         observability-up observability-down observability-logs \
-        kind-up kind-down kind-deploy kind-logs kind-migrate \
+        kind-up kind-down kind-deploy kind-logs kind-status kind-migrate kind-setup \
         migrate-up migrate-down migrate-status migrate-reset migrate-redo migrate-create \
-        swagger
+        sandbox sandbox-claude sandbox-shell sandbox-stop sandbox-build sandbox-rebuild \
+        sandbox-firewall sandbox-ssh sandbox-status
 
 # Target padrão
 .DEFAULT_GOAL := help
@@ -41,130 +52,152 @@ ENV_FILE := $(shell test -f .env && echo "--env-file .env" || echo "")
 # ============================================
 
 help: ## Exibe esta mensagem de ajuda
-	@echo "$(APP_NAME) - Comandos disponíveis:"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@echo "\033[1m$(APP_NAME)\033[0m"
+	@echo ""
+	@echo "\033[1;33m  Setup\033[0m"
+	@grep -Eh '^(setup|tools):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "\033[1;33m  Development\033[0m"
+	@grep -Eh '^(dev|run|build|clean):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "\033[1;33m  Code Quality\033[0m"
+	@grep -Eh '^(lint|security|vulncheck|swagger):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "\033[1;33m  Testing\033[0m"
+	@grep -Eh '^(test|test-unit|test-e2e|test-coverage):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "\033[1;33m  Docker\033[0m"
+	@grep -Eh '^docker-(up|down|build):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "\033[1;33m  Database Migrations\033[0m"
+	@grep -Eh '^migrate-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "\033[1;33m  Kubernetes (Kind)\033[0m"
+	@grep -Eh '^kind-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "\033[1;33m  Observability (ELK + OTel)\033[0m"
+	@grep -Eh '^observability-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "\033[1;33m  Load Testing (k6)\033[0m"
+	@grep -Eh '^load-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "\033[1;33m  Sandbox (DevContainer)\033[0m"
+	@grep -Eh '^sandbox.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 
 # ============================================
-# SETUP
+# SETUP (ÚNICO COMANDO NECESSÁRIO)
 # ============================================
 
-setup: tools ## 🚀 Setup completo: tools + hooks + docker + migrations
+setup: tools docker-up migrate-up ## Setup completo: tools + hooks + docker + migrations
 	@echo ""
-	@echo "🔧 Setting up git hooks..."
+	@echo "Setting up git hooks..."
 	@$(GOBIN)/lefthook install || lefthook install
 	@echo ""
-	@echo "🐳 Starting Docker containers..."
-	@$(MAKE) docker-up
-	@echo ""
-	@echo "⏳ Waiting for database to be ready..."
-	@sleep 5
-	@echo ""
-	@echo "📊 Running database migrations..."
-	@$(MAKE) migrate-up
-	@echo ""
 	@echo "============================================"
-	@echo "✅ Setup complete!"
+	@echo "Setup complete!"
 	@echo "============================================"
 	@echo ""
-	@echo "Próximos passos:"
-	@echo "  make dev      → Servidor com hot reload"
-	@echo "  make test     → Roda todos os testes"
+	@echo "Proximos passos:"
+	@echo "  make dev      -> Servidor com hot reload"
+	@echo "  make test     -> Roda todos os testes"
 	@echo ""
 
-tools: ## 📦 Instala ferramentas de desenvolvimento
-	@echo "📦 Installing dev tools..."
+tools: ## Instala ferramentas de desenvolvimento
+	@echo "Installing dev tools..."
 	@go install github.com/air-verse/air@latest
 	@go install github.com/pressly/goose/v3/cmd/goose@latest
 	@go install github.com/evilmartians/lefthook@latest
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	@go install github.com/swaggo/swag/cmd/swag@latest
-	@echo "✅ Tools installed in $(GOBIN)"
+	@go install golang.org/x/vuln/cmd/govulncheck@latest
+	@echo "Tools installed in $(GOBIN)"
 
 # ============================================
 # DESENVOLVIMENTO
 # ============================================
 
-dev: ## 🔥 Inicia servidor com hot reload (air)
+dev: docker-up migrate-up ## Inicia servidor local com hot reload (air)
 	@$(GOBIN)/air || air
 
-run: ## ▶️  Inicia servidor sem hot reload
+run: ## Inicia servidor sem hot reload
 	go run cmd/api/main.go
 
-lint: ## 🔍 Roda linters básicos (vet + gofmt)
-	@go vet ./...
+build: ## Compila binario para bin/
+	@mkdir -p bin
+	go build -o bin/api ./cmd/api
+	@echo "Binary: bin/api"
+
+clean: ## Remove arquivos gerados
+	rm -rf bin/ tests/coverage/ tests/load/results/ tmp/
+	@echo "Cleaned"
+
+# ============================================
+# QUALIDADE DE CÓDIGO
+# ============================================
+
+lint: ## Roda golangci-lint + gofmt
 	@gofmt -w .
+	@$(GOBIN)/golangci-lint run ./... || golangci-lint run ./...
 
-lint-full: ## 🔍 Roda golangci-lint com todas as verificações
-	@golangci-lint run ./...
+security: ## Roda analise de seguranca (gosec via golangci-lint)
+	@$(GOBIN)/golangci-lint run --enable-only gosec ./... || golangci-lint run --enable-only gosec ./...
 
-security: ## 🔒 Roda análise de segurança (gosec)
-	@golangci-lint run --enable-only gosec ./...
+vulncheck: ## Scan de vulnerabilidades em dependencias (govulncheck)
+	@$(GOBIN)/govulncheck ./... || govulncheck ./...
 
-swagger: ## 📚 Regenera documentação Swagger
-	@swag init -g cmd/api/main.go -o docs
-	@echo "✅ Swagger docs generated in docs/"
+swagger: ## Regenera documentacao Swagger
+	@$(GOBIN)/swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal || \
+		swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
+	@echo "Swagger docs generated in docs/"
 
 # ============================================
 # TESTES
 # ============================================
 
-test: ## 🧪 Roda todos os testes
+test: ## Roda todos os testes
 	go test ./... -v
 
-test-unit: ## 🧪 Roda apenas testes unitários
+test-unit: ## Roda apenas testes unitarios
 	go test ./pkg/... ./config/... ./internal/... -v
 
-test-e2e: ## 🧪 Roda testes e2e (requer Docker)
+test-e2e: ## Roda testes e2e (requer Docker)
 	go test ./tests/e2e/... -v -count=1
 
-test-coverage: ## 📊 Gera relatório de cobertura
+test-coverage: ## Gera relatorio de cobertura
 	@mkdir -p tests/coverage
 	go test ./... -coverprofile=tests/coverage/coverage.out
 	go tool cover -html=tests/coverage/coverage.out -o tests/coverage/coverage.html
-	@echo "✅ Coverage report: tests/coverage/coverage.html"
-
-# ============================================
-# BUILD
-# ============================================
-
-build: ## 🔨 Compila binário para bin/
-	@mkdir -p bin
-	go build -o bin/api ./cmd/api
-	@echo "✅ Binary: bin/api"
-
-clean: ## 🧹 Remove arquivos gerados
-	rm -rf bin/ tests/coverage/ tmp/
-	@echo "✅ Cleaned"
+	@echo "Coverage report: tests/coverage/coverage.html"
 
 # ============================================
 # DOCKER
 # ============================================
 
-docker-up: ## 🐳 Sobe containers Docker (Postgres + Redis)
-	docker compose $(ENV_FILE) -f docker/docker-compose.yml up -d
+docker-up: ## Sobe containers Docker (Postgres + Redis)
+	$(COMPOSE) $(ENV_FILE) up -d
 
-docker-down: ## 🐳 Para containers Docker
-	docker compose $(ENV_FILE) -f docker/docker-compose.yml down
+docker-down: ## Para containers Docker
+	$(COMPOSE) $(ENV_FILE) down
 
-docker-build: ## 🐳 Cria a imagem de produção
+docker-build: ## Cria a imagem de producao
 	docker build -f docker/Dockerfile -t $(IMAGE_NAME) .
 
 # ============================================
-# OBSERVABILIDADE (OpenTelemetry)
+# OBSERVABILIDADE (ELK + OpenTelemetry)
 # ============================================
 
-observability-up: ## 📈 Sobe stack de observabilidade
+observability-up: ## Sobe stack de observabilidade (Elasticsearch + Kibana + OTel)
 	docker compose -f docker/observability/docker-compose.yml up -d
-	@echo "🔍 Aguarde ~30s para Elasticsearch iniciar..."
-	@echo "📊 Kibana: http://localhost:5601"
-	@echo "🔌 OTel Collector: localhost:4317 (gRPC)"
+	@echo "Aguarde ~30s para Elasticsearch iniciar..."
+	@echo "Kibana: http://localhost:5601"
+	@echo "OTel Collector: localhost:4317 (gRPC)"
 
-observability-down: ## 📈 Para stack de observabilidade
+observability-down: ## Para stack de observabilidade
 	docker compose -f docker/observability/docker-compose.yml down
 
-observability-logs: ## 📈 Mostra logs do OTel Collector
+observability-logs: ## Mostra logs do OTel Collector
 	docker compose -f docker/observability/docker-compose.yml logs -f otel-collector
 
 # ============================================
@@ -176,93 +209,107 @@ KIND_NAMESPACE := $(APP_NAME)-dev
 KIND_CONFIGMAP := deploy/overlays/develop/configmap.yaml
 KIND_DB_PORT := 5433
 
-kind-up: ## ☸️ Cria cluster Kind com NGINX Ingress
+kind-up: ## Cria cluster Kind com NGINX Ingress
 	@if ! kind get clusters | grep -q $(KIND_CLUSTER); then \
-		echo "📦 Criando cluster kind..."; \
+		echo "Criando cluster kind..."; \
 		kind create cluster --name $(KIND_CLUSTER) --config deploy/overlays/develop/kind-config.yaml; \
-		echo "🌐 Instalando NGINX Ingress..."; \
+		echo "Instalando NGINX Ingress..."; \
 		kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml; \
 		kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s || true; \
 	else \
-		echo "✅ Cluster $(KIND_CLUSTER) já existe"; \
+		echo "Cluster $(KIND_CLUSTER) ja existe"; \
 	fi
 	@kubectl create namespace $(KIND_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
-	@echo "🐘 Deploying PostgreSQL..."
+	@echo "Deploying PostgreSQL..."
 	@kubectl apply -n $(KIND_NAMESPACE) -f deploy/overlays/develop/kind-postgres.yaml
 
-kind-down: ## ☸️ Remove cluster Kind
+kind-down: ## Remove cluster Kind
 	kind delete cluster --name $(KIND_CLUSTER)
 
-kind-deploy: docker-build ## ☸️ Build e deploy no Kind (simula ArgoCD PreSync)
-	@echo "📤 Loading image into kind..."
+kind-deploy: docker-build ## Build e deploy no Kind (simula ArgoCD PreSync)
+	@echo "Loading image into kind..."
 	@docker tag $(IMAGE_NAME):latest $(APP_NAME):dev
 	@kind load docker-image $(APP_NAME):dev --name $(KIND_CLUSTER)
 	@echo ""
-	@echo "⏳ Waiting for PostgreSQL..."
+	@echo "Waiting for PostgreSQL..."
 	@kubectl wait --namespace $(KIND_NAMESPACE) --for=condition=ready pod --selector=app=postgres --timeout=60s
 	@echo ""
-	@echo "🔄 Running migration Job (simulating ArgoCD PreSync)..."
+	@echo "Running migration Job (simulating ArgoCD PreSync)..."
 	@kubectl apply -n $(KIND_NAMESPACE) -f deploy/base/serviceaccount.yaml
 	@kubectl apply -n $(KIND_NAMESPACE) -f deploy/overlays/develop/configmap.yaml
 	@kubectl apply -n $(KIND_NAMESPACE) -f deploy/overlays/develop/secret.yaml
 	@kubectl delete job $(APP_NAME)-migrate -n $(KIND_NAMESPACE) --ignore-not-found
 	@cat deploy/base/migration-job.yaml | sed 's|go-boilerplate:latest|go-boilerplate:dev|g' | kubectl apply -n $(KIND_NAMESPACE) -f -
-	@echo "⏳ Waiting for migration Job to complete..."
+	@echo "Waiting for migration Job to complete..."
 	@kubectl wait --namespace $(KIND_NAMESPACE) --for=condition=complete job/$(APP_NAME)-migrate --timeout=120s
-	@echo "✅ Migrations completed!"
+	@echo "Migrations completed!"
 	@echo ""
-	@echo "☸️ Deploying application..."
+	@echo "Deploying application..."
 	@kubectl apply -n $(KIND_NAMESPACE) -f deploy/base/deployment.yaml
 	@kubectl apply -n $(KIND_NAMESPACE) -f deploy/base/service.yaml
 	@kubectl wait --namespace $(KIND_NAMESPACE) --for=condition=ready pod --selector=app=$(APP_NAME) --timeout=120s || true
 	@echo ""
-	@echo "✅ Deploy completo!"
-	@echo "📍 http://$(DB_NAME).localhost/health"
+	@echo "Deploy completo!"
+	@echo "http://$(DB_NAME).localhost/health"
 
-kind-migrate: ## ☸️ Roda migrations no PostgreSQL do Kind
-	@echo "📊 Rodando migrations via port-forward..."
+kind-migrate: ## Roda migrations no PostgreSQL do Kind
+	@echo "Rodando migrations via port-forward..."
 	@kubectl port-forward -n $(KIND_NAMESPACE) svc/postgres-service $(KIND_DB_PORT):5432 &
 	@sleep 3
 	@goose -dir $(MIGRATIONS_DIR) postgres "$$(grep 'DB_DSN:' $(KIND_CONFIGMAP) | sed 's/.*DB_DSN: *\"//;s/\".*//;s/postgres-service:5432/localhost:$(KIND_DB_PORT)/')" up || true
 	@pkill -f "port-forward.*$(KIND_DB_PORT)" || true
 
-kind-setup: kind-up kind-deploy ## ☸️ Setup completo: cluster + postgres + migrations + deploy
+kind-setup: kind-up kind-deploy ## Setup completo: cluster + postgres + migrations + deploy
 	@echo ""
-	@echo "🎉 Kind setup completo!"
-	@echo "📍 http://$(DB_NAME).localhost/health"
+	@echo "Kind setup completo!"
+	@echo "http://$(DB_NAME).localhost/health"
 	@echo ""
-	@echo "Comandos úteis:"
-	@echo "  make kind-logs   → Ver logs da aplicação"
-	@echo "  make kind-down   → Remover cluster"
+	@echo "Comandos uteis:"
+	@echo "  make kind-logs   -> Ver logs da aplicacao"
+	@echo "  make kind-status -> Status dos pods/services"
+	@echo "  make kind-down   -> Remover cluster"
 
-kind-logs: ## ☸️ Mostra logs do serviço no Kind
+kind-logs: ## Mostra logs do servico no Kind
 	kubectl logs -n $(KIND_NAMESPACE) -l app=$(APP_NAME) -f
+
+kind-status: ## Mostra status dos pods/services no Kind
+	@echo "Pods:"
+	@kubectl get pods -n $(KIND_NAMESPACE) -o wide
+	@echo ""
+	@echo "Services:"
+	@kubectl get svc -n $(KIND_NAMESPACE)
+	@echo ""
+	@echo "Ingress:"
+	@kubectl get ingress -n $(KIND_NAMESPACE)
+	@echo ""
+	@echo "HPA:"
+	@kubectl get hpa -n $(KIND_NAMESPACE)
 
 # ============================================
 # MIGRAÇÕES
 # ============================================
 
-migrate-up: ## 📊 Roda migrações do banco
+migrate-up: ## Roda migracoes do banco
 	@$(GOBIN)/goose -dir $(MIGRATIONS_DIR) postgres "$(DB_DSN)" up || \
 		goose -dir $(MIGRATIONS_DIR) postgres "$(DB_DSN)" up
 
-migrate-down: ## 📊 Reverte última migração
+migrate-down: ## Reverte ultima migracao
 	@$(GOBIN)/goose -dir $(MIGRATIONS_DIR) postgres "$(DB_DSN)" down || \
 		goose -dir $(MIGRATIONS_DIR) postgres "$(DB_DSN)" down
 
-migrate-status: ## 📊 Mostra status das migrações
+migrate-status: ## Mostra status das migracoes
 	@$(GOBIN)/goose -dir $(MIGRATIONS_DIR) postgres "$(DB_DSN)" status || \
 		goose -dir $(MIGRATIONS_DIR) postgres "$(DB_DSN)" status
 
-migrate-reset: ## 📊 Reverte todas as migrações (CUIDADO!)
+migrate-reset: ## Reverte todas as migracoes (CUIDADO!)
 	@$(GOBIN)/goose -dir $(MIGRATIONS_DIR) postgres "$(DB_DSN)" reset || \
 		goose -dir $(MIGRATIONS_DIR) postgres "$(DB_DSN)" reset
 
-migrate-redo: ## 📊 Reverte e reaplica última migração
+migrate-redo: ## Reverte e reaplica ultima migracao
 	@$(GOBIN)/goose -dir $(MIGRATIONS_DIR) postgres "$(DB_DSN)" redo || \
 		goose -dir $(MIGRATIONS_DIR) postgres "$(DB_DSN)" redo
 
-migrate-create: ## 📊 Cria nova migração (ex: make migrate-create NAME=add_users)
+migrate-create: ## Cria nova migracao (ex: make migrate-create NAME=add_users)
 	@$(GOBIN)/goose -dir $(MIGRATIONS_DIR) create $(NAME) sql || \
 		goose -dir $(MIGRATIONS_DIR) create $(NAME) sql
 
@@ -271,19 +318,105 @@ migrate-create: ## 📊 Cria nova migração (ex: make migrate-create NAME=add_u
 # ============================================
 # Requer k6: brew install k6
 
-load-smoke: ## 🔥 Smoke test - validação básica
-	k6 run --env SCENARIO=smoke tests/load/scenarios.js
+load-setup:
+	@mkdir -p tests/load/results
 
-load-test: ## 🔥 Load test - carga progressiva
-	k6 run --env SCENARIO=load tests/load/scenarios.js
+LOAD_URL ?= http://localhost:8080
 
-load-stress: ## 🔥 Stress test - encontrar limites
-	k6 run --env SCENARIO=stress tests/load/scenarios.js
+load-smoke: load-setup ## Smoke test (validacao basica)
+	k6 run --env SCENARIO=smoke --env BASE_URL=$(LOAD_URL) tests/load/scenarios.js 2>&1 | tee tests/load/results/smoke_$(shell date +%Y%m%d_%H%M%S).log
 
-load-spike: ## 🔥 Spike test - pico súbito
-	k6 run --env SCENARIO=spike tests/load/scenarios.js
+load-test: load-setup ## Load test (carga progressiva)
+	k6 run --env SCENARIO=load --env BASE_URL=$(LOAD_URL) tests/load/scenarios.js 2>&1 | tee tests/load/results/load_$(shell date +%Y%m%d_%H%M%S).log
 
-load-clean: ## 🔥 Limpa dados de testes de carga
-	@echo "🧹 Limpando dados de load test..."
+load-stress: load-setup ## Stress test (encontrar limites)
+	k6 run --env SCENARIO=stress --env BASE_URL=$(LOAD_URL) tests/load/scenarios.js 2>&1 | tee tests/load/results/stress_$(shell date +%Y%m%d_%H%M%S).log
+
+load-spike: load-setup ## Spike test (pico subito)
+	k6 run --env SCENARIO=spike --env BASE_URL=$(LOAD_URL) tests/load/scenarios.js 2>&1 | tee tests/load/results/spike_$(shell date +%Y%m%d_%H%M%S).log
+
+load-kind: ## Roda smoke test contra o cluster Kind
+	@$(MAKE) load-smoke LOAD_URL=http://$(DB_NAME).localhost
+
+load-clean: ## Limpa dados de testes de carga
+	@echo "Limpando dados de load test..."
 	@docker exec $$(docker ps --format '{{.Names}}' | grep -E 'db|postgres' | head -1) psql -U user -d $(DB_NAME) -c "DELETE FROM entities WHERE name LIKE 'Load Test%';"
-	@echo "✅ Dados de load test removidos"
+	@echo "Dados de load test removidos"
+
+# ============================================
+# SANDBOX (Claude Code DevContainer)
+# ============================================
+
+SANDBOX_IMAGE     := $(APP_NAME)-sandbox
+SANDBOX_CONTAINER := $(APP_NAME)-sandbox
+SANDBOX_ROOT      := $(shell pwd)
+
+# SSH agent detection
+ifeq ($(shell uname),Darwin)
+  SANDBOX_SSH := -v /run/host-services/ssh-auth.sock:/ssh-agent -e SSH_AUTH_SOCK=/ssh-agent
+else ifdef SSH_AUTH_SOCK
+  SANDBOX_SSH := -v $(SSH_AUTH_SOCK):/ssh-agent -e SSH_AUTH_SOCK=/ssh-agent
+else
+  SANDBOX_SSH :=
+endif
+
+SANDBOX_RUN_ARGS := -it --rm \
+	--name $(SANDBOX_CONTAINER) \
+	--cap-add=NET_ADMIN \
+	--cap-add=NET_RAW \
+	-e NODE_OPTIONS="--max-old-space-size=4096" \
+	-e CLAUDE_CONFIG_DIR="/home/node/.claude" \
+	-e GOPATH="/home/node/go" \
+	-v $(APP_NAME)-bashhistory:/commandhistory \
+	-v $(APP_NAME)-claude-config:/home/node/.claude \
+	-v $(APP_NAME)-gopath:/home/node/go \
+	-v "$(SANDBOX_ROOT):/workspace" \
+	-p 8080:8080 \
+	$(SANDBOX_SSH)
+
+SANDBOX_INIT := sudo /usr/local/bin/init-firewall.sh && (sudo chmod 666 /ssh-agent 2>/dev/null || true)
+
+sandbox-build: ## Build sandbox image
+	docker build -t $(SANDBOX_IMAGE) -f .devcontainer/Dockerfile .devcontainer
+
+sandbox-rebuild: ## Rebuild sandbox image (no cache)
+	docker build --no-cache -t $(SANDBOX_IMAGE) -f .devcontainer/Dockerfile .devcontainer
+
+sandbox: sandbox-build ## Open sandbox shell (firewall enabled)
+	docker run $(SANDBOX_RUN_ARGS) $(SANDBOX_IMAGE) \
+		bash -c "$(SANDBOX_INIT) && exec zsh"
+
+sandbox-claude: sandbox-build ## Launch Claude in sandbox directly
+	docker run $(SANDBOX_RUN_ARGS) $(SANDBOX_IMAGE) \
+		bash -c "$(SANDBOX_INIT) && claude --dangerously-skip-permissions"
+
+sandbox-shell: ## Attach shell to running sandbox
+	docker exec -it $(SANDBOX_CONTAINER) zsh
+
+sandbox-stop: ## Stop sandbox container
+	docker stop $(SANDBOX_CONTAINER) 2>/dev/null || true
+
+sandbox-firewall: ## Test sandbox firewall rules
+	@echo "\033[36m-- Blocked (example.com) --\033[0m"
+	@docker exec $(SANDBOX_CONTAINER) curl --connect-timeout 3 https://example.com 2>&1 && \
+		echo "\033[31mFAIL\033[0m" || echo "\033[32mPASS\033[0m"
+	@echo "\033[36m-- Allowed (api.github.com) --\033[0m"
+	@docker exec $(SANDBOX_CONTAINER) curl --connect-timeout 5 -s https://api.github.com/zen && \
+		echo "\n\033[32mPASS\033[0m" || echo "\033[31mFAIL\033[0m"
+	@echo "\033[36m-- Allowed (proxy.golang.org) --\033[0m"
+	@docker exec $(SANDBOX_CONTAINER) curl --connect-timeout 5 -s -o /dev/null -w "%{http_code}" https://proxy.golang.org && \
+		echo "\n\033[32mPASS\033[0m" || echo "\033[31mFAIL\033[0m"
+	@echo "\033[36m-- Allowed (bitbucket.org) --\033[0m"
+	@docker exec $(SANDBOX_CONTAINER) curl --connect-timeout 5 -s -o /dev/null -w "%{http_code}" https://bitbucket.org && \
+		echo "\n\033[32mPASS\033[0m" || echo "\033[31mFAIL\033[0m"
+
+sandbox-ssh: ## Verify SSH agent in sandbox
+	@docker exec $(SANDBOX_CONTAINER) ssh-add -l 2>/dev/null && \
+		echo "\033[32mSSH agent OK\033[0m" || \
+		echo "\033[31mSSH agent not available -- run 'ssh-add' on host\033[0m"
+
+sandbox-status: ## Show sandbox container and volumes
+	@echo "\033[1m-- Container --\033[0m"
+	@docker ps -a --filter name=$(SANDBOX_CONTAINER) --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" 2>/dev/null
+	@echo "\033[1m-- Volumes --\033[0m"
+	@docker volume ls --filter name=$(APP_NAME) --format "table {{.Name}}\t{{.Driver}}"
