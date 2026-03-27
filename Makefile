@@ -212,7 +212,11 @@ KIND_NAMESPACE := $(APP_NAME)-dev
 KIND_CONFIGMAP := deploy/overlays/develop/configmap.yaml
 KIND_DB_PORT := 5433
 
-kind-up: ## Cria cluster Kind com NGINX Ingress
+kind-check:
+	@command -v kind >/dev/null 2>&1 || { echo "kind not found. Install: brew install kind (macOS) or go install sigs.k8s.io/kind@latest"; exit 1; }
+	@command -v kubectl >/dev/null 2>&1 || { echo "kubectl not found. Install: brew install kubectl (macOS) or https://kubernetes.io/docs/tasks/tools/"; exit 1; }
+
+kind-up: kind-check ## Cria cluster Kind com NGINX Ingress
 	@if ! kind get clusters | grep -q $(KIND_CLUSTER); then \
 		echo "Criando cluster kind..."; \
 		kind create cluster --name $(KIND_CLUSTER) --config deploy/overlays/develop/kind-config.yaml; \
@@ -226,10 +230,10 @@ kind-up: ## Cria cluster Kind com NGINX Ingress
 	@echo "Deploying PostgreSQL..."
 	@kubectl apply -n $(KIND_NAMESPACE) -f deploy/overlays/develop/kind-postgres.yaml
 
-kind-down: ## Remove cluster Kind
+kind-down: kind-check ## Remove cluster Kind
 	kind delete cluster --name $(KIND_CLUSTER)
 
-kind-deploy: docker-build ## Build e deploy no Kind (simula ArgoCD PreSync)
+kind-deploy: kind-check docker-build ## Build e deploy no Kind (simula ArgoCD PreSync)
 	@echo "Loading image into kind..."
 	@docker tag $(IMAGE_NAME):latest $(APP_NAME):dev
 	@kind load docker-image $(APP_NAME):dev --name $(KIND_CLUSTER)
@@ -255,7 +259,7 @@ kind-deploy: docker-build ## Build e deploy no Kind (simula ArgoCD PreSync)
 	@echo "Deploy completo!"
 	@echo "http://$(DB_NAME).localhost/health"
 
-kind-migrate: ## Roda migrations no PostgreSQL do Kind
+kind-migrate: kind-check ## Roda migrations no PostgreSQL do Kind
 	@echo "Rodando migrations via port-forward..."
 	@kubectl port-forward -n $(KIND_NAMESPACE) svc/postgres-service $(KIND_DB_PORT):5432 &
 	@sleep 3
@@ -272,10 +276,10 @@ kind-setup: kind-up kind-deploy ## Setup completo: cluster + postgres + migratio
 	@echo "  make kind-status -> Status dos pods/services"
 	@echo "  make kind-down   -> Remover cluster"
 
-kind-logs: ## Mostra logs do servico no Kind
+kind-logs: kind-check ## Mostra logs do servico no Kind
 	kubectl logs -n $(KIND_NAMESPACE) -l app=$(APP_NAME) -f
 
-kind-status: ## Mostra status dos pods/services no Kind
+kind-status: kind-check ## Mostra status dos pods/services no Kind
 	@echo "Pods:"
 	@kubectl get pods -n $(KIND_NAMESPACE) -o wide
 	@echo ""
