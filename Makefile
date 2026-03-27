@@ -34,7 +34,7 @@ COMPOSE := docker compose -f docker/docker-compose.yml
 ENV_FILE := $(shell test -f .env && echo "--env-file .env" || echo "")
 
 # Declara todos os targets que não são arquivos
-.PHONY: help setup tools go-tools-check k6-check kind-check \
+.PHONY: help setup tools go-tools-check docker-check k6-check kind-check \
         dev run run-stop build clean lint security vulncheck swagger \
         test test-unit test-e2e test-coverage \
         load-smoke load-test load-stress load-spike load-kind load-clean \
@@ -108,6 +108,10 @@ setup: tools docker-up migrate-up ## Setup completo: tools + hooks + docker + mi
 # Prerequisite checks (used as dependencies by targets that need external tools)
 go-tools-check:
 	@command -v $(GOBIN)/air >/dev/null 2>&1 || command -v air >/dev/null 2>&1 || { echo "Dev tools not found. Run: make tools"; exit 1; }
+
+docker-check:
+	@command -v docker >/dev/null 2>&1 || { echo "docker not found. Install: https://docs.docker.com/get-docker/"; exit 1; }
+	@docker info >/dev/null 2>&1 || { echo "Docker daemon not running. Start Docker Desktop and try again."; exit 1; }
 
 k6-check:
 	@command -v k6 >/dev/null 2>&1 || { echo "k6 not found. Install: brew install k6 (macOS) or https://grafana.com/docs/k6/latest/set-up/install-k6/"; exit 1; }
@@ -186,20 +190,20 @@ test-coverage: ## Gera relatorio de cobertura
 # DOCKER
 # ============================================
 
-docker-up: ## Sobe containers Docker (Postgres + Redis)
+docker-up: docker-check ## Sobe containers Docker (Postgres + Redis)
 	$(COMPOSE) $(ENV_FILE) up -d
 
-docker-down: ## Para containers Docker
+docker-down: docker-check ## Para containers Docker
 	$(COMPOSE) $(ENV_FILE) down
 
-docker-build: ## Cria a imagem de producao
+docker-build: docker-check ## Cria a imagem de producao
 	docker build -f docker/Dockerfile -t $(IMAGE_NAME) .
 
 # ============================================
 # OBSERVABILIDADE (ELK + OpenTelemetry)
 # ============================================
 
-observability-up: ## Sobe stack de observabilidade (Elasticsearch + Kibana + OTel)
+observability-up: docker-check ## Sobe stack de observabilidade (Elasticsearch + Kibana + OTel)
 	docker compose -f docker/observability/docker-compose.yml up -d
 	@echo "Aguarde ~30s para Elasticsearch iniciar..."
 	@echo "Kibana: http://localhost:5601"
