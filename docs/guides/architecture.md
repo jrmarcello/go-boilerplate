@@ -42,14 +42,14 @@ flowchart LR
     Admin --> UC5
 
     UC1 -.->|valida| Email["Validar Email"]
-    UC1 -.->|gera| ID["Gerar ULID"]
+    UC1 -.->|gera| ID["Gerar UUID v7"]
 ```
 
 ### Descrição dos Casos de Uso
 
 | Caso de Uso | Ator | Descrição |
 | --- | --- | --- |
-| **Criar Entity** | API Client | Cadastra nova entity com validação de email e geração de ULID |
+| **Criar Entity** | API Client | Cadastra nova entity com validação de email e geração de UUID v7 |
 | **Buscar Entity** | API Client | Retorna dados de uma entity por ID (com cache) |
 | **Listar Entities** | API Client | Lista entities com paginação e filtros (nome, email, active) |
 | **Atualizar Entity** | Admin | Atualiza dados (nome, email) de uma entity existente |
@@ -73,7 +73,7 @@ flowchart TB
         Handler["EntityHandler\n(handler/entity.go)"]
         Middlewares["Middlewares\n(Logger, CORS, Idempotency)"]
         RepoImpl["EntityRepository\n(repository/entity.go)"]
-        CacheImpl["RedisCache\n(cache/redis.go)"]
+        CacheImpl["RedisCache\n(pkg/cache/redis.go)"]
         Telemetry["Telemetry\n(otel.go)"]
     end
 
@@ -167,7 +167,7 @@ sequenceDiagram
     VO-->>-UC: Email (validado)
 
     UC->>+E: NewEntity(name, email)
-    Note over E: Gera ULID<br/>Define timestamps<br/>Active = true
+    Note over E: Gera UUID v7<br/>Define timestamps<br/>Active = true
     E-->>-UC: Entity
 
     UC->>+R: Create(ctx, entity)
@@ -202,6 +202,7 @@ sequenceDiagram
     participant H as Handler
     participant UC as GetUseCase
     participant C as Redis Cache
+    participant SF as SingleFlight
     participant R as Repository
     participant DB as PostgreSQL
 
@@ -216,8 +217,10 @@ sequenceDiagram
         H-->>Client: 200 OK
     else Cache Miss
         C-->>-UC: nil
-        
-        UC->>+R: FindByID(ctx, id)
+
+        UC->>+SF: Do(id, fetchFn)
+        Note over SF: Deduplicação de requests<br/>concorrentes para mesmo ID<br/>(previne cache stampede)
+        SF->>+R: FindByID(ctx, id)
         R->>+DB: SELECT * FROM entities WHERE id = $1
         alt Não encontrado
             DB-->>R: sql.ErrNoRows
@@ -226,10 +229,11 @@ sequenceDiagram
             H-->>Client: 404 Not Found
         end
         DB-->>-R: entityDB
-        R-->>-UC: Entity
-        
+        R-->>-SF: Entity
+        SF-->>-UC: Entity
+
         UC->>C: Set(ctx, "entity:{id}", Entity JSON)
-        
+
         UC-->>-H: OutputDTO
         H-->>-Client: 200 OK
     end
@@ -429,7 +433,7 @@ internal/
 │       ├── errors.go          # Erros de domínio
 │       ├── filter.go          # Filtros de listagem
 │       └── vo/                # Value Objects
-│           ├── id.go          # ULID
+│           ├── id.go          # UUID v7 (RFC 9562)
 │           ├── email.go       # Email (RFC 5322)
 │           └── errors.go      # Erros de VO
 │
@@ -444,8 +448,8 @@ internal/
 │       └── interfaces/        # Interfaces (Repository, Cache)
 │
 ├── infrastructure/            # ⚙️ Camada de Infraestrutura
-│   ├── cache/
-│   │   └── redis.go           # Implementação Redis
+│   ├── cache/                 # Legacy (ver pkg/cache/ para novo código)
+│   │   └── redis.go
 │   ├── db/
 │   │   ├── postgres/          # Implementação Postgres
 │   │   │   ├── repository/
@@ -468,5 +472,5 @@ internal/
 
 - [Clean Architecture - Uncle Bob](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
 - [Domain-Driven Design - Eric Evans](https://domainlanguage.com/ddd/)
-- [ULID Spec](https://github.com/ulid/spec)
+- [RFC 9562 (UUID v7)](https://www.rfc-editor.org/rfc/rfc9562)
 - [OpenTelemetry Go](https://opentelemetry.io/docs/instrumentation/go/)

@@ -1,7 +1,7 @@
 ### Use com REST Client (VS Code) ou JetBrains HTTP Client
 
 @baseUrl = http://localhost:8080
-@entityId = 01KE2MQK8DENP9WWK1RT5B2PNE
+@entityId = 018e4a2c-6b4d-7000-9410-abcdef123456
 
 # Authentication Headers (required if SERVICE_KEYS is configured)
 # In dev mode (SERVICE_KEYS empty), these headers are optional
@@ -91,7 +91,7 @@ X-Service-Key: {{serviceKey}}
 }
 
 ### Entity não encontrada
-GET {{baseUrl}}/entities/01XXXXXXXXXXXXXXXXXXXXXX
+GET {{baseUrl}}/entities/00000000-0000-7000-0000-000000000000
 X-Service-Name: {{serviceName}}
 X-Service-Key: {{serviceKey}}
 
@@ -102,7 +102,7 @@ X-Service-Key: {{serviceKey}}
 ### Criar Entity com Idempotency Key
 POST {{baseUrl}}/entities
 Content-Type: application/json
-X-Idempotency-Key: unique-key-123
+Idempotency-Key: unique-key-123
 X-Service-Name: {{serviceName}}
 X-Service-Key: {{serviceKey}}
 

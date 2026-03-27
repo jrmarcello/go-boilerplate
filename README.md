@@ -14,14 +14,15 @@ Template production-ready para microserviços Go com Clean Architecture, cache R
 | Feature | Tecnologia | Descrição |
 | ------- | ---------- | --------- |
 | **Arquitetura** | Clean Architecture | Separação de camadas, DI, testabilidade |
-| **API** | Gin + Swagger | REST API documentada, respostas padronizadas via `pkg/httputil` |
+| **API** | Gin + Swagger | REST API documentada, respostas padronizadas via `pkg/httputil` (Swagger default off) |
 | **Banco** | PostgreSQL + sqlx | Migrations com Goose, DB Cluster (Writer/Reader split) |
-| **Cache** | Redis (opcional) | Cache transparente com builder pattern (`.WithCache()`) |
+| **Cache** | Redis (opcional) | Cache transparente com builder pattern (`.WithCache()`), singleflight para stampede protection |
 | **Observabilidade** | OpenTelemetry | Traces, HTTP metrics com Apdex, DB pool metrics |
 | **Erros** | `pkg/apperror` | Erros estruturados com código, mensagem e HTTP status |
 | **Pacotes** | `pkg/` | Pacotes reutilizáveis entre serviços |
 | **Testes** | TestContainers + k6 | E2E com banco real, load testing |
-| **Deploy** | Docker + Kubernetes | Kustomize overlays por ambiente |
+| **Idempotency** | `pkg/idempotency` | Redis-backed distributed idempotency (Store interface + RedisStore) |
+| **Deploy** | Docker + Kubernetes | Kustomize overlays por ambiente, NetworkPolicy, container securityContext |
 | **DX** | Makefile + Air | Hot reload, git hooks, linters |
 
 ---
@@ -86,7 +87,8 @@ make dev      # Hot reload
 │   ├── ctxkeys/          # Chaves tipadas para context
 │   ├── logutil/          # Logging estruturado
 │   ├── telemetry/        # OpenTelemetry setup + metrics
-│   ├── cache/            # Interface de cache + Redis
+│   ├── cache/            # Interface de cache + Redis (pool config)
+│   ├── idempotency/      # Distributed idempotency (Store + RedisStore)
 │   └── database/         # Conexão PostgreSQL (Writer/Reader)
 └── tests/
     ├── e2e/              # TestContainers
@@ -108,13 +110,37 @@ Hierarquia (maior prioridade primeiro):
 ```bash
 # .env (exemplo)
 SERVER_PORT=8080
-DB_DSN=postgres://user:password@localhost:5432/mydb?sslmode=disable
-DB_READER_DSN=                                # opcional, Reader replica
+
+# Postgres (Writer)
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=user
+DB_PASSWORD=password
+DB_NAME=entities
+DB_SSLMODE=disable
+
+# Postgres Pool (opcional)
+DB_MAX_OPEN_CONNS=25
+DB_MAX_IDLE_CONNS=10
+DB_CONN_MAX_LIFETIME=5m
+
+# Postgres Replica (opcional — Reader split)
+DB_REPLICA_ENABLED=false
+# DB_REPLICA_HOST=reader-host
+# DB_REPLICA_PORT=5432
+
+# Redis
 REDIS_ENABLED=true
-SWAGGER_ENABLED=true                          # toggle Swagger UI
+REDIS_URL=redis://localhost:6379
+REDIS_TTL=5m
+REDIS_POOL_SIZE=30                            # pool size (default 30)
+REDIS_MIN_IDLE_CONNS=5                        # min idle conns (default 5)
+
+SWAGGER_ENABLED=false                         # default false; set true for local dev
+SWAGGER_HOST=                                 # host override for Swagger UI
 SERVICE_KEYS=myservice:sk_myservice_abc123    # opcional, vazio = dev mode
-OTEL_ENABLED=false
 OTEL_COLLECTOR_URL=localhost:4317
+OTEL_INSECURE=true
 ```
 
 Ver: [docs/adr/003-config-strategy.md](docs/adr/003-config-strategy.md)
@@ -176,7 +202,7 @@ make kind-logs      # Ver logs no Kind
 | ADR | Sobre |
 | --- | ----- |
 | [ADR-001: Clean Architecture](docs/adr/001-clean-architecture.md) | Estrutura de camadas e DI |
-| [ADR-002: ULID](docs/adr/002-ulid.md) | Por que ULID ao invés de UUID |
+| [ADR-002: UUID v7](docs/adr/002-ids.md) | Estrategia de identificadores (UUID v7) |
 | [ADR-003: Config Strategy](docs/adr/003-config-strategy.md) | godotenv + .env + Kubernetes |
 | [ADR-004: Error Handling](docs/adr/004-error-handling.md) | Erros em camadas |
 | [ADR-005: Service Key Auth](docs/adr/005-service-key-auth.md) | Autenticação via Service Key |

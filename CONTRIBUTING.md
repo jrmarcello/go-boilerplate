@@ -10,7 +10,7 @@ Obrigado pelo interesse em contribuir com o **MS Boilerplate Go**!
 
 ## 🛠️ Desenvolvimento
 
-Certifique-se de ter as ferramentas instaladas (`Go 1.24`, `Docker`, `Make`).
+Certifique-se de ter as ferramentas instaladas (`Go 1.25`, `Docker`, `Make`).
 
 ```bash
 # Setup inicial

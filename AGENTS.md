@@ -75,7 +75,7 @@ pkg/                  # Pacotes reutilizáveis entre serviços
 - **Nunca** acessar banco de dados diretamente dos use cases (use Repository interface)
 - **Nunca** retornar HTTP status codes do domínio
 - **Nunca** criar dependências cíclicas entre pacotes
-- **Nunca** usar `internal/infrastructure/cache` (usar `pkg/cache`)
+- **Nunca** usar pacotes internos para código que deveria ser reutilizável (usar `pkg/`)
 
 ---
 
@@ -171,13 +171,14 @@ O diretório `pkg/` contém pacotes **reutilizáveis entre serviços**:
 | `pkg/telemetry` | Setup OpenTelemetry + HTTP metrics + DB pool metrics |
 | `pkg/cache` | Interface de cache + implementação Redis |
 | `pkg/database` | Conexão PostgreSQL com Writer/Reader cluster |
+| `pkg/idempotency` | Interface de Store para idempotência + implementação Redis |
 
 ```go
 // Correto — usar pkg/ para código reutilizável
 import "bitbucket.org/appmax-space/go-boilerplate/pkg/apperror"
 
 // Errado — usar internal para código que deveria ser reutilizável
-import "bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/cache"
+import "bitbucket.org/appmax-space/go-boilerplate/internal/something"
 ```
 
 ---

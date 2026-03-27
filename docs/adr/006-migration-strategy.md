@@ -97,9 +97,10 @@ cmd/
    - Falha bloqueia deploy
 
 3. **Desenvolvimento local (Kind)**
-   - `make migrate-up` para dev com Docker Compose
-   - `make kind-migrate` para dev com Kind
-   - `go run ./cmd/migrate` para testar binário
+   - `make migrate-up` para dev com Docker Compose (usa goose diretamente)
+   - `make kind-migrate` para dev com Kind (port-forward + goose)
+   - `make migrate-status` para verificar estado das migrations
+   - `make migrate-create NAME=add_something` para criar nova migration
 
 > [!IMPORTANT]
 > **O hook PreSync é específico do ArgoCD.** No Kind puro sem ArgoCD, o Job é
@@ -108,11 +109,12 @@ cmd/
 
 ### Fluxo por Ambiente
 
-| Ambiente | Ferramenta | Fluxo de Migrations |
-| ---------- | ---------- | --------------------- |
+| Ambiente | Overlay / Ferramenta | Fluxo de Migrations |
+| ---------- | -------------------- | --------------------- |
 | **Dev Local (Docker)** | Docker Compose | `make migrate-up` manual |
-| **Dev Local (Kind)** | Kind + kubectl | `make kind-migrate` manual |
-| **HOM/PROD** | ArgoCD | Job PreSync **automático** |
+| **Dev Local (Kind)** | `deploy/overlays/develop/` | `make kind-migrate` manual |
+| **Homologação** | `deploy/overlays/homologacao/` | Job PreSync **automático** (ArgoCD) |
+| **Produção** | `deploy/overlays/producao/` | Job PreSync **automático** (ArgoCD) |
 
 ---
 

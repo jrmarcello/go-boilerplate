@@ -52,7 +52,6 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
   - `web/router/` - Route registration, middleware wiring
   - `web/middleware/` - Logger, metrics, rate limiting, idempotency, service key auth
   - `db/postgres/repository/` - sqlx repository implementations
-  - `cache/` - Internal Redis client (legacy, use `pkg/cache` for new code)
   - `telemetry/` - Business-specific metrics (entity counters)
 - **`pkg/`** - Reusable packages shared across services:
   - `apperror/` - Structured application errors (AppError with code, message, HTTP status)
@@ -62,6 +61,7 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
   - `telemetry/` - OpenTelemetry setup (traces + HTTP metrics + DB pool metrics)
   - `cache/` - Cache interface and Redis implementation
   - `database/` - PostgreSQL connection with Writer/Reader cluster
+  - `idempotency/` - Idempotency Store interface and Redis implementation
 - **`config/`** - Configuration loading (godotenv + env vars)
 - **`cmd/api/`** - Application entrypoint and manual DI wiring in `server.go`
 
@@ -73,6 +73,8 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
 - **API Response Format**: Always use `httputil.SendSuccess(c, status, data)` and `httputil.SendError(c, status, message)`. Responses wrap in `{"data": ...}` or `{"errors": {"message": ...}}`.
 - **Error Handling**: Domain defines pure errors (`entity.ErrNotFound`, etc.). `pkg/apperror.AppError` provides structured errors with HTTP status. Handlers translate errors via `handler.HandleError()`. Never return HTTP concepts from domain layer.
 - **Service Key Auth**: Optional service-to-service authentication via `X-Service-Name` + `X-Service-Key` headers. See `docs/adr/005-service-key-auth.md`.
+- **Singleflight**: GetUseCase uses `golang.org/x/sync/singleflight` to prevent cache stampede on concurrent reads for the same entity.
+- **Idempotency**: Redis-backed idempotency via `pkg/idempotency.Store`, wired as optional middleware. Uses SHA-256 fingerprint + lock/unlock pattern.
 
 ### Conventions
 

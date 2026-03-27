@@ -22,13 +22,14 @@ Adotar o diretório **`pkg/`** no nível raiz do projeto para pacotes reutilizá
 
 ```text
 pkg/
-├── apperror/     → Erros estruturados com código, mensagem e HTTP status
-├── httputil/     → Helpers de resposta HTTP padronizada
-├── ctxkeys/      → Chaves tipadas para context.Value
-├── logutil/      → Logging estruturado com propagação de contexto
-├── telemetry/    → Setup OpenTelemetry + HTTP metrics + DB pool metrics
-├── cache/        → Interface de cache + implementação Redis
-└── database/     → Conexão PostgreSQL com Writer/Reader cluster
+├── apperror/      → Erros estruturados com código, mensagem e HTTP status
+├── httputil/      → Helpers de resposta HTTP padronizada
+├── ctxkeys/       → Chaves tipadas para context.Value
+├── logutil/       → Logging estruturado com propagação de contexto
+├── telemetry/     → Setup OpenTelemetry + HTTP metrics + DB pool metrics
+├── cache/         → Interface de cache + implementação Redis
+├── database/      → Conexão PostgreSQL com Writer/Reader cluster
+└── idempotency/   → Store interface + RedisStore para idempotência distribuída
 ```
 
 ### Regras

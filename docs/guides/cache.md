@@ -47,7 +47,7 @@ sequenceDiagram
 
 ### Interface
 
-A interface de cache está definida em [`internal/domain/shared/interfaces/cache.go`](file:///internal/domain/shared/interfaces/cache.go):
+A interface de cache está definida em [`pkg/cache/cache.go`](../../pkg/cache/cache.go):
 
 ```go
 type Cache interface {
@@ -55,39 +55,56 @@ type Cache interface {
     Set(ctx context.Context, key string, value interface{}) error
     Delete(ctx context.Context, key string) error
     Ping(ctx context.Context) error
+    Close() error
 }
 ```
 
 ### Cliente Redis
 
-A implementação está em [`internal/infrastructure/cache/redis.go`](file:///internal/infrastructure/cache/redis.go):
+A implementação está em [`pkg/cache/redis.go`](../../pkg/cache/redis.go):
 
 | Método | Descrição |
 | -------- | ----------- |
-| `Get` | Busca e deserializa do cache |
-| `Set` | Serializa e armazena com TTL |
+| `Get` | Busca e deserializa do cache (retorna `ErrCacheMiss` se não encontrado) |
+| `Set` | Serializa e armazena com TTL configurado |
 | `Delete` | Invalida uma chave |
 | `Ping` | Health check da conexão |
+| `Close` | Fecha a conexão Redis |
+| `UnderlyingClient` | Retorna o `*redis.Client` para uso por outros pacotes (ex: `pkg/idempotency`) |
+
+> **Nota:** Todas as operações em `*RedisClient` nil são no-ops seguros (nil-safe pattern).
 
 ### Uso nos Use Cases
 
 ```go
-// GET - Cache-first
+// GET - Cache-first com singleflight
 func (uc *GetUseCase) Execute(ctx context.Context, input dto.GetInput) (*dto.GetOutput, error) {
     cacheKey := "entity:" + input.ID
 
     // 1. Tentar cache primeiro
     if uc.Cache != nil {
         var cached dto.GetOutput
-        if err := uc.Cache.Get(ctx, cacheKey, &cached); err == nil {
+        if cacheErr := uc.Cache.Get(ctx, cacheKey, &cached); cacheErr == nil {
             return &cached, nil // Cache hit
         }
     }
 
-    // 2. Cache miss - buscar no DB
-    entity, err := uc.Repo.FindByID(ctx, id)
-    if err != nil {
-        return nil, err
+    // 2. Cache miss - buscar no DB (com singleflight para evitar stampede)
+    var e *entity.Entity
+    if uc.Flight != nil {
+        val, flightErr, _ := uc.Flight.byID.Do(input.ID, func() (any, error) {
+            return uc.Repo.FindByID(ctx, id)
+        })
+        if flightErr != nil {
+            return nil, flightErr
+        }
+        e = val.(*entity.Entity)
+    } else {
+        var findErr error
+        e, findErr = uc.Repo.FindByID(ctx, id)
+        if findErr != nil {
+            return nil, findErr
+        }
     }
 
     // 3. Armazenar no cache
@@ -111,6 +128,8 @@ func (uc *UpdateUseCase) Execute(ctx context.Context, input dto.UpdateInput) (*d
 }
 ```
 
+> **Singleflight**: O `GetUseCase` suporta `singleflight` opcionalmente via `.WithFlight(fg)`. Quando ativado, requests concorrentes para o mesmo ID durante um cache miss são deduplicados -- apenas uma goroutine consulta o banco, e as demais recebem o mesmo resultado. Isso previne o problema de **cache stampede** (thundering herd).
+
 ---
 
 ## Configuração
@@ -122,6 +141,11 @@ func (uc *UpdateUseCase) Execute(ctx context.Context, input dto.UpdateInput) (*d
 | `REDIS_ENABLED` | Habilita/desabilita cache | `false` |
 | `REDIS_URL` | URL de conexão | `redis://localhost:6379` |
 | `REDIS_TTL` | Tempo de expiração | `5m` |
+| `REDIS_POOL_SIZE` | Tamanho máximo do pool de conexões | `30` |
+| `REDIS_MIN_IDLE_CONNS` | Conexões ociosas mínimas mantidas | `5` |
+| `REDIS_DIAL_TIMEOUT` | Timeout para estabelecer conexão | `500ms` |
+| `REDIS_READ_TIMEOUT` | Timeout para operações de leitura | `200ms` |
+| `REDIS_WRITE_TIMEOUT` | Timeout para operações de escrita | `200ms` |
 
 ### Exemplo `.env`
 
@@ -129,7 +153,28 @@ func (uc *UpdateUseCase) Execute(ctx context.Context, input dto.UpdateInput) (*d
 REDIS_ENABLED=true
 REDIS_URL=redis://localhost:6379
 REDIS_TTL=5m
+REDIS_POOL_SIZE=30
+REDIS_MIN_IDLE_CONNS=5
+REDIS_DIAL_TIMEOUT=500ms
+REDIS_READ_TIMEOUT=200ms
+REDIS_WRITE_TIMEOUT=200ms
 ```
+
+### Pool de Conexões
+
+O `RedisClient` configura o pool automaticamente a partir das variáveis de ambiente. Os valores são aplicados sobre o `*redis.Options` retornado pelo parse da URL:
+
+```go
+if cfg.PoolSize > 0 {
+    opts.PoolSize = cfg.PoolSize
+}
+if cfg.MinIdleConns > 0 {
+    opts.MinIdleConns = cfg.MinIdleConns
+}
+// DialTimeout, ReadTimeout, WriteTimeout seguem o mesmo padrão
+```
+
+> **Dica**: Em produção, ajuste `REDIS_POOL_SIZE` para o número de goroutines concorrentes esperadas. O default (`30`) é adequado para a maioria dos cenários.
 
 ---
 
