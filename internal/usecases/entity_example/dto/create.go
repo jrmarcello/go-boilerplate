@@ -12,6 +12,6 @@ type CreateInput struct {
 
 // CreateOutput representa os dados de saída após criação.
 type CreateOutput struct {
-	ID        string `json:"id"`         // ID gerado (ULID)
+	ID        string `json:"id"`         // ID gerado (UUID v7)
 	CreatedAt string `json:"created_at"` // Timestamp no formato RFC3339
 }

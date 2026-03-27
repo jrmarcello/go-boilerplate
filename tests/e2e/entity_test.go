@@ -268,8 +268,8 @@ func TestE2E_CreateEntity_EmptyRequest(t *testing.T) {
 func TestE2E_GetEntity_NotFound(t *testing.T) {
 	router := setupTestRouter()
 
-	// ULID válido mas não existe
-	req := httptest.NewRequest("GET", "/entities/01ARZ3NDEKTSV4RRFFQ69G5FAV", nil)
+	// UUID v7 válido mas não existe
+	req := httptest.NewRequest("GET", "/entities/018e4a2c-6b4d-7000-9410-abcdef123456", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -294,7 +294,7 @@ func TestE2E_UpdateEntity_NotFound(t *testing.T) {
 	update := map[string]string{"name": "Updated Name"}
 	body, _ := json.Marshal(update)
 
-	req := httptest.NewRequest("PUT", "/entities/01ARZ3NDEKTSV4RRFFQ69G5FAV", bytes.NewReader(body))
+	req := httptest.NewRequest("PUT", "/entities/018e4a2c-6b4d-7000-9410-abcdef123456", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -336,7 +336,7 @@ func TestE2E_UpdateEntity_InvalidEmail(t *testing.T) {
 func TestE2E_DeleteEntity_NotFound(t *testing.T) {
 	router := setupTestRouter()
 
-	req := httptest.NewRequest("DELETE", "/entities/01ARZ3NDEKTSV4RRFFQ69G5FAV", nil)
+	req := httptest.NewRequest("DELETE", "/entities/018e4a2c-6b4d-7000-9410-abcdef123456", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -384,7 +384,7 @@ func TestE2E_ServiceKeyAuth_Errors(t *testing.T) {
 	router := setupTestRouterWithAuth()
 
 	t.Run("missing auth headers returns 401", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/entities/01H123456789", nil)
+		req := httptest.NewRequest("GET", "/entities/018e4a2c-6b4d-7000-8000-000000000001", nil)
 		// Sem headers de auth
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
@@ -394,7 +394,7 @@ func TestE2E_ServiceKeyAuth_Errors(t *testing.T) {
 	})
 
 	t.Run("invalid key returns 401", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/entities/01H123456789", nil)
+		req := httptest.NewRequest("GET", "/entities/018e4a2c-6b4d-7000-8000-000000000001", nil)
 		req.Header.Set("X-Service-Name", "test-service")
 		req.Header.Set("X-Service-Key", "wrong_key")
 		w := httptest.NewRecorder()
@@ -405,7 +405,7 @@ func TestE2E_ServiceKeyAuth_Errors(t *testing.T) {
 	})
 
 	t.Run("unknown service returns 401", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/entities/01H123456789", nil)
+		req := httptest.NewRequest("GET", "/entities/018e4a2c-6b4d-7000-8000-000000000001", nil)
 		req.Header.Set("X-Service-Name", "unknown-service")
 		req.Header.Set("X-Service-Key", "any_key")
 		w := httptest.NewRecorder()
@@ -416,7 +416,7 @@ func TestE2E_ServiceKeyAuth_Errors(t *testing.T) {
 	})
 
 	t.Run("valid key allows access", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/entities/01ARZ3NDEKTSV4RRFFQ69G5FAV", nil)
+		req := httptest.NewRequest("GET", "/entities/018e4a2c-6b4d-7000-9410-abcdef123456", nil)
 		addAuthHeaders(req)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)

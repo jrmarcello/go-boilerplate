@@ -52,7 +52,7 @@ func TestGetUseCase_Execute_NotFound(t *testing.T) {
 		Return(nil, entity.ErrEntityNotFound)
 
 	uc := NewGetUseCase(mockRepo)
-	input := dto.GetInput{ID: "01ARZ3NDEKTSV4RRFFQ69G5FAV"}
+	input := dto.GetInput{ID: "018e4a2c-6b4d-7000-9410-abcdef123456"}
 
 	// Act
 	output, err := uc.Execute(context.Background(), input)
@@ -88,7 +88,7 @@ func TestGetUseCase_Execute_CacheHit(t *testing.T) {
 	mockRepo := new(MockRepository)
 	mockCache := new(MockCache)
 
-	id := "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+	id := "018e4a2c-6b4d-7000-9410-abcdef123456"
 	cacheKey := "entity:" + id
 
 	// Simula cache hit - Get retorna sucesso

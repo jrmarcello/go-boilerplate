@@ -2,11 +2,16 @@ definitions:
   bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.CreateInput:
     properties:
       email:
-        description: Email (será validado no UseCase)
+        description: Email (validado via binding + UseCase)
+        maxLength: 255
         type: string
       name:
         description: Nome da entity
+        maxLength: 255
         type: string
+    required:
+    - email
+    - name
     type: object
   bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.CreateOutput:
     properties:
@@ -14,7 +19,7 @@ definitions:
         description: Timestamp no formato RFC3339
         type: string
       id:
-        description: ID gerado (ULID)
+        description: ID gerado (UUID v7)
         type: string
     type: object
   bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.DeleteOutput:
@@ -64,9 +69,11 @@ definitions:
     properties:
       email:
         description: Email (opcional)
+        maxLength: 255
         type: string
       name:
         description: Nome (opcional)
+        maxLength: 255
         type: string
     type: object
   bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.UpdateOutput:

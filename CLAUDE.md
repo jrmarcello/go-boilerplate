@@ -68,7 +68,7 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
 ### Key Patterns
 
 - **Manual DI**: All wiring happens in `cmd/api/server.go:buildDependencies()`. No DI framework. Use cases accept interfaces via constructor, optional dependencies (cache) via `.WithCache()` builder method.
-- **ID Strategy**: ULID for all entity IDs. See `docs/adr/002-ulid.md`.
+- **ID Strategy**: UUID v7 for all entity IDs. See `docs/adr/002-ids.md`.
 - **DB Cluster**: Writer/Reader split via `pkg/database.DBCluster`. Reader is optional, falls back to writer.
 - **API Response Format**: Always use `httputil.SendSuccess(c, status, data)` and `httputil.SendError(c, status, message)`. Responses wrap in `{"data": ...}` or `{"errors": {"message": ...}}`.
 - **Error Handling**: Domain defines pure errors (`entity.ErrNotFound`, etc.). `pkg/apperror.AppError` provides structured errors with HTTP status. Handlers translate errors via `handler.HandleError()`. Never return HTTP concepts from domain layer.

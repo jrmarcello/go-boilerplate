@@ -6,7 +6,7 @@ package dto
 
 // GetInput representa os dados de entrada para buscar uma entity.
 type GetInput struct {
-	ID string `json:"id"` // ULID da entity
+	ID string `json:"id"` // UUID v7 da entity
 }
 
 // GetOutput representa os dados de saída da entity encontrada.

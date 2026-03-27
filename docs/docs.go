@@ -258,14 +258,20 @@ const docTemplate = `{
     "definitions": {
         "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.CreateInput": {
             "type": "object",
+            "required": [
+                "email",
+                "name"
+            ],
             "properties": {
                 "email": {
-                    "description": "Email (será validado no UseCase)",
-                    "type": "string"
+                    "description": "Email (validado via binding + UseCase)",
+                    "type": "string",
+                    "maxLength": 255
                 },
                 "name": {
                     "description": "Nome da entity",
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 255
                 }
             }
         },
@@ -277,7 +283,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
-                    "description": "ID gerado (ULID)",
+                    "description": "ID gerado (UUID v7)",
                     "type": "string"
                 }
             }
@@ -353,11 +359,13 @@ const docTemplate = `{
             "properties": {
                 "email": {
                     "description": "Email (opcional)",
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 255
                 },
                 "name": {
                     "description": "Nome (opcional)",
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 255
                 }
             }
         },

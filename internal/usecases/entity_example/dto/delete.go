@@ -6,7 +6,7 @@ package dto
 
 // DeleteInput representa os dados de entrada para deletar uma entity.
 type DeleteInput struct {
-	ID string `json:"id"` // ULID da entity
+	ID string `json:"id"` // UUID v7 da entity
 }
 
 // DeleteOutput representa os dados de saída após deleção.

@@ -23,7 +23,7 @@ func TestEntityDB_ToEntity_Success(t *testing.T) {
 	// Arrange
 	now := time.Now().Truncate(time.Microsecond)
 	dbModel := entityDB{
-		ID:        "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+		ID:        "018e4a2c-6b4d-7000-9410-abcdef123456",
 		Name:      "João Silva",
 		Email:     "joao@example.com",
 		Active:    true,
@@ -37,7 +37,7 @@ func TestEntityDB_ToEntity_Success(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.NotNil(t, entity)
-	assert.Equal(t, "01ARZ3NDEKTSV4RRFFQ69G5FAV", entity.ID.String())
+	assert.Equal(t, "018e4a2c-6b4d-7000-9410-abcdef123456", entity.ID.String())
 	assert.Equal(t, "João Silva", entity.Name)
 	assert.Equal(t, "joao@example.com", entity.Email.String())
 	assert.True(t, entity.Active)
@@ -63,7 +63,7 @@ func TestEntityDB_ToEntity_InvalidID(t *testing.T) {
 func TestEntityDB_ToEntity_InvalidEmail(t *testing.T) {
 	// Arrange
 	dbModel := entityDB{
-		ID:    "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+		ID:    "018e4a2c-6b4d-7000-9410-abcdef123456",
 		Name:  "Test",
 		Email: "invalid-email",
 	}

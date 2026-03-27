@@ -40,7 +40,7 @@ func TestDeleteUseCase_Execute_NotFound(t *testing.T) {
 		Return(entity.ErrEntityNotFound)
 
 	uc := NewDeleteUseCase(mockRepo)
-	input := dto.DeleteInput{ID: "01ARZ3NDEKTSV4RRFFQ69G5FAV"}
+	input := dto.DeleteInput{ID: "018e4a2c-6b4d-7000-9410-abcdef123456"}
 
 	// Act
 	output, err := uc.Execute(context.Background(), input)
@@ -98,7 +98,7 @@ func TestDeleteUseCase_Execute_RepositoryError(t *testing.T) {
 		Return(errors.New("database error"))
 
 	uc := NewDeleteUseCase(mockRepo)
-	input := dto.DeleteInput{ID: "01ARZ3NDEKTSV4RRFFQ69G5FAV"}
+	input := dto.DeleteInput{ID: "018e4a2c-6b4d-7000-9410-abcdef123456"}
 
 	// Act
 	output, err := uc.Execute(context.Background(), input)

@@ -20,7 +20,7 @@ type Repository interface {
 	// Create persiste uma nova Entity no banco de dados.
 	Create(ctx context.Context, e *entity.Entity) error
 
-	// FindByID busca uma Entity pelo ID (ULID).
+	// FindByID busca uma Entity pelo ID (UUID v7).
 	// Retorna ErrEntityNotFound se não encontrar.
 	FindByID(ctx context.Context, id vo.ID) (*entity.Entity, error)
 

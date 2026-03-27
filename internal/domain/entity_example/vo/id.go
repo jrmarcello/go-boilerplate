@@ -1,60 +1,53 @@
 package vo
 
 import (
-	"crypto/rand"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 
-	"github.com/oklog/ulid/v2"
+	"github.com/google/uuid"
 )
 
-// ID é um Value Object que encapsula um ULID (Universally Unique Lexicographically Sortable Identifier).
-//
-// Por que ULID em vez de UUID?
-//   - Ordenável: ULIDs são ordenados cronologicamente (ótimo para índices de banco)
-//   - Compacto: 26 caracteres vs 36 do UUID
-//   - URL-safe: não contém caracteres especiais
-//
-// Exemplo: 01ARZ3NDEKTSV4RRFFQ69G5FAV
+// ID represents a unique entity identifier using UUID v7 (RFC 9562).
+// UUID v7 is time-ordered (48-bit unix timestamp + 74-bit randomness),
+// providing good B-tree index locality and global uniqueness.
 type ID string
 
+// NewID generates a new UUID v7 identifier.
 func NewID() ID {
-	// Usa crypto/rand para geração segura de entropia (G404 fix)
-	return ID(ulid.MustNew(ulid.Now(), rand.Reader).String())
+	return ID(uuid.Must(uuid.NewV7()).String())
 }
 
-// ParseID converte uma string em ID, validando o formato ULID.
-// Use quando receber um ID de fonte externa (API, banco, etc).
+// ParseID validates and parses a UUID v7 string into an ID.
 func ParseID(s string) (ID, error) {
-	if _, err := ulid.Parse(s); err != nil {
+	if _, parseErr := uuid.Parse(s); parseErr != nil {
 		return "", ErrInvalidID
 	}
 	return ID(s), nil
 }
 
-// String retorna a representação em string do ID.
-// Implementa fmt.Stringer para uso em logs, prints, etc.
-func (i ID) String() string { return string(i) }
+// String returns the string representation.
+func (i ID) String() string {
+	return string(i)
+}
 
-// Value implementa driver.Valuer para o pacote database/sql.
-// É chamado automaticamente quando o ID é usado em INSERT/UPDATE.
+// Value implements driver.Valuer for database storage.
 func (i ID) Value() (driver.Value, error) {
 	return string(i), nil
 }
 
-// Scan implementa sql.Scanner para o pacote database/sql.
-// É chamado automaticamente quando o ID é lido do banco (SELECT).
-func (i *ID) Scan(value interface{}) error {
+// Scan implements sql.Scanner for database retrieval.
+func (i *ID) Scan(value any) error {
 	if value == nil {
-		return errors.New("ID não pode ser nulo")
+		return errors.New("ID cannot be empty")
 	}
-	switch v := value.(type) {
-	case string:
-		*i = ID(v)
-	case []byte:
-		*i = ID(string(v))
-	default:
-		return errors.New("tipo inválido para ID")
+	sv, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("invalid type for ID: %T", value)
 	}
+	if _, parseErr := uuid.Parse(sv); parseErr != nil {
+		return ErrInvalidID
+	}
+	*i = ID(sv)
 	return nil
 }

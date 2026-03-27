@@ -57,7 +57,7 @@ func TestUpdateUseCase_Execute_NotFound(t *testing.T) {
 	uc := NewUpdateUseCase(mockRepo)
 	newName := "Updated Name"
 	input := dto.UpdateInput{
-		ID:   "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+		ID:   "018e4a2c-6b4d-7000-9410-abcdef123456",
 		Name: &newName,
 	}
 
