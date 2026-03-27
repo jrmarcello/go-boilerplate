@@ -10,6 +10,7 @@ import (
 
 	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/database"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -29,14 +30,14 @@ type entityDB struct {
 }
 
 func (e *entityDB) toEntity() (*entity.Entity, error) {
-	id, err := vo.ParseID(e.ID)
-	if err != nil {
-		return nil, fmt.Errorf("erro ao parsear ID: %w", err)
+	id, parseErr := vo.ParseID(e.ID)
+	if parseErr != nil {
+		return nil, fmt.Errorf("parsing ID: %w", parseErr)
 	}
 
-	email, err := vo.NewEmail(e.Email)
-	if err != nil {
-		return nil, fmt.Errorf("erro ao parsear email: %w", err)
+	email, emailErr := vo.NewEmail(e.Email)
+	if emailErr != nil {
+		return nil, fmt.Errorf("parsing email: %w", emailErr)
 	}
 
 	return &entity.Entity{
@@ -62,7 +63,12 @@ func fromDomainEntity(e *entity.Entity) entityDB {
 
 // EntityRepository implementa a interface Repository para Entity.
 type EntityRepository struct {
-	DB *sqlx.DB
+	cluster *database.DBCluster
+}
+
+// NewEntityRepository cria uma nova instância do repositório.
+func NewEntityRepository(cluster *database.DBCluster) *EntityRepository {
+	return &EntityRepository{cluster: cluster}
 }
 
 func (r *EntityRepository) Create(ctx context.Context, e *entity.Entity) error {
@@ -75,8 +81,8 @@ func (r *EntityRepository) Create(ctx context.Context, e *entity.Entity) error {
 	`
 
 	dbModel := fromDomainEntity(e)
-	_, err := r.DB.NamedExecContext(ctx, query, dbModel)
-	return err
+	_, execErr := r.cluster.Writer().NamedExecContext(ctx, query, dbModel)
+	return execErr
 }
 
 func (r *EntityRepository) FindByID(ctx context.Context, id vo.ID) (*entity.Entity, error) {
@@ -87,12 +93,12 @@ func (r *EntityRepository) FindByID(ctx context.Context, id vo.ID) (*entity.Enti
 	`
 
 	var dbModel entityDB
-	err := r.DB.GetContext(ctx, &dbModel, query, id.String())
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+	selectErr := r.cluster.Reader().GetContext(ctx, &dbModel, query, id.String())
+	if selectErr != nil {
+		if errors.Is(selectErr, sql.ErrNoRows) {
 			return nil, entity.ErrEntityNotFound
 		}
-		return nil, err
+		return nil, selectErr
 	}
 
 	return dbModel.toEntity()
@@ -106,12 +112,12 @@ func (r *EntityRepository) FindByEmail(ctx context.Context, email vo.Email) (*en
 	`
 
 	var dbModel entityDB
-	err := r.DB.GetContext(ctx, &dbModel, query, email.String())
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+	selectErr := r.cluster.Reader().GetContext(ctx, &dbModel, query, email.String())
+	if selectErr != nil {
+		if errors.Is(selectErr, sql.ErrNoRows) {
 			return nil, entity.ErrEntityNotFound
 		}
-		return nil, err
+		return nil, selectErr
 	}
 
 	return dbModel.toEntity()
@@ -120,7 +126,7 @@ func (r *EntityRepository) FindByEmail(ctx context.Context, email vo.Email) (*en
 func (r *EntityRepository) List(ctx context.Context, filter entity.ListFilter) (*entity.ListResult, error) {
 	filter.Normalize()
 
-	// Construir query dinâmica com filtros
+	// Build dynamic query with filters
 	var conditions []string
 	args := make(map[string]interface{})
 
@@ -141,22 +147,24 @@ func (r *EntityRepository) List(ctx context.Context, filter entity.ListFilter) (
 		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
 
-	// Query para contar total
+	reader := r.cluster.Reader()
+
+	// Count query
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM entities %s", whereClause)
 	var total int
 
-	countQuery, countArgs, err := sqlx.Named(countQuery, args)
-	if err != nil {
-		return nil, err
+	countQuery, countArgs, namedErr := sqlx.Named(countQuery, args)
+	if namedErr != nil {
+		return nil, namedErr
 	}
-	countQuery = r.DB.Rebind(countQuery)
+	countQuery = reader.Rebind(countQuery)
 
-	err = r.DB.GetContext(ctx, &total, countQuery, countArgs...)
-	if err != nil {
-		return nil, err
+	countErr := reader.GetContext(ctx, &total, countQuery, countArgs...)
+	if countErr != nil {
+		return nil, countErr
 	}
 
-	// Query para buscar dados paginados
+	// Paginated data query
 	args["limit"] = filter.Limit
 	args["offset"] = filter.Offset()
 
@@ -168,24 +176,24 @@ func (r *EntityRepository) List(ctx context.Context, filter entity.ListFilter) (
 		LIMIT :limit OFFSET :offset
 	`, whereClause)
 
-	dataQuery, dataArgs, err := sqlx.Named(dataQuery, args)
-	if err != nil {
-		return nil, err
+	dataQuery, dataArgs, dataNamedErr := sqlx.Named(dataQuery, args)
+	if dataNamedErr != nil {
+		return nil, dataNamedErr
 	}
-	dataQuery = r.DB.Rebind(dataQuery)
+	dataQuery = reader.Rebind(dataQuery)
 
 	var dbModels []entityDB
-	err = r.DB.SelectContext(ctx, &dbModels, dataQuery, dataArgs...)
-	if err != nil {
-		return nil, err
+	selectErr := reader.SelectContext(ctx, &dbModels, dataQuery, dataArgs...)
+	if selectErr != nil {
+		return nil, selectErr
 	}
 
-	// Converter para entidades de domínio
+	// Convert to domain entities
 	entities := make([]*entity.Entity, 0, len(dbModels))
 	for i := range dbModels {
-		e, err := dbModels[i].toEntity()
-		if err != nil {
-			return nil, err
+		e, convertErr := dbModels[i].toEntity()
+		if convertErr != nil {
+			return nil, convertErr
 		}
 		entities = append(entities, e)
 	}
@@ -199,6 +207,12 @@ func (r *EntityRepository) List(ctx context.Context, filter entity.ListFilter) (
 }
 
 func (r *EntityRepository) Update(ctx context.Context, e *entity.Entity) error {
+	tx, txErr := r.cluster.Writer().BeginTxx(ctx, nil)
+	if txErr != nil {
+		return fmt.Errorf("beginning transaction: %w", txErr)
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	query := `
 		UPDATE entities SET
 			name = :name,
@@ -209,18 +223,23 @@ func (r *EntityRepository) Update(ctx context.Context, e *entity.Entity) error {
 	`
 
 	dbModel := fromDomainEntity(e)
-	result, err := r.DB.NamedExecContext(ctx, query, dbModel)
-	if err != nil {
-		return err
+	result, execErr := tx.NamedExecContext(ctx, query, dbModel)
+	if execErr != nil {
+		return execErr
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
+	rowsAffected, rowsErr := result.RowsAffected()
+	if rowsErr != nil {
+		return rowsErr
 	}
 
 	if rowsAffected == 0 {
 		return entity.ErrEntityNotFound
+	}
+
+	commitErr := tx.Commit()
+	if commitErr != nil {
+		return fmt.Errorf("committing transaction: %w", commitErr)
 	}
 
 	return nil
@@ -234,14 +253,14 @@ func (r *EntityRepository) Delete(ctx context.Context, id vo.ID) error {
 		WHERE id = $2 AND active = true
 	`
 
-	result, err := r.DB.ExecContext(ctx, query, time.Now(), id.String())
-	if err != nil {
-		return err
+	result, execErr := r.cluster.Writer().ExecContext(ctx, query, time.Now(), id.String())
+	if execErr != nil {
+		return execErr
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
+	rowsAffected, rowsErr := result.RowsAffected()
+	if rowsErr != nil {
+		return rowsErr
 	}
 
 	if rowsAffected == 0 {

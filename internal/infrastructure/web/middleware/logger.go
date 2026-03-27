@@ -7,6 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/trace"
+
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/ctxkeys"
 )
 
 const (
@@ -24,7 +26,7 @@ func Logger() gin.HandlerFunc {
 		if requestID == "" {
 			requestID = uuid.New().String()
 		}
-		c.Set("request_id", requestID)
+		c.Set(ctxkeys.RequestID, requestID)
 		c.Header(RequestIDHeader, requestID)
 
 		// Extrair Trace ID se disponível

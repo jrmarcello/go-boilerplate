@@ -18,6 +18,7 @@ import (
 	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example"
 	pkgcache "bitbucket.org/appmax-space/go-boilerplate/pkg/cache"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/database"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/idempotency"
 	pkgtelemetry "bitbucket.org/appmax-space/go-boilerplate/pkg/telemetry"
 )
 
@@ -40,15 +41,26 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	defer shutdownTelemetry(tp, logger)
 
 	// 3. Database (Writer/Reader Cluster)
-	cluster, clusterErr := database.NewDBCluster(
-		database.Config{
-			DSN:             cfg.DB.DSN,
-			MaxOpenConns:    cfg.DB.MaxOpenConns,
-			MaxIdleConns:    cfg.DB.MaxIdleConns,
-			ConnMaxLifetime: cfg.DB.ConnMaxLifetime,
-		},
-		cfg.DB.ReaderConfig(),
-	)
+	writerCfg := database.Config{
+		DSN:             cfg.DB.GetWriterDSN(),
+		MaxOpenConns:    cfg.DB.MaxOpenConns,
+		MaxIdleConns:    cfg.DB.MaxIdleConns,
+		ConnMaxLifetime: cfg.DB.ConnMaxLifetime,
+		ConnMaxIdleTime: cfg.DB.ConnMaxIdleTime,
+	}
+
+	var readerCfg *database.Config
+	if cfg.DB.ReplicaEnabled {
+		readerCfg = &database.Config{
+			DSN:             cfg.DB.GetReaderDSN(),
+			MaxOpenConns:    cfg.DB.ReplicaMaxOpenConns,
+			MaxIdleConns:    cfg.DB.ReplicaMaxIdleConns,
+			ConnMaxLifetime: cfg.DB.ReplicaConnMaxLifetime,
+			ConnMaxIdleTime: cfg.DB.ReplicaConnMaxIdleTime,
+		}
+	}
+
+	cluster, clusterErr := database.NewDBCluster(writerCfg, readerCfg)
 	if clusterErr != nil {
 		return clusterErr
 	}
@@ -86,8 +98,8 @@ func shutdownTelemetry(tp *pkgtelemetry.Provider, logger *slog.Logger) {
 }
 
 func buildDependencies(cluster *database.DBCluster, cfg *config.Config, httpMetrics *pkgtelemetry.HTTPMetrics) router.Dependencies {
-	// Repositories (use writer for mutations, reader for queries)
-	repo := &repository.EntityRepository{DB: cluster.Writer()}
+	// Repositories (cluster handles Writer/Reader routing internally)
+	repo := repository.NewEntityRepository(cluster)
 
 	// Cache (optional)
 	redisClient, cacheErr := pkgcache.NewRedisClient(pkgcache.RedisConfig{
@@ -106,13 +118,20 @@ func buildDependencies(cluster *database.DBCluster, cfg *config.Config, httpMetr
 	updateUC := entityuc.NewUpdateUseCase(repo).WithCache(redisClient)
 	deleteUC := entityuc.NewDeleteUseCase(repo).WithCache(redisClient)
 
+	// Idempotency Store (optional — uses Redis if available)
+	var idempotencyStore idempotency.Store
+	if rc := redisClient.UnderlyingClient(); rc != nil {
+		idempotencyStore = idempotency.NewRedisStore(rc, 24*time.Hour, 30*time.Second)
+	}
+
 	// Handlers
 	entityHandler := handler.NewEntityHandler(createUC, getUC, listUC, updateUC, deleteUC)
 
 	return router.Dependencies{
-		DB:            cluster.Writer(),
-		EntityHandler: entityHandler,
-		HTTPMetrics:   httpMetrics,
+		DB:               cluster.Writer(),
+		EntityHandler:    entityHandler,
+		HTTPMetrics:      httpMetrics,
+		IdempotencyStore: idempotencyStore,
 		Config: router.Config{
 			ServiceName:    cfg.Otel.ServiceName,
 			ServiceKeys:    cfg.Auth.ServiceKeys,

@@ -107,6 +107,15 @@ func (r *RedisClient) Close() error {
 	return r.client.Close()
 }
 
+// RedisClient returns the underlying go-redis client for use by other packages
+// (e.g., pkg/idempotency). Returns nil if the cache is disabled.
+func (r *RedisClient) UnderlyingClient() *redis.Client {
+	if r == nil {
+		return nil
+	}
+	return r.client
+}
+
 // Ping checks the Redis connection.
 func (r *RedisClient) Ping(ctx context.Context) error {
 	if r == nil {

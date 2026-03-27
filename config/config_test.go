@@ -9,16 +9,21 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	// Setup env vars for test - os.Getenv reads these!
-	// Struct structure: Server.Port -> SERVER_PORT
+	// Setup env vars for test
 	os.Setenv("SERVER_PORT", "9090")
-	// DB.DSN -> DB_DSN
-	os.Setenv("DB_DSN", "postgres://test:test@localhost:5432/test_db?sslmode=disable")
-	os.Setenv("DB_READER_DSN", "postgres://test:test@reader:5432/test_db?sslmode=disable")
+	os.Setenv("DB_HOST", "testhost")
+	os.Setenv("DB_PORT", "5433")
+	os.Setenv("DB_USER", "testuser")
+	os.Setenv("DB_PASSWORD", "testpass")
+	os.Setenv("DB_NAME", "test_db")
+	os.Setenv("DB_SSLMODE", "require")
 	os.Setenv("DB_MAX_OPEN_CONNS", "50")
-	os.Setenv("DB_MAX_IDLE_CONNS", "10")
+	os.Setenv("DB_MAX_IDLE_CONNS", "15")
 	os.Setenv("DB_CONN_MAX_LIFETIME", "10m")
-	// Redis.Enabled -> REDIS_ENABLED
+	os.Setenv("DB_CONN_MAX_IDLE_TIME", "2m")
+	os.Setenv("DB_REPLICA_ENABLED", "true")
+	os.Setenv("DB_REPLICA_HOST", "replicahost")
+	os.Setenv("DB_REPLICA_PORT", "5434")
 	os.Setenv("REDIS_ENABLED", "true")
 	os.Setenv("SWAGGER_ENABLED", "false")
 	defer os.Clearenv()
@@ -29,20 +34,35 @@ func TestLoad(t *testing.T) {
 
 	// Verify overrides
 	assert.Equal(t, "9090", cfg.Server.Port)
-	assert.Contains(t, cfg.DB.DSN, "test_db")
-	assert.Equal(t, "postgres://test:test@reader:5432/test_db?sslmode=disable", cfg.DB.ReaderDSN)
+	assert.Equal(t, "testhost", cfg.DB.Host)
+	assert.Equal(t, "5433", cfg.DB.Port)
+	assert.Equal(t, "testuser", cfg.DB.User)
+	assert.Equal(t, "testpass", cfg.DB.Password)
+	assert.Equal(t, "test_db", cfg.DB.Name)
+	assert.Equal(t, "require", cfg.DB.SSLMode)
 	assert.Equal(t, 50, cfg.DB.MaxOpenConns)
-	assert.Equal(t, 10, cfg.DB.MaxIdleConns)
+	assert.Equal(t, 15, cfg.DB.MaxIdleConns)
 	assert.Equal(t, 10*time.Minute, cfg.DB.ConnMaxLifetime)
+	assert.Equal(t, 2*time.Minute, cfg.DB.ConnMaxIdleTime)
+	assert.True(t, cfg.DB.ReplicaEnabled)
+	assert.Equal(t, "replicahost", cfg.DB.ReplicaHost)
+	assert.Equal(t, "5434", cfg.DB.ReplicaPort)
 	assert.True(t, cfg.Redis.Enabled)
 	assert.False(t, cfg.Swagger.Enabled)
 	assert.Equal(t, 5*time.Minute, cfg.GetRedisTTL())
 
-	// Verify ReaderConfig returns proper config
-	readerCfg := cfg.DB.ReaderConfig()
-	assert.NotNil(t, readerCfg)
-	assert.Equal(t, cfg.DB.ReaderDSN, readerCfg.DSN)
-	assert.Equal(t, cfg.DB.MaxOpenConns, readerCfg.MaxOpenConns)
+	// Verify DSN methods
+	writerDSN := cfg.DB.GetWriterDSN()
+	assert.Contains(t, writerDSN, "host=testhost")
+	assert.Contains(t, writerDSN, "port=5433")
+	assert.Contains(t, writerDSN, "dbname=test_db")
+
+	readerDSN := cfg.DB.GetReaderDSN()
+	assert.Contains(t, readerDSN, "host=replicahost")
+	assert.Contains(t, readerDSN, "port=5434")
+	// Falls back to writer user/password/name
+	assert.Contains(t, readerDSN, "user=testuser")
+	assert.Contains(t, readerDSN, "dbname=test_db")
 }
 
 func TestLoad_Defaults(t *testing.T) {
@@ -53,14 +73,25 @@ func TestLoad_Defaults(t *testing.T) {
 
 	// Verify defaults
 	assert.Equal(t, "8080", cfg.Server.Port)
-	assert.Contains(t, cfg.DB.DSN, "entities")
-	assert.Equal(t, "", cfg.DB.ReaderDSN)
+	assert.Equal(t, "localhost", cfg.DB.Host)
+	assert.Equal(t, "5432", cfg.DB.Port)
+	assert.Equal(t, "user", cfg.DB.User)
+	assert.Equal(t, "password", cfg.DB.Password)
+	assert.Equal(t, "entities", cfg.DB.Name)
+	assert.Equal(t, "disable", cfg.DB.SSLMode)
 	assert.Equal(t, 25, cfg.DB.MaxOpenConns)
-	assert.Equal(t, 25, cfg.DB.MaxIdleConns)
+	assert.Equal(t, 10, cfg.DB.MaxIdleConns)
 	assert.Equal(t, 5*time.Minute, cfg.DB.ConnMaxLifetime)
+	assert.Equal(t, 90*time.Second, cfg.DB.ConnMaxIdleTime)
+	assert.False(t, cfg.DB.ReplicaEnabled)
 	assert.False(t, cfg.Redis.Enabled)
 	assert.True(t, cfg.Swagger.Enabled)
 
-	// ReaderConfig should be nil when no reader DSN
-	assert.Nil(t, cfg.DB.ReaderConfig())
+	// Writer DSN with defaults
+	writerDSN := cfg.DB.GetWriterDSN()
+	assert.Equal(t, "host=localhost port=5432 user=user password=password dbname=entities sslmode=disable", writerDSN)
+
+	// Reader DSN falls back entirely to writer when no replica fields set
+	readerDSN := cfg.DB.GetReaderDSN()
+	assert.Equal(t, writerDSN, readerDSN)
 }

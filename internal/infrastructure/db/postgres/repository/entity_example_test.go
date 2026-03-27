@@ -51,7 +51,7 @@ func TestEntityDB_ToEntity_InvalidID(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Nil(t, entity)
-	assert.Contains(t, err.Error(), "erro ao parsear ID")
+	assert.Contains(t, err.Error(), "parsing ID")
 }
 
 func TestEntityDB_ToEntity_InvalidEmail(t *testing.T) {
@@ -68,7 +68,7 @@ func TestEntityDB_ToEntity_InvalidEmail(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Nil(t, entity)
-	assert.Contains(t, err.Error(), "erro ao parsear email")
+	assert.Contains(t, err.Error(), "parsing email")
 }
 
 func TestFromDomainEntity(t *testing.T) {

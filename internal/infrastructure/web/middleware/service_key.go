@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/ctxkeys"
 )
 
 // ServiceKeyConfig contém a configuração de autenticação por Service Key.
@@ -103,7 +105,7 @@ func ServiceKeyAuth(config ServiceKeyConfig) gin.HandlerFunc {
 		}
 
 		// Armazena o nome do serviço chamador no contexto para logging/auditoria
-		c.Set("caller_service", serviceName)
+		c.Set(ctxkeys.CallerService, serviceName)
 
 		c.Next()
 	}

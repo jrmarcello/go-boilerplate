@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -15,6 +16,7 @@ type Config struct {
 	MaxOpenConns    int
 	MaxIdleConns    int
 	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -22,8 +24,9 @@ func DefaultConfig(dsn string) Config {
 	return Config{
 		DSN:             dsn,
 		MaxOpenConns:    25,
-		MaxIdleConns:    25,
+		MaxIdleConns:    10,
 		ConnMaxLifetime: 5 * time.Minute,
+		ConnMaxIdleTime: 90 * time.Second,
 	}
 }
 
@@ -44,6 +47,7 @@ func NewConnection(cfg Config) (*sqlx.DB, error) {
 	db.SetMaxOpenConns(cfg.MaxOpenConns)
 	db.SetMaxIdleConns(cfg.MaxIdleConns)
 	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	db.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -69,13 +73,20 @@ func NewDBCluster(writerCfg Config, readerCfg *Config) (*DBCluster, error) {
 		reader, readerErr := NewConnection(*readerCfg)
 		if readerErr != nil {
 			// Log warning but don't fail — fall back to writer
-			fmt.Printf("WARNING: Failed to connect reader, falling back to writer: %v\n", readerErr)
+			slog.Warn("Failed to connect reader, falling back to writer", "error", readerErr)
 		} else {
 			cluster.reader = reader
 		}
 	}
 
 	return cluster, nil
+}
+
+// NewDBClusterFromDB creates a DBCluster from an existing *sqlx.DB connection.
+// The same connection is used for both writer and reader.
+// Useful for tests where a single connection is sufficient.
+func NewDBClusterFromDB(db *sqlx.DB) *DBCluster {
+	return &DBCluster{writer: db}
 }
 
 // Writer returns the writer database connection.

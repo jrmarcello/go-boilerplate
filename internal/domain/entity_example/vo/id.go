@@ -27,7 +27,7 @@ func NewID() ID {
 // Use quando receber um ID de fonte externa (API, banco, etc).
 func ParseID(s string) (ID, error) {
 	if _, err := ulid.Parse(s); err != nil {
-		return "", errors.New("invalid ULID")
+		return "", ErrInvalidID
 	}
 	return ID(s), nil
 }

@@ -2,9 +2,7 @@ package router
 
 import (
 	"net/http"
-	"time"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 	swaggerFiles "github.com/swaggo/files"
@@ -14,6 +12,7 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/handler"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/middleware"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/idempotency"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/telemetry"
 )
 
@@ -26,10 +25,11 @@ type Config struct {
 
 // Dependencies agrupa todas as dependências necessárias para o router
 type Dependencies struct {
-	DB            *sqlx.DB
-	EntityHandler *handler.EntityHandler
-	HTTPMetrics   *telemetry.HTTPMetrics
-	Config        Config
+	DB               *sqlx.DB
+	EntityHandler    *handler.EntityHandler
+	HTTPMetrics      *telemetry.HTTPMetrics
+	IdempotencyStore idempotency.Store
+	Config           Config
 }
 
 // Setup configura e retorna o router Gin com todos os middlewares e rotas
@@ -48,18 +48,10 @@ func Setup(deps Dependencies) *gin.Engine {
 	// Custom structured logger
 	r.Use(middleware.Logger())
 
-	// CORS
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID", "X-Idempotency-Key", "X-Service-Name", "X-Service-Key"},
-		ExposeHeaders:    []string{"Content-Length", "X-Request-ID"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
-
-	// Idempotency
-	r.Use(middleware.Idempotency(middleware.DefaultIdempotencyConfig()))
+	// Idempotency (optional — only if store is provided)
+	if deps.IdempotencyStore != nil {
+		r.Use(middleware.Idempotency(deps.IdempotencyStore))
+	}
 
 	// Public routes (no auth required)
 	if deps.Config.SwaggerEnabled {

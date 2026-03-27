@@ -50,14 +50,12 @@ func HandleError(c *gin.Context, span trace.Span, err error) {
 func translateError(err error) (status int, code, message string) {
 	switch {
 	case errors.Is(err, vo.ErrInvalidEmail):
-		return http.StatusBadRequest, apperror.CodeInvalidRequest, "Email inválido"
+		return http.StatusBadRequest, apperror.CodeInvalidRequest, "invalid email"
+	case errors.Is(err, vo.ErrInvalidID):
+		return http.StatusBadRequest, apperror.CodeInvalidRequest, "invalid ID"
 	case errors.Is(err, entity.ErrEntityNotFound):
-		return http.StatusNotFound, apperror.CodeNotFound, "Entity não encontrada"
+		return http.StatusNotFound, apperror.CodeNotFound, "entity not found"
 	default:
-		// Error with message "invalid ULID" from vo.ParseID
-		if err != nil && err.Error() == "invalid ULID" {
-			return http.StatusBadRequest, apperror.CodeInvalidRequest, "ID inválido"
-		}
-		return http.StatusInternalServerError, apperror.CodeInternalError, "Erro interno do servidor"
+		return http.StatusInternalServerError, apperror.CodeInternalError, "internal server error"
 	}
 }

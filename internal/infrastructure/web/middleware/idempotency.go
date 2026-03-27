@@ -1,162 +1,175 @@
 package middleware
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"io"
 	"net/http"
-	"sync"
-	"time"
 
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/idempotency"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/logutil"
 	"github.com/gin-gonic/gin"
 )
 
-type IdempotencyConfig struct {
-	TTL        time.Duration
-	HeaderName string
-}
+const (
+	// IdempotencyKeyHeader is the header used for idempotency.
+	IdempotencyKeyHeader = "Idempotency-Key"
 
-// idempotencyEntry representa uma resposta cacheada
-type idempotencyEntry struct {
-	StatusCode int
-	Body       []byte
-	Headers    http.Header
-	ExpiresAt  time.Time
-}
+	// idempotencyKeyPrefix is the prefix used in Redis keys.
+	idempotencyKeyPrefix = "idempotency:"
+)
 
-// TODO: implementar redis
-// MemoryIdempotencyStore é uma implementação in-memory do store de idempotência
-// NOTA: Em produção, usar Redis para suportar múltiplas instâncias
-type MemoryIdempotencyStore struct {
-	entries map[string]idempotencyEntry
-	mu      sync.RWMutex
-}
-
-// NewMemoryIdempotencyStore cria um novo store in-memory
-func NewMemoryIdempotencyStore() *MemoryIdempotencyStore {
-	store := &MemoryIdempotencyStore{
-		entries: make(map[string]idempotencyEntry),
-	}
-
-	// Goroutine para limpar entradas expiradas
-	go func() {
-		for {
-			time.Sleep(1 * time.Minute)
-			store.cleanup()
-		}
-	}()
-
-	return store
-}
-
-func (s *MemoryIdempotencyStore) cleanup() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	now := time.Now()
-	for key, entry := range s.entries {
-		if entry.ExpiresAt.Before(now) {
-			delete(s.entries, key)
-		}
-	}
-}
-
-func (s *MemoryIdempotencyStore) Get(key string) (idempotencyEntry, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	entry, exists := s.entries[key]
-	if !exists || entry.ExpiresAt.Before(time.Now()) {
-		return idempotencyEntry{}, false
-	}
-	return entry, true
-}
-
-func (s *MemoryIdempotencyStore) Set(key string, entry idempotencyEntry) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.entries[key] = entry
-}
-
-// responseWriter é um wrapper para capturar a resposta
-type responseWriter struct {
-	gin.ResponseWriter
-	body []byte
-}
-
-func (w *responseWriter) Write(b []byte) (int, error) {
-	w.body = append(w.body, b...)
-	return w.ResponseWriter.Write(b)
-}
-
-// Idempotency retorna um middleware de idempotência
-// O cliente deve enviar um header X-Idempotency-Key único para cada operação
-func Idempotency(config IdempotencyConfig) gin.HandlerFunc {
-	store := NewMemoryIdempotencyStore()
-
-	if config.HeaderName == "" {
-		config.HeaderName = "X-Idempotency-Key"
-	}
-	if config.TTL == 0 {
-		config.TTL = 24 * time.Hour
-	}
-
+// Idempotency returns a middleware that ensures idempotency for POST requests.
+// The Idempotency-Key header is optional: if absent, the request is processed normally.
+// If Redis is unavailable, the middleware operates in fail-open mode (degrades gracefully).
+func Idempotency(store idempotency.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Apenas aplicar a métodos que modificam estado
-		if c.Request.Method != http.MethodPost &&
-			c.Request.Method != http.MethodPut &&
-			c.Request.Method != http.MethodPatch {
+		// 1. Only applies to POST requests
+		if c.Request.Method != http.MethodPost {
 			c.Next()
 			return
 		}
 
-		idempotencyKey := c.GetHeader(config.HeaderName)
-		if idempotencyKey == "" {
-			// Sem chave de idempotência, processar normalmente
+		// 2. Header is optional — if absent, process normally
+		key := c.GetHeader(IdempotencyKeyHeader)
+		if key == "" {
 			c.Next()
 			return
 		}
 
-		// Criar hash da chave + path para evitar colisões
-		hasher := sha256.New()
-		hasher.Write([]byte(idempotencyKey + c.Request.URL.Path))
-		key := hex.EncodeToString(hasher.Sum(nil))
+		// 3. Read and buffer body for fingerprint
+		reqBody, readErr := io.ReadAll(c.Request.Body)
+		if readErr != nil {
+			c.Next()
+			return
+		}
+		c.Request.Body = io.NopCloser(bytes.NewBuffer(reqBody))
+		fingerprint := bodyFingerprint(reqBody)
 
-		// Verificar se já existe resposta cacheada
-		if entry, exists := store.Get(key); exists {
-			// Retornar resposta cacheada
-			for k, v := range entry.Headers {
-				for _, val := range v {
-					c.Header(k, val)
-				}
+		// 4. Build Redis key with optional service namespace
+		serviceName := c.GetHeader("X-Service-Name")
+		fullKey := buildIdempotencyKey(serviceName, key)
+
+		ctx := c.Request.Context()
+
+		// 5. Attempt to acquire lock
+		acquired, lockErr := store.Lock(ctx, fullKey, fingerprint)
+		if lockErr != nil {
+			// Redis unavailable -> fail-open
+			logutil.LogWarn(ctx, "idempotency store unavailable, proceeding without",
+				"error", lockErr.Error(), "idempotency_key", key)
+			c.Next()
+			return
+		}
+
+		if !acquired {
+			// Key already exists: check state
+			entry, getErr := store.Get(ctx, fullKey)
+			if getErr != nil {
+				// Error fetching -> fail-open
+				logutil.LogWarn(ctx, "idempotency store get failed, proceeding without",
+					"error", getErr.Error(), "idempotency_key", key)
+				c.Next()
+				return
 			}
-			c.Header("X-Idempotent-Replayed", "true")
-			c.Data(entry.StatusCode, "application/json", entry.Body)
+
+			if entry == nil {
+				// Key existed but expired between Lock and Get (rare race condition)
+				c.Next()
+				return
+			}
+
+			if entry.Status == idempotency.StatusProcessing {
+				// Previous request still in progress -> 409 Conflict
+				c.AbortWithStatusJSON(http.StatusConflict, httputil.ErrorResponse{
+					Errors: httputil.ErrorDetail{Message: "A request with this Idempotency-Key is already being processed"},
+				})
+				return
+			}
+
+			// COMPLETED -> verify fingerprint before replay
+			if entry.Fingerprint != "" && fingerprint != entry.Fingerprint {
+				logutil.LogWarn(ctx, "idempotency key reused with different body",
+					"idempotency_key", key)
+				c.AbortWithStatusJSON(http.StatusUnprocessableEntity, httputil.ErrorResponse{
+					Errors: httputil.ErrorDetail{Message: "Idempotency-Key already used with a different request body"},
+				})
+				return
+			}
+
+			// Replay stored response
+			logutil.LogInfo(ctx, "idempotency replay",
+				"idempotency_key", key, "status_code", entry.StatusCode)
+			c.Data(entry.StatusCode, "application/json; charset=utf-8", entry.Body)
 			c.Abort()
 			return
 		}
 
-		// Capturar resposta
-		rw := &responseWriter{ResponseWriter: c.Writer}
+		// 6. First request with this key — capture response
+		rw := &idempotencyResponseWriter{
+			ResponseWriter: c.Writer,
+			body:           &bytes.Buffer{},
+		}
 		c.Writer = rw
 
+		// 7. Execute handler
 		c.Next()
 
-		// Armazenar resposta se sucesso (2xx)
-		if c.Writer.Status() >= 200 && c.Writer.Status() < 300 {
-			store.Set(key, idempotencyEntry{
-				StatusCode: c.Writer.Status(),
-				Body:       rw.body,
-				Headers:    c.Writer.Header().Clone(),
-				ExpiresAt:  time.Now().Add(config.TTL),
+		// 8. Store or release based on status code
+		statusCode := rw.Status()
+		if shouldStoreResponse(statusCode) {
+			completeErr := store.Complete(ctx, fullKey, &idempotency.Entry{
+				StatusCode:  statusCode,
+				Body:        rw.body.Bytes(),
+				Fingerprint: fingerprint,
 			})
+			if completeErr != nil {
+				logutil.LogWarn(ctx, "failed to store idempotency response",
+					"error", completeErr.Error(), "idempotency_key", key)
+			}
+		} else {
+			// 5xx error -> unlock to allow retry
+			unlockErr := store.Unlock(ctx, fullKey)
+			if unlockErr != nil {
+				logutil.LogWarn(ctx, "failed to unlock idempotency key",
+					"error", unlockErr.Error(), "idempotency_key", key)
+			}
 		}
 	}
 }
 
-// DefaultIdempotencyConfig retorna configuração padrão
-func DefaultIdempotencyConfig() IdempotencyConfig {
-	return IdempotencyConfig{
-		TTL:        24 * time.Hour,
-		HeaderName: "X-Idempotency-Key",
+// buildIdempotencyKey builds the Redis key with namespace.
+// Format: idempotency:{service-name}:{key} or idempotency:{key}
+func buildIdempotencyKey(serviceName, key string) string {
+	if serviceName != "" {
+		return idempotencyKeyPrefix + serviceName + ":" + key
 	}
+	return idempotencyKeyPrefix + key
+}
+
+// shouldStoreResponse determines whether the response should be stored for replay.
+// 2xx and 4xx are deterministic and should be stored.
+// 5xx are transient and should allow retry.
+func shouldStoreResponse(statusCode int) bool {
+	return statusCode >= 200 && statusCode < 500
+}
+
+// idempotencyResponseWriter wraps gin.ResponseWriter to capture the response body.
+type idempotencyResponseWriter struct {
+	gin.ResponseWriter
+	body *bytes.Buffer
+}
+
+func (w *idempotencyResponseWriter) Write(data []byte) (int, error) {
+	w.body.Write(data)
+	return w.ResponseWriter.Write(data)
+}
+
+// bodyFingerprint calculates the SHA-256 of the request body to detect reuse
+// of Idempotency-Key with a different body.
+func bodyFingerprint(body []byte) string {
+	h := sha256.Sum256(body)
+	return hex.EncodeToString(h[:])
 }

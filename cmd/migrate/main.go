@@ -43,8 +43,8 @@ func run() error {
 		return fmt.Errorf("loading config: %w", loadErr)
 	}
 
-	// Connect to database
-	db, openErr := sql.Open("postgres", cfg.DB.DSN)
+	// Connect to database (always use writer for migrations)
+	db, openErr := sql.Open("postgres", cfg.DB.GetWriterDSN())
 	if openErr != nil {
 		return fmt.Errorf("opening database connection: %w", openErr)
 	}

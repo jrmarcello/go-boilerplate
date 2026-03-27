@@ -12,4 +12,7 @@ import "errors"
 var (
 	// ErrInvalidEmail indica que o email informado não é válido.
 	ErrInvalidEmail = errors.New("email inválido")
+
+	// ErrInvalidID indica que o ID informado não é um ULID válido.
+	ErrInvalidID = errors.New("invalid ID")
 )

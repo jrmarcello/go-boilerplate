@@ -1,22 +1,20 @@
 package ctxkeys
 
-// contextKey is a private type for HTTP context keys.
-// Prevents collisions with other packages using context.Value.
-type contextKey string
-
+// Gin context keys used across middleware and handlers.
+// Plain string constants so they work with gin.Context.Set/Get (which require string keys).
 const (
 	// IPAddress stores the client IP.
-	IPAddress contextKey = "ip_address"
+	IPAddress = "ip_address"
 
 	// UserID stores the authenticated user ID.
-	UserID contextKey = "user_id"
+	UserID = "user_id"
 
 	// ServiceKey stores the authenticated service key.
-	ServiceKey contextKey = "service_key"
+	ServiceKey = "service_key"
 
 	// RequestID stores the unique request ID.
-	RequestID contextKey = "request_id"
+	RequestID = "request_id"
 
 	// CallerService stores the caller service name.
-	CallerService contextKey = "caller_service"
+	CallerService = "caller_service"
 )
