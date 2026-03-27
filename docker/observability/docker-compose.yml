@@ -15,6 +15,8 @@ services:
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
       - cluster.name=boilerplate-cluster
+      # Disable disk watermarks for local dev (prevents shard allocation failures on low disk)
+      - cluster.routing.allocation.disk.threshold_enabled=false
     ports:
       - "${ES_PORT:-9200}:9200"
     volumes:
