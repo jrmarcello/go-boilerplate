@@ -160,7 +160,7 @@ func buildDependencies(cluster *database.DBCluster, cfg *config.Config, httpMetr
 	}
 
 	// Singleflight protection (prevents cache stampede on concurrent reads)
-	flightGroup := entityuc.NewFlightGroup()
+	flightGroup := pkgcache.NewFlightGroup()
 
 	// Use Cases (with optional cache via builder pattern)
 	createUC := entityuc.NewCreateUseCase(repo)
