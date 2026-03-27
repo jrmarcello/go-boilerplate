@@ -22,11 +22,21 @@ const (
 	StepMiddleware = "middleware"
 )
 
+// Known domain error codes that should NOT include stack traces.
+var domainErrorCodes = map[string]bool{
+	"NOT_FOUND":       true,
+	"INVALID_REQUEST": true,
+	"CONFLICT":        true,
+	"VALIDATION":      true,
+	"DUPLICATE":       true,
+	"FORBIDDEN":       true,
+	"UNAUTHORIZED":    true,
+}
+
 // LogContext holds structured logging context across layers.
 type LogContext struct {
 	RequestID     string
 	TraceID       string
-	UserID        string
 	CallerService string
 	Step          string
 	Resource      string
@@ -63,49 +73,49 @@ func (lc LogContext) WithAction(action string) LogContext {
 	return lc
 }
 
-// ToSlogAttrs converts the LogContext to slog attributes for structured logging.
-func (lc LogContext) ToSlogAttrs() []slog.Attr {
-	attrs := []slog.Attr{}
+// ToSlogAttrs converts the LogContext to flat key-value pairs for slog.
+// Returns []any (alternating key, value) which is ergonomic for slog API calls.
+func (lc LogContext) ToSlogAttrs() []any {
+	// 6 fixed fields * 2 (key+value) + extra entries * 2
+	attrs := make([]any, 0, 12+len(lc.Extra)*2)
 
 	if lc.RequestID != "" {
-		attrs = append(attrs, slog.String("request_id", lc.RequestID))
+		attrs = append(attrs, "request_id", lc.RequestID)
 	}
 	if lc.TraceID != "" {
-		attrs = append(attrs, slog.String("trace_id", lc.TraceID))
-	}
-	if lc.UserID != "" {
-		attrs = append(attrs, slog.String("user_id", lc.UserID))
+		attrs = append(attrs, "trace_id", lc.TraceID)
 	}
 	if lc.CallerService != "" {
-		attrs = append(attrs, slog.String("caller_service", lc.CallerService))
+		attrs = append(attrs, "caller_service", lc.CallerService)
 	}
 	if lc.Step != "" {
-		attrs = append(attrs, slog.String("step", lc.Step))
+		attrs = append(attrs, "step", lc.Step)
 	}
 	if lc.Resource != "" {
-		attrs = append(attrs, slog.String("resource", lc.Resource))
+		attrs = append(attrs, "resource", lc.Resource)
 	}
 	if lc.Action != "" {
-		attrs = append(attrs, slog.String("action", lc.Action))
+		attrs = append(attrs, "action", lc.Action)
 	}
 
 	for k, v := range lc.Extra {
-		attrs = append(attrs, slog.Any(k, v))
+		attrs = append(attrs, k, v)
 	}
 
 	return attrs
 }
 
-// ErrorLogFields returns slog attributes for error logging.
-// Includes stack trace for 5xx errors (non-domain errors).
-func ErrorLogFields(err error, isDomainError bool) []slog.Attr {
-	attrs := []slog.Attr{
-		slog.String("error", err.Error()),
-		slog.String("error_type", fmt.Sprintf("%T", err)),
+// ErrorLogFields returns slog key-value pairs for error logging.
+// Includes the error code in log attributes. Stack trace is only included
+// when the code is empty or indicates an internal error (not a known domain error code).
+func ErrorLogFields(err error, code string) []any {
+	attrs := []any{
+		"error.message", err.Error(),
+		"error.code", code,
 	}
 
-	if !isDomainError {
-		attrs = append(attrs, slog.String("stack_trace", getStackTrace()))
+	if !domainErrorCodes[code] {
+		attrs = append(attrs, "error.stack", getStackTrace())
 	}
 
 	return attrs
@@ -113,14 +123,18 @@ func ErrorLogFields(err error, isDomainError bool) []slog.Attr {
 
 // getStackTrace returns a formatted stack trace string.
 func getStackTrace() string {
-	var sb strings.Builder
-	pcs := make([]uintptr, 10)
-	n := runtime.Callers(3, pcs) // skip getStackTrace, ErrorLogFields, and caller
+	const maxDepth = 10
+	var pcs [maxDepth]uintptr
+	n := runtime.Callers(3, pcs[:]) // skip getStackTrace, ErrorLogFields, and caller
+
 	frames := runtime.CallersFrames(pcs[:n])
+	var sb strings.Builder
 
 	for {
 		frame, more := frames.Next()
-		sb.WriteString(fmt.Sprintf("%s\n\t%s:%d\n", frame.Function, frame.File, frame.Line))
+		if !strings.Contains(frame.File, "runtime/") {
+			fmt.Fprintf(&sb, "%s:%d %s\n", frame.File, frame.Line, frame.Function)
+		}
 		if !more {
 			break
 		}
@@ -156,11 +170,5 @@ func contextArgsFromCtx(ctx context.Context) []any {
 	if !ok {
 		return nil
 	}
-
-	attrs := lc.ToSlogAttrs()
-	args := make([]any, 0, len(attrs)*2)
-	for _, attr := range attrs {
-		args = append(args, attr.Key, attr.Value.Any())
-	}
-	return args
+	return lc.ToSlogAttrs()
 }

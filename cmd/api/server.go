@@ -21,6 +21,7 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/database"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/health"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/idempotency"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/logutil"
 	pkgtelemetry "bitbucket.org/appmax-space/go-boilerplate/pkg/telemetry"
 	"go.opentelemetry.io/otel"
 )
@@ -113,7 +114,8 @@ func Start(ctx context.Context, cfg *config.Config) error {
 }
 
 func setupLogger() *slog.Logger {
-	return slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	stdout := slog.NewJSONHandler(os.Stdout, nil)
+	return slog.New(logutil.NewFanoutHandler(stdout))
 }
 
 func shutdownTelemetry(tp *pkgtelemetry.Provider, logger *slog.Logger) {

@@ -27,7 +27,7 @@ commit-msg:
   commands:
     conventional-commit:
       run: |
-        msg=$(head -1 {1})
+        msg=$(head -1 "{1}")
         if ! echo "$msg" | grep -qE '^(feat|fix|refactor|docs|test|chore|perf|ci|build|style)(\(.+\))?: .+'; then
           echo "Commit message must follow Conventional Commits:"
           echo "  type(scope): description"
