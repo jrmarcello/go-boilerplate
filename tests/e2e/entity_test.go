@@ -247,7 +247,7 @@ func TestE2E_CreateEntity_InvalidEmail(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), "Email inválido")
+	assert.Contains(t, w.Body.String(), "invalid email")
 }
 
 func TestE2E_CreateEntity_EmptyRequest(t *testing.T) {
