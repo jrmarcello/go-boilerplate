@@ -36,6 +36,6 @@ You are a PostgreSQL database specialist reviewing a Go microservice boilerplate
 - Schema should serve as a good starting point when renaming `entity_example`
 - Migration patterns should be exemplary
 
-Reference `.agent/skills/database-design/` and `.agent/agents/database-architect.md` for detailed patterns.
+Check migration patterns and PostgreSQL best practices.
 
 Provide specific SQL improvements with EXPLAIN ANALYZE suggestions where applicable.

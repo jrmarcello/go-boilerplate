@@ -40,4 +40,4 @@ You are a senior security engineer reviewing a Go microservice boilerplate (Gin 
 - Ensure .gitignore covers all sensitive files
 
 Provide specific file:line references and suggested fixes. Rate each finding: CRITICAL, HIGH, MEDIUM, LOW.
-Reference `.agent/agents/security-auditor.md` and `.agent/skills/vulnerability-scanner/` for detailed checklists.
+Check OWASP Top 10 and Go-specific security patterns.

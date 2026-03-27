@@ -151,13 +151,6 @@ Three-layer quality enforcement:
 - **Stop** — `stop-validate.sh`: build + fmt + vet + swagger + lint + tests gate (auto-retry with tiered validation)
 - **WorktreeCreate/Remove** — automated git worktree setup and cleanup
 
-### Knowledge Base (`.agent/`)
-
-- **Skills** (23): Deep domain knowledge — consult `.agent/skills/` before implementing.
-- **Agents** (14): Specialized personas — use `.agent/agents/` for analysis (security, docs, DB, QA, ops).
-- **Workflows** (8): Multi-step procedures — use `.agent/workflows/` for debug, test, deploy, etc.
-- **Index**: See `.agent/ARCHITECTURE.md` for full reference.
-
 ### Execution Directives
 
 1. **Prefer subagents and parallelization** — use subagents or Agent Teams for independent discovery/analysis. Merge findings before coding.

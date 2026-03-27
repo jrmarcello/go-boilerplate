@@ -289,39 +289,3 @@ make help          # Ver todos os comandos
 | `go-conventions.md` | `**/*.go` | Error handling, DI, testing, pkg/ |
 | `migrations.md` | `**/migration/**` | Goose Up+Down, reversibilidade |
 | `security.md` | `**/*` | Credenciais, PII, SQL injection |
-
----
-
-## Toolkit de Agentes (`.agent/`)
-
-Este projeto também possui um toolkit completo para agentes de IA em `.agent/`. **Leia `.agent/ARCHITECTURE.md` para o índice completo.**
-
-### Estrutura
-
-| Diretório | Conteúdo | Quando usar |
-| --------- | -------- | ----------- |
-| `.agent/rules/RULES.md` | Regras de governança e roteamento | Sempre (leia primeiro) |
-| `.agent/workflows/` | Guias passo-a-passo (8 workflows) | Antes de iniciar qualquer tarefa |
-| `.agent/skills/` | Módulos de conhecimento (23 skills) | Carregar conforme necessidade |
-| `.agent/agents/` | Definições de agentes especializados (14) | Para tarefas complexas |
-| `.agent/scripts/` | Scripts de qualidade (checklist, verify) | Validação antes de commits |
-
-### Workflows disponíveis
-
-| Workflow | Trigger | Arquivo |
-| -------- | ------- | ------- |
-| Implementar feature | "add", "create", "implement" | `.agent/workflows/enhance.md` |
-| Debug | "fix", "bug", "error" | `.agent/workflows/debug.md` |
-| Testes | "test", "coverage" | `.agent/workflows/test.md` |
-| Deploy | "deploy", "release" | `.agent/workflows/deploy.md` |
-| Planejamento | "plan", "roadmap" | `.agent/workflows/plan.md` |
-| Brainstorm | "explore", "options" | `.agent/workflows/brainstorm.md` |
-| Orquestração | "complex", "multi-step" | `.agent/workflows/orchestrate.md` |
-| Status | "status", "health" | `.agent/workflows/status.md` |
-
-### Como usar
-
-1. **Identifique o tipo de tarefa** e consulte o workflow correspondente
-2. **Carregue as skills** indicadas no workflow (cada workflow lista as skills necessárias)
-3. **Siga o passo-a-passo** do workflow
-4. **Valide** com `python3 .agent/scripts/checklist.py` antes de finalizar
