@@ -11,6 +11,7 @@ This project serves as a **starter template** — clone it and rename `entity_ex
 ## Common Commands
 
 ```bash
+make setup          # Full setup: install tools + start Docker + run migrations
 make dev            # Start server with hot reload (air)
 make lint           # Run go vet + gofmt
 make lint-full      # Run golangci-lint (same as CI)
@@ -86,49 +87,77 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
 
 PRs run: `swag init` -> `golangci-lint run` -> `go test ./internal/...` with coverage. Branch pushes to `develop`/`main` build Docker image, push to ECR, and update Kustomize image tags.
 
-## Agent Toolkit (`.agent/`)
+## MCP — Context7
 
-This project has a comprehensive AI agent toolkit in `.agent/`. **Read `.agent/ARCHITECTURE.md` for the full index.** Before starting any task, check if there is a relevant workflow, skill, or agent definition.
+Context7 is installed as a global MCP plugin. It fetches up-to-date documentation directly from library sources.
 
-### Key resources
+**Usage directives:**
 
-- **Rules**: `.agent/rules/RULES.md` — Governance rules, request classification, agent routing
-- **Workflows**: `.agent/workflows/` — Step-by-step guides for common tasks (debug, enhance, deploy, test, plan, brainstorm, orchestrate, status)
-- **Skills**: `.agent/skills/` — Reusable knowledge modules (go-patterns, clean-code, api-patterns, testing-patterns, database-design, architecture, etc.)
-- **Agents**: `.agent/agents/` — Specialized agent definitions (backend-specialist, test-engineer, debugger, database-architect, etc.)
-- **Scripts**: `.agent/scripts/checklist.py` (quality gate), `.agent/scripts/verify_all.py` (full verification suite)
+- Always consult Context7 before writing code that depends on external library APIs (Gin, sqlx, Goose, golangci-lint, OpenTelemetry, etc.)
+- Use `resolve-library-id` to find the library ID, then `query-docs` to fetch the docs
+- Maximum 3 calls per question (Context7 rate limit)
+- Do NOT include sensitive data (API keys, passwords) in the `query` parameter
+- Prioritize results with source reputation "High" and high benchmark score
 
-### How to use
+**Pre-resolved library IDs:**
 
-1. For feature work → read `.agent/workflows/enhance.md`
-2. For debugging → read `.agent/workflows/debug.md`
-3. For testing → read `.agent/workflows/test.md`
-4. For deployment → read `.agent/workflows/deploy.md`
-5. Load relevant skills as needed (e.g., `go-patterns`, `api-patterns`)
+| Library | Context7 ID |
+| ------- | ----------- |
+| golangci-lint | `/golangci/golangci-lint` |
+| Gin | `/gin-gonic/gin` |
+| Testify | `/stretchr/testify` |
 
-## Agent Workflow
+**Resolve on-demand:** sqlx, Goose, OpenTelemetry Go, go-sqlmock, go-redis, Swag, Lefthook, Air, TestContainers Go
 
-Always follow these execution directives when working in this repository.
+**When NOT to use Context7:** Go stdlib — use built-in knowledge instead.
 
-### 1) Mandatory implementation cycle
+## Claude Code Resources
 
-For every non-trivial task, execute in this order:
+### Skills (slash commands)
 
-1. **Plan** — define scope, affected files, risks, and validation strategy.
-2. **Implement** — apply changes strictly following project architecture and conventions.
-3. **Test** — create/update tests when needed and run relevant automated checks.
-4. **Validate** — perform complete functional verification to ensure the planned behavior actually works.
+| Skill | Purpose | When to use |
+| ----- | ------- | ----------- |
+| `/validate` | Full validation pipeline (build, lint, tests, Kind, smoke) | Before committing any code change |
+| `/validate quick` | Static validation + unit tests only | Quick feedback during development |
+| `/new-endpoint` | Scaffold full Clean Architecture endpoint | Adding a new API route |
+| `/fix-issue` | E2E bug fix workflow (understand → plan → implement → test) | Fixing reported bugs |
+| `/migrate` | Create/run/rollback Goose migrations | Database schema changes |
+| `/review` | Single-agent code review | Quick review of small changes |
+| `/full-review-team` | Parallel review: architecture + security + DB (Agent Team) | PRs, major changes, cross-layer work |
+| `/security-review-team` | Parallel security audit with 3 specialists (Agent Team) | Releases, sensitive changes, compliance |
+| `/debug-logs` | Analyze logs from Kind/Docker | Quick log-based debugging |
+| `/debug-team` | Parallel bug investigation with competing hypotheses (Agent Team) | Complex bugs that resist sequential debugging |
+| `/load-test` | Run k6 load tests + analyze results | Performance validation and regression |
 
-Do not finish a task without concrete validation evidence.
+### Agent Teams and Subagents
 
-### 2) Prefer subagents and parallelization
+Agent Teams enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`). Team skills spawn 3 parallel teammates each. Use for tasks where parallel exploration adds value: reviews, audits, debugging.
 
-- Use subagents whenever there are independent discovery/analysis tracks.
-- Parallelize read-only investigation and validation tasks whenever possible.
-- Merge findings into a single concise execution plan before coding.
+- `security-reviewer`, `code-reviewer`, `db-analyst` — all with persistent memory (`memory: project`). Delegate with "use a subagent to..."
 
-### 3) Architecture guard
+### Rules
 
-- Before creating or modifying files, verify the change respects layer boundaries.
-- Run `make lint` before considering any task complete.
-- Consult `AGENTS.md` for detailed rules and patterns.
+Auto-applied by file pattern: Go conventions (`**/*.go`), security (`**/*`), migrations (`**/migration/**`).
+
+### Hooks
+
+Three-layer quality enforcement:
+
+- **PreToolUse[Bash]** — `guard-bash.sh`: blocks .env staging, `git add -A`, DROP statements, `--no-verify`
+- **PostToolUse[Edit|Write]** — `lint-go-file.sh`: goimports/gopls diagnostics on every Go file edit
+- **PostToolUse[Edit|Write]** — `validate-migration.sh`: ensures Up + Down sections in migrations
+- **Stop** — `stop-validate.sh`: build + fmt + vet + swagger + lint + tests gate (auto-retry with tiered validation)
+- **WorktreeCreate/Remove** — automated git worktree setup and cleanup
+
+### Knowledge Base (`.agent/`)
+
+- **Skills** (23): Deep domain knowledge — consult `.agent/skills/` before implementing.
+- **Agents** (14): Specialized personas — use `.agent/agents/` for analysis (security, docs, DB, QA, ops).
+- **Workflows** (8): Multi-step procedures — use `.agent/workflows/` for debug, test, deploy, etc.
+- **Index**: See `.agent/ARCHITECTURE.md` for full reference.
+
+### Execution Directives
+
+1. **Prefer subagents and parallelization** — use subagents or Agent Teams for independent discovery/analysis. Merge findings before coding.
+2. **Mandatory cycle** for non-trivial tasks: **Plan** → **Implement** → **Test** → **Validate**. Do not finish without concrete validation evidence.
+3. **Post-implementation validation** — enforced automatically by the **Stop hook** (build + fmt + vet + swagger + lint + tests). The hook blocks completion until validation passes. For the full pipeline including E2E, Kind deploy, and smoke tests, run `/validate` explicitly.

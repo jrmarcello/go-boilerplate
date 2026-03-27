@@ -1,5 +1,5 @@
 definitions:
-  dto.CreateInput:
+  bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.CreateInput:
     properties:
       email:
         description: Email (será validado no UseCase)
@@ -8,7 +8,7 @@ definitions:
         description: Nome da entity
         type: string
     type: object
-  dto.CreateOutput:
+  bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.CreateOutput:
     properties:
       created_at:
         description: Timestamp no formato RFC3339
@@ -17,7 +17,7 @@ definitions:
         description: ID gerado (ULID)
         type: string
     type: object
-  dto.DeleteOutput:
+  bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.DeleteOutput:
     properties:
       deleted_at:
         description: Timestamp da deleção
@@ -25,7 +25,7 @@ definitions:
       id:
         type: string
     type: object
-  dto.GetOutput:
+  bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.GetOutput:
     properties:
       active:
         type: boolean
@@ -40,16 +40,16 @@ definitions:
       updated_at:
         type: string
     type: object
-  dto.ListOutput:
+  bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.ListOutput:
     properties:
       data:
         items:
-          $ref: '#/definitions/dto.GetOutput'
+          $ref: '#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.GetOutput'
         type: array
       pagination:
-        $ref: '#/definitions/dto.PaginationOutput'
+        $ref: '#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.PaginationOutput'
     type: object
-  dto.PaginationOutput:
+  bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.PaginationOutput:
     properties:
       limit:
         type: integer
@@ -60,7 +60,7 @@ definitions:
       total_pages:
         type: integer
     type: object
-  dto.UpdateInput:
+  bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.UpdateInput:
     properties:
       email:
         description: Email (opcional)
@@ -69,7 +69,7 @@ definitions:
         description: Nome (opcional)
         type: string
     type: object
-  dto.UpdateOutput:
+  bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.UpdateOutput:
     properties:
       active:
         type: boolean
@@ -82,17 +82,14 @@ definitions:
       updated_at:
         type: string
     type: object
-  handler.ErrorResponse:
+  internal_infrastructure_web_handler.ErrorResponse:
     properties:
-      code:
-        type: string
-      details:
-        additionalProperties: {}
+      errors:
+        properties:
+          message:
+            example: error description
+            type: string
         type: object
-      error:
-        type: string
-      trace_id:
-        type: string
     type: object
 info:
   contact: {}
@@ -127,11 +124,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.ListOutput'
+            $ref: '#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.ListOutput'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.ErrorResponse'
+            $ref: '#/definitions/internal_infrastructure_web_handler.ErrorResponse'
       summary: List entities
       tags:
       - entities
@@ -145,22 +142,22 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateInput'
+          $ref: '#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.CreateInput'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.CreateOutput'
+            $ref: '#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.CreateOutput'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handler.ErrorResponse'
+            $ref: '#/definitions/internal_infrastructure_web_handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.ErrorResponse'
+            $ref: '#/definitions/internal_infrastructure_web_handler.ErrorResponse'
       summary: Create a new entity
       tags:
       - entities
@@ -179,15 +176,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.DeleteOutput'
+            $ref: '#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.DeleteOutput'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/handler.ErrorResponse'
+            $ref: '#/definitions/internal_infrastructure_web_handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.ErrorResponse'
+            $ref: '#/definitions/internal_infrastructure_web_handler.ErrorResponse'
       summary: Delete an entity
       tags:
       - entities
@@ -205,15 +202,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.GetOutput'
+            $ref: '#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.GetOutput'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/handler.ErrorResponse'
+            $ref: '#/definitions/internal_infrastructure_web_handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.ErrorResponse'
+            $ref: '#/definitions/internal_infrastructure_web_handler.ErrorResponse'
       summary: Get an entity by ID
       tags:
       - entities
@@ -232,26 +229,26 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/dto.UpdateInput'
+          $ref: '#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.UpdateInput'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.UpdateOutput'
+            $ref: '#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.UpdateOutput'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handler.ErrorResponse'
+            $ref: '#/definitions/internal_infrastructure_web_handler.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/handler.ErrorResponse'
+            $ref: '#/definitions/internal_infrastructure_web_handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.ErrorResponse'
+            $ref: '#/definitions/internal_infrastructure_web_handler.ErrorResponse'
       summary: Update an entity
       tags:
       - entities

@@ -61,13 +61,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.ListOutput"
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.ListOutput"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/handler.ErrorResponse"
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
                         }
                     }
                 }
@@ -91,7 +91,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateInput"
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.CreateInput"
                         }
                     }
                 ],
@@ -99,19 +99,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateOutput"
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.CreateOutput"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/handler.ErrorResponse"
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/handler.ErrorResponse"
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
                         }
                     }
                 }
@@ -140,19 +140,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.GetOutput"
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.GetOutput"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/handler.ErrorResponse"
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/handler.ErrorResponse"
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
                         }
                     }
                 }
@@ -183,7 +183,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.UpdateInput"
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.UpdateInput"
                         }
                     }
                 ],
@@ -191,25 +191,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.UpdateOutput"
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.UpdateOutput"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/handler.ErrorResponse"
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/handler.ErrorResponse"
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/handler.ErrorResponse"
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
                         }
                     }
                 }
@@ -236,19 +236,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.DeleteOutput"
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.DeleteOutput"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/handler.ErrorResponse"
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/handler.ErrorResponse"
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
                         }
                     }
                 }
@@ -256,7 +256,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "dto.CreateInput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.CreateInput": {
             "type": "object",
             "properties": {
                 "email": {
@@ -269,7 +269,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateOutput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.CreateOutput": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -282,7 +282,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.DeleteOutput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.DeleteOutput": {
             "type": "object",
             "properties": {
                 "deleted_at": {
@@ -294,7 +294,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.GetOutput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.GetOutput": {
             "type": "object",
             "properties": {
                 "active": {
@@ -317,21 +317,21 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.ListOutput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.ListOutput": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.GetOutput"
+                        "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.GetOutput"
                     }
                 },
                 "pagination": {
-                    "$ref": "#/definitions/dto.PaginationOutput"
+                    "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.PaginationOutput"
                 }
             }
         },
-        "dto.PaginationOutput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.PaginationOutput": {
             "type": "object",
             "properties": {
                 "limit": {
@@ -348,7 +348,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.UpdateInput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.UpdateInput": {
             "type": "object",
             "properties": {
                 "email": {
@@ -361,7 +361,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.UpdateOutput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.UpdateOutput": {
             "type": "object",
             "properties": {
                 "active": {
@@ -381,21 +381,17 @@ const docTemplate = `{
                 }
             }
         },
-        "handler.ErrorResponse": {
+        "internal_infrastructure_web_handler.ErrorResponse": {
             "type": "object",
             "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "details": {
+                "errors": {
                     "type": "object",
-                    "additionalProperties": {}
-                },
-                "error": {
-                    "type": "string"
-                },
-                "trace_id": {
-                    "type": "string"
+                    "properties": {
+                        "message": {
+                            "type": "string",
+                            "example": "error description"
+                        }
+                    }
                 }
             }
         }

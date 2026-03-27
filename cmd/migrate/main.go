@@ -15,6 +15,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -27,27 +28,31 @@ import (
 )
 
 func main() {
+	if runErr := run(); runErr != nil {
+		slog.Error("migration failed", "error", runErr)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	slog.Info("starting database migrations")
 
 	// Load configuration
-	cfg, err := config.Load()
-	if err != nil {
-		slog.Error("failed to load config", "error", err)
-		os.Exit(1)
+	cfg, loadErr := config.Load()
+	if loadErr != nil {
+		return fmt.Errorf("loading config: %w", loadErr)
 	}
 
 	// Connect to database
-	db, err := sql.Open("postgres", cfg.DB.DSN)
-	if err != nil {
-		slog.Error("failed to open database connection", "error", err)
-		os.Exit(1)
+	db, openErr := sql.Open("postgres", cfg.DB.DSN)
+	if openErr != nil {
+		return fmt.Errorf("opening database connection: %w", openErr)
 	}
 	defer db.Close()
 
 	// Verify connection
-	if err := db.Ping(); err != nil {
-		slog.Error("failed to ping database", "error", err)
-		os.Exit(1)
+	if pingErr := db.Ping(); pingErr != nil {
+		return fmt.Errorf("pinging database: %w", pingErr)
 	}
 	slog.Info("database connection established")
 
@@ -55,17 +60,16 @@ func main() {
 	migrationsDir := getMigrationsDir()
 	slog.Info("running migrations", "dir", migrationsDir)
 
-	if err := goose.SetDialect("postgres"); err != nil {
-		slog.Error("failed to set goose dialect", "error", err)
-		os.Exit(1)
+	if dialectErr := goose.SetDialect("postgres"); dialectErr != nil {
+		return fmt.Errorf("setting goose dialect: %w", dialectErr)
 	}
 
-	if err := goose.Up(db, migrationsDir); err != nil {
-		slog.Error("migrations failed", "error", err)
-		os.Exit(1)
+	if upErr := goose.Up(db, migrationsDir); upErr != nil {
+		return fmt.Errorf("running migrations: %w", upErr)
 	}
 
 	slog.Info("migrations completed successfully")
+	return nil
 }
 
 // getMigrationsDir returns the path to migrations directory.
@@ -73,7 +77,7 @@ func main() {
 // In development, they're at internal/infrastructure/db/postgres/migration.
 func getMigrationsDir() string {
 	// Production: migrations are copied to ./migrations in Dockerfile
-	if _, err := os.Stat("./migrations"); err == nil {
+	if _, statErr := os.Stat("./migrations"); statErr == nil {
 		return "./migrations"
 	}
 

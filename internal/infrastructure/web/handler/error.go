@@ -13,6 +13,13 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// ErrorResponse represents the standard error response for Swagger documentation.
+type ErrorResponse struct {
+	Errors struct {
+		Message string `json:"message" example:"error description"`
+	} `json:"errors"`
+}
+
 // HandleError handles errors in a centralized and consistent way.
 // It supports AppError (structured) and falls back to domain error translation.
 func HandleError(c *gin.Context, span trace.Span, err error) {
