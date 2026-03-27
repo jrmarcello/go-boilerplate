@@ -43,12 +43,17 @@ Agent(db-analyst): Analyze database schema, queries, and migrations
 
 ## Output
 
-Synthesize findings into a unified report:
+Synthesize findings into a unified report and save as `docs/review-report-YYYY-MM-DD.md` (using the current date).
+
+The report must include:
+1. Executive summary table (severity x category counts)
+2. All findings grouped by priority (CRITICAL/MUST FIX first)
+3. Deduplicated findings (when multiple reviewers flag the same issue)
+4. Positive findings section (patterns to preserve)
+5. Recommended action plan in phases
 
 | Category | Severity | Count |
 |----------|----------|-------|
 | Architecture | MUST FIX / SHOULD FIX / NICE TO HAVE | N |
 | Security | CRITICAL / HIGH / MEDIUM / LOW | N |
 | Database | MUST FIX / SHOULD FIX / NICE TO HAVE | N |
-
-Then list all findings by severity (highest first).

@@ -350,6 +350,7 @@ load-clean: ## Limpa dados de testes de carga
 SANDBOX_IMAGE     := $(APP_NAME)-sandbox
 SANDBOX_CONTAINER := $(APP_NAME)-sandbox
 SANDBOX_ROOT      := $(shell pwd)
+SANDBOX_PORT      ?= 8081
 
 # SSH agent detection
 ifeq ($(shell uname),Darwin)
@@ -371,7 +372,7 @@ SANDBOX_RUN_ARGS := -it --rm \
 	-v $(APP_NAME)-claude-config:/home/node/.claude \
 	-v $(APP_NAME)-gopath:/home/node/go \
 	-v "$(SANDBOX_ROOT):/workspace" \
-	-p 8080:8080 \
+	-p $(SANDBOX_PORT):8080 \
 	$(SANDBOX_SSH)
 
 SANDBOX_INIT := sudo /usr/local/bin/init-firewall.sh && (sudo chmod 666 /ssh-agent 2>/dev/null || true)
