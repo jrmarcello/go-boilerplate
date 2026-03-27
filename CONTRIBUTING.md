@@ -67,11 +67,16 @@ O pipeline roda automaticamente: lint, vulncheck, unit tests e E2E tests em para
 
 ## Testes
 
+O CI exige **60% de coverage** minimo (pacotes com logica, excluindo handler/router/telemetry).
+Coverage atual: ~89%. Use `make test-coverage` para verificar localmente.
+
 Novas funcionalidades devem incluir:
 
 - **Testes unitarios** para domain e usecases (hand-written mocks em `mock_test.go`)
 - **Testes de repositorio** com go-sqlmock
+- **Testes de pkg/** com miniredis (cache, idempotency) ou sqlmock (database)
 - **Testes E2E** com TestContainers para mudancas criticas
+- Cobrir tanto **happy path** quanto **todos os error paths** possiveis
 
 ## Arquitetura
 

@@ -230,8 +230,10 @@ make help          # Ver todos os comandos
 | Arquivo | Sobre |
 | ------- | ----- |
 | `docs/guides/architecture.md` | Diagramas e visão geral |
-| `docs/guides/cache.md` | Cache com Redis e builder pattern |
-| `docs/guides/kubernetes.md` | Deploy e operação |
+| `docs/guides/cache.md` | Cache com Redis, singleflight e pool config |
+| `docs/guides/kubernetes.md` | Deploy, Kind e operação |
+| `docs/guides/fx-dependency-injection.md` | Uber Fx como alternativa ao DI manual |
+| `docs/guides/multi-database.md` | Estrategia para múltiplos bancos |
 
 ---
 

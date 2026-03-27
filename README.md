@@ -215,8 +215,10 @@ make kind-logs      # Ver logs no Kind
 | Guia | Sobre |
 | ---- | ----- |
 | [architecture.md](docs/guides/architecture.md) | Diagramas e visão geral |
-| [cache.md](docs/guides/cache.md) | Cache com Redis e builder pattern |
-| [kubernetes.md](docs/guides/kubernetes.md) | Deploy e operação |
+| [cache.md](docs/guides/cache.md) | Cache com Redis, singleflight e pool config |
+| [kubernetes.md](docs/guides/kubernetes.md) | Deploy, Kind e operação |
+| [fx-dependency-injection.md](docs/guides/fx-dependency-injection.md) | Uber Fx como alternativa ao DI manual |
+| [multi-database.md](docs/guides/multi-database.md) | Estrategia para serviços com múltiplos bancos |
 
 ### Para Agentes de IA
 
