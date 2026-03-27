@@ -182,9 +182,10 @@ test-unit: ## Roda apenas testes unitarios
 test-e2e: ## Roda testes e2e (requer Docker)
 	go test ./tests/e2e/... -v -count=1
 
-test-coverage: ## Gera relatorio de cobertura
+test-coverage: ## Gera relatorio de cobertura (exclui bootstrap/wiring)
 	@mkdir -p tests/coverage
-	go test ./... -coverprofile=tests/coverage/coverage.out
+	go test $$(go list ./internal/... ./pkg/... ./config/... | grep -v -E '(web/handler$$|web/router$$|telemetry$$|db/postgres$$)') -coverprofile=tests/coverage/coverage.out
+	@go tool cover -func=tests/coverage/coverage.out | tail -1
 	go tool cover -html=tests/coverage/coverage.out -o tests/coverage/coverage.html
 	@echo "Coverage report: tests/coverage/coverage.html"
 
