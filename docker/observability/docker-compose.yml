@@ -2,7 +2,7 @@
 # Requer: make docker-up (cria a rede go-boilerplate-network)
 # Uso: docker compose -f docker/observability/docker-compose.yml up -d
 
-name: boilerplate-observability
+name: go-boilerplate
 
 services:
   # ============================================
