@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/ctxkeys"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/logutil"
 )
 
 const requestIDMaxLen = 64
@@ -41,6 +42,15 @@ func Logger() gin.HandlerFunc {
 		if span.SpanContext().HasTraceID() {
 			traceID = span.SpanContext().TraceID().String()
 		}
+
+		// Inject LogContext into request context for downstream use
+		lc := logutil.LogContext{
+			RequestID: requestID,
+			TraceID:   traceID,
+			Step:      logutil.StepMiddleware,
+		}
+		ctx := logutil.Inject(c.Request.Context(), lc)
+		c.Request = c.Request.WithContext(ctx)
 
 		// Log de entrada
 		slog.Info("request started",

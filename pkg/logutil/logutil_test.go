@@ -39,6 +39,22 @@ func TestLogContext_WithStep(t *testing.T) {
 	assert.Equal(t, StepHandler, lc.Step) // original not mutated
 }
 
+func TestLogContext_WithResource(t *testing.T) {
+	lc := LogContext{RequestID: "req-123"}
+	withRes := lc.WithResource("entity")
+
+	assert.Equal(t, "entity", withRes.Resource)
+	assert.Equal(t, "", lc.Resource) // original not mutated
+}
+
+func TestLogContext_WithAction(t *testing.T) {
+	lc := LogContext{RequestID: "req-123"}
+	withAct := lc.WithAction("create")
+
+	assert.Equal(t, "create", withAct.Action)
+	assert.Equal(t, "", lc.Action) // original not mutated
+}
+
 func TestLogContext_ToSlogAttrs(t *testing.T) {
 	lc := LogContext{
 		RequestID:     "req-123",
@@ -50,41 +66,131 @@ func TestLogContext_ToSlogAttrs(t *testing.T) {
 	}
 
 	attrs := lc.ToSlogAttrs()
-	assert.GreaterOrEqual(t, len(attrs), 5)
 
-	keys := make(map[string]bool)
-	for _, attr := range attrs {
-		keys[attr.Key] = true
+	// attrs should be flat key-value pairs: []any{"key1", "val1", "key2", "val2", ...}
+	assert.True(t, len(attrs)%2 == 0, "attrs should have even length (key-value pairs)")
+
+	keys := make(map[string]any)
+	for i := 0; i < len(attrs); i += 2 {
+		key, ok := attrs[i].(string)
+		assert.True(t, ok, "even-indexed elements should be string keys")
+		keys[key] = attrs[i+1]
 	}
-	assert.True(t, keys["request_id"])
-	assert.True(t, keys["trace_id"])
-	assert.True(t, keys["step"])
-	assert.True(t, keys["resource"])
-	assert.True(t, keys["action"])
+
+	assert.Equal(t, "req-123", keys["request_id"])
+	assert.Equal(t, "trace-456", keys["trace_id"])
+	assert.Equal(t, StepUseCase, keys["step"])
+	assert.Equal(t, "entity", keys["resource"])
+	assert.Equal(t, "create", keys["action"])
+	assert.Equal(t, "api-gateway", keys["caller_service"])
 }
 
-func TestErrorLogFields_DomainError(t *testing.T) {
-	err := errors.New("validation failed")
-	attrs := ErrorLogFields(err, true)
-
-	hasStack := false
-	for _, attr := range attrs {
-		if attr.Key == "stack_trace" {
-			hasStack = true
-		}
+func TestLogContext_ToSlogAttrs_omitsEmptyFields(t *testing.T) {
+	lc := LogContext{
+		RequestID: "req-123",
+		// All other fields empty
 	}
-	assert.False(t, hasStack, "domain errors should NOT have stack trace")
+
+	attrs := lc.ToSlogAttrs()
+
+	// Should only contain request_id
+	assert.Equal(t, 2, len(attrs)) // "request_id", "req-123"
+	assert.Equal(t, "request_id", attrs[0])
+	assert.Equal(t, "req-123", attrs[1])
+}
+
+func TestLogContext_ToSlogAttrs_includesExtra(t *testing.T) {
+	lc := LogContext{
+		RequestID: "req-123",
+		Extra:     map[string]any{"custom_key": "custom_value"},
+	}
+
+	attrs := lc.ToSlogAttrs()
+
+	keys := make(map[string]any)
+	for i := 0; i < len(attrs); i += 2 {
+		key, ok := attrs[i].(string)
+		assert.True(t, ok)
+		keys[key] = attrs[i+1]
+	}
+
+	assert.Equal(t, "custom_value", keys["custom_key"])
+}
+
+func TestErrorLogFields_DomainErrorCode(t *testing.T) {
+	domainErr := errors.New("entity not found")
+	attrs := ErrorLogFields(domainErr, "NOT_FOUND")
+
+	keys := make(map[string]any)
+	for i := 0; i < len(attrs); i += 2 {
+		key, ok := attrs[i].(string)
+		assert.True(t, ok)
+		keys[key] = attrs[i+1]
+	}
+
+	assert.Equal(t, "entity not found", keys["error.message"])
+	assert.Equal(t, "NOT_FOUND", keys["error.code"])
+	_, hasStack := keys["error.stack"]
+	assert.False(t, hasStack, "domain error codes should NOT have stack trace")
 }
 
 func TestErrorLogFields_InternalError(t *testing.T) {
-	err := errors.New("db connection failed")
-	attrs := ErrorLogFields(err, false)
+	internalErr := errors.New("db connection failed")
+	attrs := ErrorLogFields(internalErr, "")
 
-	hasStack := false
-	for _, attr := range attrs {
-		if attr.Key == "stack_trace" {
-			hasStack = true
-		}
+	keys := make(map[string]any)
+	for i := 0; i < len(attrs); i += 2 {
+		key, ok := attrs[i].(string)
+		assert.True(t, ok)
+		keys[key] = attrs[i+1]
 	}
+
+	assert.Equal(t, "db connection failed", keys["error.message"])
+	assert.Equal(t, "", keys["error.code"])
+	_, hasStack := keys["error.stack"]
 	assert.True(t, hasStack, "internal errors SHOULD have stack trace")
+}
+
+func TestErrorLogFields_UnknownCode(t *testing.T) {
+	unknownErr := errors.New("something unexpected")
+	attrs := ErrorLogFields(unknownErr, "UNKNOWN_CODE")
+
+	keys := make(map[string]any)
+	for i := 0; i < len(attrs); i += 2 {
+		key, ok := attrs[i].(string)
+		assert.True(t, ok)
+		keys[key] = attrs[i+1]
+	}
+
+	assert.Equal(t, "UNKNOWN_CODE", keys["error.code"])
+	_, hasStack := keys["error.stack"]
+	assert.True(t, hasStack, "unknown error codes SHOULD have stack trace")
+}
+
+func TestStepConstants(t *testing.T) {
+	assert.Equal(t, "handler", StepHandler)
+	assert.Equal(t, "usecase", StepUseCase)
+	assert.Equal(t, "repository", StepRepository)
+	assert.Equal(t, "cache", StepCache)
+	assert.Equal(t, "middleware", StepMiddleware)
+}
+
+func TestContextArgsFromCtx_withLogContext(t *testing.T) {
+	ctx := context.Background()
+	lc := LogContext{
+		RequestID: "req-abc",
+		Step:      StepMiddleware,
+	}
+	ctx = Inject(ctx, lc)
+
+	args := contextArgsFromCtx(ctx)
+
+	assert.NotNil(t, args)
+	assert.True(t, len(args) >= 4, "should have at least request_id and step pairs")
+}
+
+func TestContextArgsFromCtx_withoutLogContext(t *testing.T) {
+	ctx := context.Background()
+	args := contextArgsFromCtx(ctx)
+	assert.Nil(t, args)
 }
