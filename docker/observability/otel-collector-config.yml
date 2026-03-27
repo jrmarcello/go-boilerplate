@@ -26,11 +26,20 @@ processors:
         action: insert
 
 exporters:
-  # Elasticsearch para traces
+  # Elasticsearch para traces e logs (ECS mapping)
   elasticsearch:
     endpoints: ["http://elasticsearch:9200"]
     traces_index: otel-traces
     logs_index: otel-logs
+    mapping:
+      mode: ecs
+
+  # Elasticsearch para métricas (mode: none — ECS não suporta métricas, OTel requer data streams)
+  elasticsearch/metrics:
+    endpoints: ["http://elasticsearch:9200"]
+    metrics_index: otel-metrics
+    mapping:
+      mode: none
 
   # Debug/logging local
   debug:
@@ -58,7 +67,12 @@ service:
       receivers: [otlp]
       processors: [memory_limiter, batch, resource]
       exporters: [elasticsearch, debug]
-    
+
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [elasticsearch/metrics, prometheus, debug]
+
     logs:
       receivers: [otlp]
       processors: [memory_limiter, batch]

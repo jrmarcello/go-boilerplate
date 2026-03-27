@@ -80,6 +80,7 @@ help: ## Exibe esta mensagem de ajuda
 	@echo "\033[1;33m  Observability (ELK + OTel)\033[0m"
 	@grep -Eh '^observability-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
+	@echo ""
 	@echo "\033[1;33m  Load Testing (k6)\033[0m"
 	@grep -Eh '^load-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
@@ -124,6 +125,7 @@ tools: ## Instala ferramentas de desenvolvimento
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	@go install github.com/swaggo/swag/cmd/swag@latest
 	@go install golang.org/x/vuln/cmd/govulncheck@latest
+	@go install golang.org/x/tools/cmd/goimports@latest
 	@echo "Tools installed in $(GOBIN)"
 
 # ============================================
@@ -214,6 +216,9 @@ observability-down: ## Para stack de observabilidade
 
 observability-logs: ## Mostra logs do OTel Collector
 	docker compose -f docker/observability/docker-compose.yml logs -f otel-collector
+
+observability-setup: ## Importa dashboard + data views + alertas no Kibana
+	@bash docker/observability/scripts/setup_kibana.sh
 
 # ============================================
 # KIND (Kubernetes Local)

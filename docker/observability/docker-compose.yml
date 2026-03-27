@@ -8,15 +8,15 @@ services:
   # ELASTICSEARCH
   # ============================================
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
-    container_name: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    container_name: boilerplate-elasticsearch
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
       - cluster.name=boilerplate-cluster
     ports:
-      - "9200:9200"
+      - "${ES_PORT:-9200}:9200"
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
     healthcheck:
@@ -37,13 +37,16 @@ services:
   # KIBANA
   # ============================================
   kibana:
-    image: docker.elastic.co/kibana/kibana:8.11.0
-    container_name: kibana
+    image: docker.elastic.co/kibana/kibana:8.13.0
+    container_name: boilerplate-kibana
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - XPACK_SECURITY_ENABLED=false
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=boilerplate-kibana-alerts-encrypt-32ch
     ports:
-      - "5601:5601"
+      - "${KIBANA_PORT:-5601}:5601"
+    volumes:
+      - ./scripts:/usr/share/kibana/scripts:ro
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -53,15 +56,15 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 512M
+          cpus: "1.0"
+          memory: 1G
 
   # ============================================
   # OPENTELEMETRY COLLECTOR
   # ============================================
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.91.0
-    container_name: otel-collector
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: boilerplate-otel-collector
     command: [ "--config=/etc/otel-config.yml" ]
     volumes:
       - ./otel-collector-config.yml:/etc/otel-config.yml:ro
