@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -25,15 +26,26 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/idempotency/redisstore"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/logutil"
 	pkgtelemetry "bitbucket.org/appmax-space/go-boilerplate/pkg/telemetry"
+	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel"
 )
 
 // Start initializes the application following the composition pattern:
 // Config → Logger → Telemetry → Database → Dependencies → Router → Server
 func Start(ctx context.Context, cfg *config.Config) error {
+	// 0. Validate config
+	if validateErr := cfg.Validate(); validateErr != nil {
+		return fmt.Errorf("invalid configuration: %w", validateErr)
+	}
+
 	// 1. Logger
 	logger := setupLogger()
 	slog.SetDefault(logger)
+
+	// Set Gin mode from config (avoid "Running in debug mode" warning in production)
+	if cfg.Server.GinMode != "" {
+		gin.SetMode(cfg.Server.GinMode)
+	}
 
 	// 2. Telemetry (OpenTelemetry Traces + Metrics)
 	tp, tpErr := pkgtelemetry.Setup(ctx, pkgtelemetry.Config{
@@ -171,10 +183,14 @@ func buildDependencies(cluster *database.DBCluster, cfg *config.Config, httpMetr
 	updateUC := entityuc.NewUpdateUseCase(repo).WithCache(redisClient)
 	deleteUC := entityuc.NewDeleteUseCase(repo).WithCache(redisClient)
 
-	// Idempotency Store (optional — uses Redis if available)
+	// Idempotency Store (optional — uses Redis when enabled)
 	var idempotencyStore idempotency.Store
-	if rc := redisClient.UnderlyingClient(); rc != nil {
-		idempotencyStore = redisstore.NewRedisStore(rc, 24*time.Hour, 30*time.Second)
+	if cfg.Idempotency.Enabled {
+		if rc := redisClient.UnderlyingClient(); rc != nil {
+			ttl, _ := time.ParseDuration(cfg.Idempotency.TTL)
+			lockTTL, _ := time.ParseDuration(cfg.Idempotency.LockTTL)
+			idempotencyStore = redisstore.NewRedisStore(rc, ttl, lockTTL)
+		}
 	}
 
 	// Handlers

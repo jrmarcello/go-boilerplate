@@ -10,12 +10,13 @@ import (
 )
 
 type Config struct {
-	Server  ServerConfig
-	DB      DBConfig
-	Otel    OtelConfig
-	Redis   RedisConfig
-	Auth    AuthConfig
-	Swagger SwaggerConfig
+	Server      ServerConfig
+	DB          DBConfig
+	Otel        OtelConfig
+	Redis       RedisConfig
+	Auth        AuthConfig
+	Swagger     SwaggerConfig
+	Idempotency IdempotencyConfig
 }
 
 type AuthConfig struct {
@@ -27,8 +28,16 @@ type AuthConfig struct {
 }
 
 type ServerConfig struct {
-	Port string
-	Env  string
+	Port        string
+	Env         string
+	GinMode     string // "release", "debug", "test" — default: "" (debug)
+	MaxBodySize int64  // Max request body size in bytes (0 = default 1MB)
+}
+
+type IdempotencyConfig struct {
+	Enabled bool
+	TTL     string // Duração do armazenamento de respostas. Ex: "24h"
+	LockTTL string // Duração do lock de processamento. Ex: "30s"
 }
 
 // DBConfig contém a configuração do banco de dados.
@@ -133,8 +142,10 @@ func Load() (*Config, error) {
 
 	return &Config{
 		Server: ServerConfig{
-			Port: getEnv("SERVER_PORT", "8080"),
-			Env:  getEnv("APP_ENV", "development"),
+			Port:        getEnv("SERVER_PORT", "8080"),
+			Env:         getEnv("APP_ENV", "development"),
+			GinMode:     getEnv("GIN_MODE", ""),
+			MaxBodySize: int64(getEnvInt("HTTP_MAX_BODY_SIZE", 1<<20)), // default 1MB
 		},
 		DB: DBConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -184,7 +195,43 @@ func Load() (*Config, error) {
 			Enabled: getEnvBool("SWAGGER_ENABLED", false),
 			Host:    getEnv("SWAGGER_HOST", ""),
 		},
+		Idempotency: IdempotencyConfig{
+			Enabled: getEnvBool("IDEMPOTENCY_ENABLED", false),
+			TTL:     getEnv("IDEMPOTENCY_TTL", "24h"),
+			LockTTL: getEnv("IDEMPOTENCY_LOCK_TTL", "30s"),
+		},
 	}, nil
+}
+
+// Validate checks for invalid configuration states at startup.
+// Returns an error if a critical misconfiguration is detected.
+func (c *Config) Validate() error {
+	// DB: sslmode=disable in non-dev environments
+	if c.Server.Env != "development" && c.DB.SSLMode == "disable" {
+		fmt.Println("WARNING: DB_SSLMODE=disable in non-development environment")
+	}
+
+	// Idempotency: enabled but Redis disabled
+	if c.Idempotency.Enabled && !c.Redis.Enabled {
+		return fmt.Errorf("IDEMPOTENCY_ENABLED=true requires REDIS_ENABLED=true")
+	}
+
+	// Idempotency: validate TTL strings are parseable
+	if c.Idempotency.Enabled {
+		if _, parseErr := time.ParseDuration(c.Idempotency.TTL); parseErr != nil {
+			return fmt.Errorf("IDEMPOTENCY_TTL=%q is not a valid duration: %w", c.Idempotency.TTL, parseErr)
+		}
+		if _, parseErr := time.ParseDuration(c.Idempotency.LockTTL); parseErr != nil {
+			return fmt.Errorf("IDEMPOTENCY_LOCK_TTL=%q is not a valid duration: %w", c.Idempotency.LockTTL, parseErr)
+		}
+	}
+
+	// MaxBodySize: must be positive if set
+	if c.Server.MaxBodySize < 0 {
+		return fmt.Errorf("HTTP_MAX_BODY_SIZE must be >= 0, got %d", c.Server.MaxBodySize)
+	}
+
+	return nil
 }
 
 // getEnv retorna o valor da variável de ambiente ou o fallback se não existir.
