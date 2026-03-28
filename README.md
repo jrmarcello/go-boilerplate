@@ -5,9 +5,16 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](docker/)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-326CE5?logo=kubernetes)](deploy/)
 
-Template production-ready para microserviços Go com Clean Architecture, cache Redis, observabilidade e deploy Kubernetes.
+Template production-ready para microsserviços Go. De zero a produção em minutos, não semanas.
 
-Resumo baseado no docs/presentation.md aqui... 
+Clone, renomeie `entity_example` para seu domínio, e comece a desenvolver — a infraestrutura já está pronta: PostgreSQL com Writer/Reader split, Redis cache com singleflight, OpenTelemetry, idempotência, autenticação service-to-service, 223 testes (89% coverage), CI/CD com Slack notifications, Kubernetes com Kustomize, e observabilidade completa com dashboard e alertas.
+
+```bash
+git clone https://bitbucket.org/appmax-space/go-boilerplate my-service
+cd my-service && make setup && make dev
+```
+
+> Para uma visão completa com comparativos, números e FAQ, veja [docs/guides/presentation.md](docs/guides/presentation.md).
 
 ---
 
