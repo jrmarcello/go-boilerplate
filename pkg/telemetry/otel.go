@@ -5,8 +5,6 @@ import (
 	"log/slog"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -16,10 +14,26 @@ import (
 
 // Config holds telemetry configuration.
 type Config struct {
-	ServiceName  string
-	CollectorURL string
-	Enabled      bool
-	Insecure     bool
+	ServiceName string
+	Enabled     bool
+}
+
+// Option configures the telemetry setup.
+type Option func(*options)
+
+type options struct {
+	spanExporter   sdktrace.SpanExporter
+	metricExporter sdkmetric.Exporter
+}
+
+// WithTraceExporter sets the span exporter (e.g., gRPC, HTTP, stdout).
+func WithTraceExporter(e sdktrace.SpanExporter) Option {
+	return func(o *options) { o.spanExporter = e }
+}
+
+// WithMetricExporter sets the metric exporter (e.g., gRPC, HTTP, stdout).
+func WithMetricExporter(e sdkmetric.Exporter) Option {
+	return func(o *options) { o.metricExporter = e }
 }
 
 // Provider encapsulates tracing and metrics providers.
@@ -31,9 +45,21 @@ type Provider struct {
 
 // Setup initializes OpenTelemetry (Traces + Metrics).
 // Returns a Provider that must be shut down on application exit.
-func Setup(ctx context.Context, cfg Config) (*Provider, error) {
-	if !cfg.Enabled || cfg.CollectorURL == "" {
-		slog.Info("OpenTelemetry disabled or no collector URL configured")
+func Setup(ctx context.Context, cfg Config, opts ...Option) (*Provider, error) {
+	if !cfg.Enabled {
+		slog.Info("OpenTelemetry disabled")
+		return &Provider{}, nil
+	}
+
+	// Apply functional options
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	// If enabled but no exporters provided, return empty provider gracefully
+	if o.spanExporter == nil && o.metricExporter == nil {
+		slog.Warn("OpenTelemetry enabled but no exporters configured, skipping initialization")
 		return &Provider{}, nil
 	}
 
@@ -47,16 +73,29 @@ func Setup(ctx context.Context, cfg Config) (*Provider, error) {
 		return nil, resErr
 	}
 
+	var tp *sdktrace.TracerProvider
+	var mp *sdkmetric.MeterProvider
+
 	// Traces
-	tp, tpErr := setupTracer(ctx, cfg.CollectorURL, cfg.Insecure, res)
-	if tpErr != nil {
-		return nil, tpErr
+	if o.spanExporter != nil {
+		tp = sdktrace.NewTracerProvider(
+			sdktrace.WithBatcher(o.spanExporter),
+			sdktrace.WithResource(res),
+		)
+		otel.SetTracerProvider(tp)
+		otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+			propagation.TraceContext{},
+			propagation.Baggage{},
+		))
 	}
 
 	// Metrics
-	mp, mpErr := setupMeter(ctx, cfg.CollectorURL, cfg.Insecure, res)
-	if mpErr != nil {
-		return nil, mpErr
+	if o.metricExporter != nil {
+		mp = sdkmetric.NewMeterProvider(
+			sdkmetric.WithReader(sdkmetric.NewPeriodicReader(o.metricExporter)),
+			sdkmetric.WithResource(res),
+		)
+		otel.SetMeterProvider(mp)
 	}
 
 	// HTTP Metrics
@@ -67,60 +106,9 @@ func Setup(ctx context.Context, cfg Config) (*Provider, error) {
 
 	slog.Info("OpenTelemetry initialized",
 		"service", cfg.ServiceName,
-		"collector", cfg.CollectorURL,
 	)
 
 	return &Provider{tp: tp, mp: mp, httpMetrics: httpMetrics}, nil
-}
-
-func setupTracer(ctx context.Context, collectorURL string, insecure bool, res *resource.Resource) (*sdktrace.TracerProvider, error) {
-	traceOpts := []otlptracegrpc.Option{
-		otlptracegrpc.WithEndpoint(collectorURL),
-	}
-	if insecure {
-		traceOpts = append(traceOpts, otlptracegrpc.WithInsecure())
-	}
-
-	exporter, exporterErr := otlptracegrpc.New(ctx, traceOpts...)
-	if exporterErr != nil {
-		return nil, exporterErr
-	}
-
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(res),
-	)
-
-	otel.SetTracerProvider(tp)
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
-	))
-
-	return tp, nil
-}
-
-func setupMeter(ctx context.Context, collectorURL string, insecure bool, res *resource.Resource) (*sdkmetric.MeterProvider, error) {
-	metricOpts := []otlpmetricgrpc.Option{
-		otlpmetricgrpc.WithEndpoint(collectorURL),
-	}
-	if insecure {
-		metricOpts = append(metricOpts, otlpmetricgrpc.WithInsecure())
-	}
-
-	exporter, exporterErr := otlpmetricgrpc.New(ctx, metricOpts...)
-	if exporterErr != nil {
-		return nil, exporterErr
-	}
-
-	mp := sdkmetric.NewMeterProvider(
-		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter)),
-		sdkmetric.WithResource(res),
-	)
-
-	otel.SetMeterProvider(mp)
-
-	return mp, nil
 }
 
 // Shutdown shuts down telemetry providers gracefully.

@@ -96,7 +96,9 @@ services:
       REDIS_ENABLED: "true"
       SWAGGER_ENABLED: "true"
       SERVICE_KEYS: ""
-      OTEL_EXPORTER_OTLP_ENDPOINT: ""
+      OTEL_SERVICE_NAME: entity-service
+      OTEL_COLLECTOR_URL: otel-collector:4317
+      OTEL_INSECURE: "true"
     depends_on:
       go-boilerplate-migrate:
         condition: service_completed_successfully

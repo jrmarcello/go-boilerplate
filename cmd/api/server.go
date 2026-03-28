@@ -26,6 +26,7 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/idempotency/redisstore"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/logutil"
 	pkgtelemetry "bitbucket.org/appmax-space/go-boilerplate/pkg/telemetry"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/telemetry/otelgrpc"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel"
 )
@@ -48,19 +49,26 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	}
 
 	// 2. Telemetry (OpenTelemetry Traces + Metrics)
-	// Graceful degradation: if OTel setup fails, app continues without telemetry.
+	var exporterOpts []pkgtelemetry.Option
+	if cfg.Otel.CollectorURL != "" {
+		grpcOpts, exporterErr := otelgrpc.Exporters(ctx, otelgrpc.Config{
+			CollectorURL: cfg.Otel.CollectorURL,
+			Insecure:     cfg.Otel.Insecure,
+		})
+		if exporterErr != nil {
+			return fmt.Errorf("creating telemetry exporters: %w", exporterErr)
+		}
+		exporterOpts = grpcOpts
+	}
+
 	tp, tpErr := pkgtelemetry.Setup(ctx, pkgtelemetry.Config{
-		ServiceName:  cfg.Otel.ServiceName,
-		CollectorURL: cfg.Otel.CollectorURL,
-		Enabled:      cfg.Otel.CollectorURL != "",
-		Insecure:     cfg.Otel.Insecure,
-	})
+		ServiceName: cfg.Otel.ServiceName,
+		Enabled:     cfg.Otel.CollectorURL != "",
+	}, exporterOpts...)
 	if tpErr != nil {
-		slog.Warn("Telemetry setup failed, continuing without observability", "error", tpErr)
+		return tpErr
 	}
-	if tp != nil {
-		defer shutdownTelemetry(tp, logger)
-	}
+	defer shutdownTelemetry(tp, logger)
 
 	// 3. Database (Writer/Reader Cluster)
 	writerCfg := database.Config{
