@@ -141,10 +141,11 @@ run: ## Sobe tudo em Docker (infra + migrations + API)
 run-stop: ## Para todos os containers (infra + API)
 	$(COMPOSE) $(ENV_FILE) --profile api down
 
-build: ## Compila binario para bin/
+build: ## Compila binarios para bin/
 	@mkdir -p bin
 	go build -o bin/api ./cmd/api
-	@echo "Binary: bin/api"
+	go build -o bin/migrate ./cmd/migrate
+	@echo "Binaries: bin/api, bin/migrate"
 
 clean: ## Remove arquivos gerados
 	rm -rf bin/ tests/coverage/ tests/load/results/ tmp/
