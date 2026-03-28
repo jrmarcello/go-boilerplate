@@ -21,7 +21,7 @@ pre-push:
     test:
       run: go test ./internal/... -count=1
     vulncheck:
-      run: govulncheck ./...
+      run: govulncheck -show verbose ./...
 
 commit-msg:
   commands:
