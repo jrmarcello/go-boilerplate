@@ -43,6 +43,10 @@ RUN GOTOOLCHAIN=auto GOBIN=/usr/local/bin go install github.com/air-verse/air@la
   GOTOOLCHAIN=auto GOBIN=/usr/local/bin go install golang.org/x/tools/gopls@latest && \
   GOTOOLCHAIN=auto GOBIN=/usr/local/bin go install golang.org/x/tools/cmd/goimports@latest
 
+# Install Docker CLI (uses host Docker daemon via socket mount)
+RUN curl -fsSL https://get.docker.com | sh && \
+  apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Install Claude Code
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 
@@ -53,9 +57,10 @@ RUN ARCH=$(dpkg --print-architecture) && \
   dpkg -i "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
   rm "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb"
 
-# Create non-root user
+# Create non-root user with docker group access
 ARG USERNAME=node
 RUN useradd -m -s /bin/zsh $USERNAME || true
+RUN usermod -aG docker $USERNAME 2>/dev/null || true
 
 # Persist bash history
 RUN mkdir -p /commandhistory && \
@@ -90,7 +95,7 @@ RUN mkdir -p /home/$USERNAME/.ssh && \
 # Copy and configure firewall script
 COPY init-firewall.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/init-firewall.sh && \
-  echo "$USERNAME ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh, /usr/bin/chmod 666 /ssh-agent" > /etc/sudoers.d/$USERNAME-firewall && \
+  echo "$USERNAME ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh, /usr/bin/chmod 666 /ssh-agent, /usr/bin/chmod 666 /var/run/docker.sock" > /etc/sudoers.d/$USERNAME-firewall && \
   chmod 0440 /etc/sudoers.d/$USERNAME-firewall
 
 # Environment
