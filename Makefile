@@ -42,7 +42,7 @@ ENV_FILE := $(shell test -f .env && echo "--env-file .env" || echo "")
         observability-up observability-down observability-logs \
         kind-up kind-down kind-deploy kind-logs kind-status kind-migrate kind-setup \
         migrate-up migrate-down migrate-status migrate-reset migrate-redo migrate-create \
-        sandbox sandbox-claude sandbox-shell sandbox-stop sandbox-build sandbox-rebuild \
+        sandbox sandbox-claude sandbox-shell sandbox-stop sandbox-clean sandbox-build sandbox-rebuild \
         sandbox-firewall sandbox-ssh sandbox-status
 
 # Target padrão
@@ -439,6 +439,13 @@ sandbox-shell: ## Attach shell to running sandbox
 
 sandbox-stop: ## Stop sandbox container
 	docker stop $(SANDBOX_CONTAINER) 2>/dev/null || true
+
+sandbox-clean: ## Remove sandbox container, image and all volumes
+	docker stop $(SANDBOX_CONTAINER) 2>/dev/null || true
+	docker rm $(SANDBOX_CONTAINER) 2>/dev/null || true
+	docker rmi $(SANDBOX_IMAGE) 2>/dev/null || true
+	docker volume rm $(APP_NAME)-bashhistory $(APP_NAME)-claude-config $(APP_NAME)-gopath 2>/dev/null || true
+	@echo "Sandbox cleaned (container, image, volumes)"
 
 sandbox-firewall: ## Test sandbox firewall rules
 	@echo "\033[36m-- Blocked (example.com) --\033[0m"
