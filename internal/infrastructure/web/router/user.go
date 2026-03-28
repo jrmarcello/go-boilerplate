@@ -6,8 +6,8 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/handler"
 )
 
-// RegisterEntityRoutes registra todas as rotas relacionadas a Entity
-func RegisterEntityRoutes(rg *gin.RouterGroup, h *handler.EntityHandler) {
+// RegisterUserRoutes registra todas as rotas relacionadas a Entity
+func RegisterUserRoutes(rg *gin.RouterGroup, h *handler.UserHandler) {
 	rg.POST("/entities", h.Create)
 	rg.GET("/entities", h.List)
 	rg.GET("/entities/:id", h.GetByID)

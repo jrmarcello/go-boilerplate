@@ -15,7 +15,7 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/db/postgres/repository"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/handler"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/middleware"
-	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example"
+	useruc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil/httpgin"
 )
 
@@ -25,16 +25,16 @@ func setupTestRouter() *gin.Engine {
 
 	db := GetTestDB()
 	cache := GetTestCache()
-	repo := repository.NewEntityRepository(db, db)
+	repo := repository.NewUserRepository(db, db)
 
 	// Use Cases (with cache)
-	createUC := entityuc.NewCreateUseCase(repo)
-	getUC := entityuc.NewGetUseCase(repo).WithCache(cache)
-	listUC := entityuc.NewListUseCase(repo)
-	updateUC := entityuc.NewUpdateUseCase(repo).WithCache(cache)
-	deleteUC := entityuc.NewDeleteUseCase(repo).WithCache(cache)
+	createUC := useruc.NewCreateUseCase(repo)
+	getUC := useruc.NewGetUseCase(repo).WithCache(cache)
+	listUC := useruc.NewListUseCase(repo)
+	updateUC := useruc.NewUpdateUseCase(repo).WithCache(cache)
+	deleteUC := useruc.NewDeleteUseCase(repo).WithCache(cache)
 
-	h := handler.NewEntityHandler(createUC, getUC, listUC, updateUC, deleteUC, nil)
+	h := handler.NewUserHandler(createUC, getUC, listUC, updateUC, deleteUC, nil)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -53,11 +53,11 @@ func setupTestRouter() *gin.Engine {
 	})
 
 	// CRUD Routes (without auth for backward compatibility)
-	r.POST("/entities", h.Create)
-	r.GET("/entities", h.List)
-	r.GET("/entities/:id", h.GetByID)
-	r.PUT("/entities/:id", h.Update)
-	r.DELETE("/entities/:id", h.Delete)
+	r.POST("/users", h.Create)
+	r.GET("/users", h.List)
+	r.GET("/users/:id", h.GetByID)
+	r.PUT("/users/:id", h.Update)
+	r.DELETE("/users/:id", h.Delete)
 
 	return r
 }
@@ -68,15 +68,15 @@ func setupTestRouterWithAuth() *gin.Engine {
 
 	db := GetTestDB()
 	cache := GetTestCache()
-	repo := repository.NewEntityRepository(db, db)
+	repo := repository.NewUserRepository(db, db)
 
-	createUC := entityuc.NewCreateUseCase(repo)
-	getUC := entityuc.NewGetUseCase(repo).WithCache(cache)
-	listUC := entityuc.NewListUseCase(repo)
-	updateUC := entityuc.NewUpdateUseCase(repo).WithCache(cache)
-	deleteUC := entityuc.NewDeleteUseCase(repo).WithCache(cache)
+	createUC := useruc.NewCreateUseCase(repo)
+	getUC := useruc.NewGetUseCase(repo).WithCache(cache)
+	listUC := useruc.NewListUseCase(repo)
+	updateUC := useruc.NewUpdateUseCase(repo).WithCache(cache)
+	deleteUC := useruc.NewDeleteUseCase(repo).WithCache(cache)
 
-	h := handler.NewEntityHandler(createUC, getUC, listUC, updateUC, deleteUC, nil)
+	h := handler.NewUserHandler(createUC, getUC, listUC, updateUC, deleteUC, nil)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -97,11 +97,11 @@ func setupTestRouterWithAuth() *gin.Engine {
 	// Protected routes
 	protected := r.Group("")
 	protected.Use(middleware.ServiceKeyAuth(authConfig))
-	protected.POST("/entities", h.Create)
-	protected.GET("/entities", h.List)
-	protected.GET("/entities/:id", h.GetByID)
-	protected.PUT("/entities/:id", h.Update)
-	protected.DELETE("/entities/:id", h.Delete)
+	protected.POST("/users", h.Create)
+	protected.GET("/users", h.List)
+	protected.GET("/users/:id", h.GetByID)
+	protected.PUT("/users/:id", h.Update)
+	protected.DELETE("/users/:id", h.Delete)
 
 	return r
 }
@@ -137,7 +137,7 @@ func TestE2E_CreateEntity_Success(t *testing.T) {
 		"email": "test@example.com"
 	}`
 
-	req := httptest.NewRequest(http.MethodPost, "/entities", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/users", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -152,7 +152,7 @@ func TestE2E_CreateEntity_Success(t *testing.T) {
 
 	// Verificar no banco de dados
 	var count int
-	dbErr := GetTestDB().Get(&count, "SELECT COUNT(*) FROM entities WHERE email = $1", "test@example.com")
+	dbErr := GetTestDB().Get(&count, "SELECT COUNT(*) FROM users WHERE email = $1", "test@example.com")
 	require.NoError(t, dbErr)
 	assert.Equal(t, 1, count)
 }
@@ -168,7 +168,7 @@ func TestE2E_EntityFullCycle(t *testing.T) {
 	}
 	body, _ := json.Marshal(entity)
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", "/entities", bytes.NewReader(body))
+	req := httptest.NewRequest("POST", "/users", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusCreated, w.Code)
@@ -181,7 +181,7 @@ func TestE2E_EntityFullCycle(t *testing.T) {
 
 	// 2. Get By ID
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest("GET", "/entities/"+id, nil)
+	req = httptest.NewRequest("GET", "/users/"+id, nil)
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
 	fetched := extractData(t, w.Body.Bytes())
@@ -191,14 +191,14 @@ func TestE2E_EntityFullCycle(t *testing.T) {
 	update := map[string]string{"name": "Cycle Update"}
 	body, _ = json.Marshal(update)
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest("PUT", "/entities/"+id, bytes.NewReader(body))
+	req = httptest.NewRequest("PUT", "/users/"+id, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
 
 	// 4. Verify Update
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest("GET", "/entities/"+id, nil)
+	req = httptest.NewRequest("GET", "/users/"+id, nil)
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
 	fetched = extractData(t, w.Body.Bytes())
@@ -206,19 +206,19 @@ func TestE2E_EntityFullCycle(t *testing.T) {
 
 	// 5. List
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest("GET", "/entities", nil)
+	req = httptest.NewRequest("GET", "/users", nil)
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
 
 	// 6. Delete
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest("DELETE", "/entities/"+id, nil)
+	req = httptest.NewRequest("DELETE", "/users/"+id, nil)
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
 
 	// 7. Verify Delete (soft delete - entity becomes inactive)
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest("GET", "/entities/"+id, nil)
+	req = httptest.NewRequest("GET", "/users/"+id, nil)
 	router.ServeHTTP(w, req)
 	// Soft delete pode retornar 200 com active=false ou 404, depende da implementação
 	// Vamos verificar se ainda existe mas está inativo
@@ -240,7 +240,7 @@ func TestE2E_CreateEntity_InvalidEmail(t *testing.T) {
 		"email": "invalid-email"
 	}`
 
-	req := httptest.NewRequest(http.MethodPost, "/entities", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/users", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -255,7 +255,7 @@ func TestE2E_CreateEntity_EmptyRequest(t *testing.T) {
 
 	body := `{}`
 
-	req := httptest.NewRequest(http.MethodPost, "/entities", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/users", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -269,7 +269,7 @@ func TestE2E_GetEntity_NotFound(t *testing.T) {
 	router := setupTestRouter()
 
 	// UUID v7 válido mas não existe
-	req := httptest.NewRequest("GET", "/entities/018e4a2c-6b4d-7000-9410-abcdef123456", nil)
+	req := httptest.NewRequest("GET", "/users/018e4a2c-6b4d-7000-9410-abcdef123456", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -280,7 +280,7 @@ func TestE2E_GetEntity_NotFound(t *testing.T) {
 func TestE2E_GetEntity_InvalidID(t *testing.T) {
 	router := setupTestRouter()
 
-	req := httptest.NewRequest("GET", "/entities/invalid-id", nil)
+	req := httptest.NewRequest("GET", "/users/invalid-id", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -294,7 +294,7 @@ func TestE2E_UpdateEntity_NotFound(t *testing.T) {
 	update := map[string]string{"name": "Updated Name"}
 	body, _ := json.Marshal(update)
 
-	req := httptest.NewRequest("PUT", "/entities/018e4a2c-6b4d-7000-9410-abcdef123456", bytes.NewReader(body))
+	req := httptest.NewRequest("PUT", "/users/018e4a2c-6b4d-7000-9410-abcdef123456", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -309,7 +309,7 @@ func TestE2E_UpdateEntity_InvalidEmail(t *testing.T) {
 
 	// 1. Create entity
 	createBody := `{"name": "Test", "email": "valid@example.com"}`
-	req := httptest.NewRequest("POST", "/entities", bytes.NewBufferString(createBody))
+	req := httptest.NewRequest("POST", "/users", bytes.NewBufferString(createBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -324,7 +324,7 @@ func TestE2E_UpdateEntity_InvalidEmail(t *testing.T) {
 	// 2. Update with invalid email
 	update := map[string]string{"email": "invalid-email"}
 	body, _ := json.Marshal(update)
-	req = httptest.NewRequest("PUT", "/entities/"+id, bytes.NewReader(body))
+	req = httptest.NewRequest("PUT", "/users/"+id, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w = httptest.NewRecorder()
 
@@ -336,7 +336,7 @@ func TestE2E_UpdateEntity_InvalidEmail(t *testing.T) {
 func TestE2E_DeleteEntity_NotFound(t *testing.T) {
 	router := setupTestRouter()
 
-	req := httptest.NewRequest("DELETE", "/entities/018e4a2c-6b4d-7000-9410-abcdef123456", nil)
+	req := httptest.NewRequest("DELETE", "/users/018e4a2c-6b4d-7000-9410-abcdef123456", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -384,7 +384,7 @@ func TestE2E_ServiceKeyAuth_Errors(t *testing.T) {
 	router := setupTestRouterWithAuth()
 
 	t.Run("missing auth headers returns 401", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/entities/018e4a2c-6b4d-7000-8000-000000000001", nil)
+		req := httptest.NewRequest("GET", "/users/018e4a2c-6b4d-7000-8000-000000000001", nil)
 		// Sem headers de auth
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
@@ -394,7 +394,7 @@ func TestE2E_ServiceKeyAuth_Errors(t *testing.T) {
 	})
 
 	t.Run("invalid key returns 401", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/entities/018e4a2c-6b4d-7000-8000-000000000001", nil)
+		req := httptest.NewRequest("GET", "/users/018e4a2c-6b4d-7000-8000-000000000001", nil)
 		req.Header.Set("X-Service-Name", "test-service")
 		req.Header.Set("X-Service-Key", "wrong_key")
 		w := httptest.NewRecorder()
@@ -405,7 +405,7 @@ func TestE2E_ServiceKeyAuth_Errors(t *testing.T) {
 	})
 
 	t.Run("unknown service returns 401", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/entities/018e4a2c-6b4d-7000-8000-000000000001", nil)
+		req := httptest.NewRequest("GET", "/users/018e4a2c-6b4d-7000-8000-000000000001", nil)
 		req.Header.Set("X-Service-Name", "unknown-service")
 		req.Header.Set("X-Service-Key", "any_key")
 		w := httptest.NewRecorder()
@@ -416,7 +416,7 @@ func TestE2E_ServiceKeyAuth_Errors(t *testing.T) {
 	})
 
 	t.Run("valid key allows access", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/entities/018e4a2c-6b4d-7000-9410-abcdef123456", nil)
+		req := httptest.NewRequest("GET", "/users/018e4a2c-6b4d-7000-9410-abcdef123456", nil)
 		addAuthHeaders(req)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
@@ -449,7 +449,7 @@ func TestE2E_ListEntities_Pagination(t *testing.T) {
 			"name":  "Entity " + string(rune('A'+i-1)),
 			"email": "entity" + string(rune('a'+i-1)) + "@example.com",
 		})
-		req := httptest.NewRequest("POST", "/entities", bytes.NewReader(body))
+		req := httptest.NewRequest("POST", "/users", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
@@ -457,7 +457,7 @@ func TestE2E_ListEntities_Pagination(t *testing.T) {
 	}
 
 	// List with pagination (page 1, limit 2)
-	req := httptest.NewRequest("GET", "/entities?page=1&limit=2", nil)
+	req := httptest.NewRequest("GET", "/users?page=1&limit=2", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -491,7 +491,7 @@ func TestE2E_CacheBehavior(t *testing.T) {
 	}
 	body, _ := json.Marshal(entity)
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", "/entities", bytes.NewReader(body))
+	req := httptest.NewRequest("POST", "/users", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusCreated, w.Code)
@@ -505,7 +505,7 @@ func TestE2E_CacheBehavior(t *testing.T) {
 	// 2. First GET - should be cache miss, fetches from DB
 	start1 := time.Now()
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest("GET", "/entities/"+id, nil)
+	req = httptest.NewRequest("GET", "/users/"+id, nil)
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
 	duration1 := time.Since(start1)
@@ -516,7 +516,7 @@ func TestE2E_CacheBehavior(t *testing.T) {
 	// 3. Second GET - should be cache hit (typically faster)
 	start2 := time.Now()
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest("GET", "/entities/"+id, nil)
+	req = httptest.NewRequest("GET", "/users/"+id, nil)
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
 	duration2 := time.Since(start2)
@@ -532,14 +532,14 @@ func TestE2E_CacheBehavior(t *testing.T) {
 	updateBody := map[string]string{"name": "Updated Cache Entity"}
 	body, _ = json.Marshal(updateBody)
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest("PUT", "/entities/"+id, bytes.NewReader(body))
+	req = httptest.NewRequest("PUT", "/users/"+id, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
 
 	// 5. Third GET - should reflect updated data (cache was invalidated)
 	w = httptest.NewRecorder()
-	req = httptest.NewRequest("GET", "/entities/"+id, nil)
+	req = httptest.NewRequest("GET", "/users/"+id, nil)
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
 
@@ -560,7 +560,7 @@ func TestE2E_CreateEntity_PerformanceBaseline(t *testing.T) {
 		"email": "perf@example.com"
 	}`
 
-	req := httptest.NewRequest(http.MethodPost, "/entities", bytes.NewBufferString(body))
+	req := httptest.NewRequest(http.MethodPost, "/users", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 

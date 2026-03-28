@@ -81,7 +81,7 @@ func TestLoad_Defaults(t *testing.T) {
 	assert.Equal(t, "5432", cfg.DB.Port)
 	assert.Equal(t, "user", cfg.DB.User)
 	assert.Equal(t, "password", cfg.DB.Password)
-	assert.Equal(t, "entities", cfg.DB.Name)
+	assert.Equal(t, "users", cfg.DB.Name)
 	assert.Equal(t, "disable", cfg.DB.SSLMode)
 	assert.Equal(t, 25, cfg.DB.MaxOpenConns)
 	assert.Equal(t, 10, cfg.DB.MaxIdleConns)
@@ -93,7 +93,7 @@ func TestLoad_Defaults(t *testing.T) {
 
 	// Writer DSN with defaults
 	writerDSN := cfg.DB.GetWriterDSN()
-	assert.Equal(t, "host=localhost port=5432 user=user password=password dbname=entities sslmode=disable", writerDSN)
+	assert.Equal(t, "host=localhost port=5432 user=user password=password dbname=users sslmode=disable", writerDSN)
 
 	// Reader DSN falls back entirely to writer when no replica fields set
 	readerDSN := cfg.DB.GetReaderDSN()

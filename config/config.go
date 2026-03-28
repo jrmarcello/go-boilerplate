@@ -152,7 +152,7 @@ func Load() (*Config, error) {
 			Port:     getEnv("DB_PORT", "5432"),
 			User:     getEnv("DB_USER", "user"),
 			Password: getEnv("DB_PASSWORD", "password"),
-			Name:     getEnv("DB_NAME", "entities"),
+			Name:     getEnv("DB_NAME", "users"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 
 			MaxOpenConns:    getEnvInt("DB_MAX_OPEN_CONNS", 25),

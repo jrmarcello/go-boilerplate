@@ -3,8 +3,8 @@ package interfaces
 import (
 	"context"
 
-	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
+	userdomain "bitbucket.org/appmax-space/go-boilerplate/internal/domain/user"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/user/vo"
 )
 
 // Repository define o CONTRATO para persistência de Entity.
@@ -18,24 +18,24 @@ import (
 //   - Fácil criar mocks para testes
 type Repository interface {
 	// Create persiste uma nova Entity no banco de dados.
-	Create(ctx context.Context, e *entity.Entity) error
+	Create(ctx context.Context, e *userdomain.User) error
 
 	// FindByID busca uma Entity pelo ID (UUID v7).
-	// Retorna ErrEntityNotFound se não encontrar.
-	FindByID(ctx context.Context, id vo.ID) (*entity.Entity, error)
+	// Retorna ErrUserNotFound se não encontrar.
+	FindByID(ctx context.Context, id vo.ID) (*userdomain.User, error)
 
 	// FindByEmail busca uma Entity pelo email.
-	// Retorna ErrEntityNotFound se não encontrar.
-	FindByEmail(ctx context.Context, email vo.Email) (*entity.Entity, error)
+	// Retorna ErrUserNotFound se não encontrar.
+	FindByEmail(ctx context.Context, email vo.Email) (*userdomain.User, error)
 
 	// List retorna uma lista paginada de Entities com filtros opcionais.
-	List(ctx context.Context, filter entity.ListFilter) (*entity.ListResult, error)
+	List(ctx context.Context, filter userdomain.ListFilter) (*userdomain.ListResult, error)
 
 	// Update atualiza uma Entity existente.
-	// Retorna ErrEntityNotFound se o ID não existir.
-	Update(ctx context.Context, e *entity.Entity) error
+	// Retorna ErrUserNotFound se o ID não existir.
+	Update(ctx context.Context, e *userdomain.User) error
 
 	// Delete realiza soft delete (active=false) de uma Entity.
-	// Retorna ErrEntityNotFound se o ID não existir.
+	// Retorna ErrUserNotFound se o ID não existir.
 	Delete(ctx context.Context, id vo.ID) error
 }

@@ -1,4 +1,4 @@
-package entity_example
+package user
 
 import (
 	"context"
@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
-	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
+	userdomain "bitbucket.org/appmax-space/go-boilerplate/internal/domain/user"
+
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/user/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/dto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -20,8 +21,8 @@ func TestListUseCase_Execute_Success(t *testing.T) {
 	email1, _ := vo.NewEmail("joao@example.com")
 	email2, _ := vo.NewEmail("maria@example.com")
 
-	expectedResult := &entity.ListResult{
-		Entities: []*entity.Entity{
+	expectedResult := &userdomain.ListResult{
+		Users: []*userdomain.User{
 			{
 				ID:        vo.NewID(),
 				Name:      "João Silva",
@@ -44,7 +45,7 @@ func TestListUseCase_Execute_Success(t *testing.T) {
 		Limit: 20,
 	}
 
-	mockRepo.On("List", mock.Anything, mock.AnythingOfType("entity_example.ListFilter")).Return(expectedResult, nil)
+	mockRepo.On("List", mock.Anything, mock.AnythingOfType("user.ListFilter")).Return(expectedResult, nil)
 
 	uc := NewListUseCase(mockRepo)
 	input := dto.ListInput{Page: 1, Limit: 20}
@@ -66,8 +67,8 @@ func TestListUseCase_Execute_WithFilters(t *testing.T) {
 	mockRepo := new(MockRepository)
 
 	email, _ := vo.NewEmail("maria@example.com")
-	expectedResult := &entity.ListResult{
-		Entities: []*entity.Entity{
+	expectedResult := &userdomain.ListResult{
+		Users: []*userdomain.User{
 			{
 				ID:        vo.NewID(),
 				Name:      "Maria Santos",
@@ -82,7 +83,7 @@ func TestListUseCase_Execute_WithFilters(t *testing.T) {
 		Limit: 20,
 	}
 
-	mockRepo.On("List", mock.Anything, mock.AnythingOfType("entity_example.ListFilter")).Return(expectedResult, nil)
+	mockRepo.On("List", mock.Anything, mock.AnythingOfType("user.ListFilter")).Return(expectedResult, nil)
 
 	uc := NewListUseCase(mockRepo)
 	input := dto.ListInput{
@@ -105,7 +106,7 @@ func TestListUseCase_Execute_WithFilters(t *testing.T) {
 func TestListUseCase_Execute_RepositoryError(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockRepository)
-	mockRepo.On("List", mock.Anything, mock.AnythingOfType("entity_example.ListFilter")).
+	mockRepo.On("List", mock.Anything, mock.AnythingOfType("user.ListFilter")).
 		Return(nil, errors.New("database error"))
 
 	uc := NewListUseCase(mockRepo)
@@ -125,14 +126,14 @@ func TestListUseCase_Execute_EmptyResult(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockRepository)
 
-	expectedResult := &entity.ListResult{
-		Entities: []*entity.Entity{},
-		Total:    0,
-		Page:     1,
-		Limit:    20,
+	expectedResult := &userdomain.ListResult{
+		Users: []*userdomain.User{},
+		Total: 0,
+		Page:  1,
+		Limit: 20,
 	}
 
-	mockRepo.On("List", mock.Anything, mock.AnythingOfType("entity_example.ListFilter")).Return(expectedResult, nil)
+	mockRepo.On("List", mock.Anything, mock.AnythingOfType("user.ListFilter")).Return(expectedResult, nil)
 
 	uc := NewListUseCase(mockRepo)
 	input := dto.ListInput{Page: 1, Limit: 20}

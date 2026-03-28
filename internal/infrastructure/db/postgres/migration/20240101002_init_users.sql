@@ -1,5 +1,5 @@
 -- +goose Up
-CREATE TABLE entities (
+CREATE TABLE users (
     id UUID PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -8,11 +8,11 @@ CREATE TABLE entities (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
-CREATE INDEX idx_entities_active_created ON entities(created_at DESC) WHERE active = true;
+CREATE INDEX idx_users_active_created ON users(created_at DESC) WHERE active = true;
 
 -- For name search performance at scale, consider:
 -- CREATE EXTENSION IF NOT EXISTS pg_trgm;
--- CREATE INDEX idx_entities_name_trgm ON entities USING gin(name gin_trgm_ops);
+-- CREATE INDEX idx_users_name_trgm ON users USING gin(name gin_trgm_ops);
 
 -- +goose Down
-DROP TABLE IF EXISTS entities;
+DROP TABLE IF EXISTS users;

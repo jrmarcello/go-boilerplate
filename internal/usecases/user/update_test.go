@@ -1,4 +1,4 @@
-package entity_example
+package user
 
 import (
 	"context"
@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
-	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
+	userdomain "bitbucket.org/appmax-space/go-boilerplate/internal/domain/user"
+
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/user/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/dto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -19,7 +20,7 @@ func TestUpdateUseCase_Execute_Success(t *testing.T) {
 	id := vo.NewID()
 	email, _ := vo.NewEmail("joao@example.com")
 
-	existingEntity := &entity.Entity{
+	existingEntity := &userdomain.User{
 		ID:        id,
 		Name:      "João Silva",
 		Email:     email,
@@ -29,7 +30,7 @@ func TestUpdateUseCase_Execute_Success(t *testing.T) {
 	}
 
 	mockRepo.On("FindByID", mock.Anything, id).Return(existingEntity, nil)
-	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*entity_example.Entity")).Return(nil)
+	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*user.User")).Return(nil)
 
 	uc := NewUpdateUseCase(mockRepo)
 	newName := "João Silva Updated"
@@ -52,7 +53,7 @@ func TestUpdateUseCase_Execute_NotFound(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockRepository)
 	mockRepo.On("FindByID", mock.Anything, mock.AnythingOfType("vo.ID")).
-		Return(nil, entity.ErrEntityNotFound)
+		Return(nil, userdomain.ErrUserNotFound)
 
 	uc := NewUpdateUseCase(mockRepo)
 	newName := "Updated Name"
@@ -67,7 +68,7 @@ func TestUpdateUseCase_Execute_NotFound(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Nil(t, output)
-	assert.True(t, errors.Is(err, entity.ErrEntityNotFound))
+	assert.True(t, errors.Is(err, userdomain.ErrUserNotFound))
 	mockRepo.AssertNotCalled(t, "Update")
 }
 
@@ -77,7 +78,7 @@ func TestUpdateUseCase_Execute_InvalidEmail(t *testing.T) {
 	id := vo.NewID()
 	email, _ := vo.NewEmail("joao@example.com")
 
-	existingEntity := &entity.Entity{
+	existingEntity := &userdomain.User{
 		ID:        id,
 		Name:      "João Silva",
 		Email:     email,
@@ -130,9 +131,9 @@ func TestUpdateUseCase_Execute_CacheInvalidation(t *testing.T) {
 	mockCache := new(MockCache)
 	id := vo.NewID()
 	email, _ := vo.NewEmail("joao@example.com")
-	cacheKey := "entity:" + id.String()
+	cacheKey := "user:" + id.String()
 
-	existingEntity := &entity.Entity{
+	existingEntity := &userdomain.User{
 		ID:        id,
 		Name:      "João Silva",
 		Email:     email,
@@ -142,7 +143,7 @@ func TestUpdateUseCase_Execute_CacheInvalidation(t *testing.T) {
 	}
 
 	mockRepo.On("FindByID", mock.Anything, id).Return(existingEntity, nil)
-	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*entity_example.Entity")).Return(nil)
+	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*user.User")).Return(nil)
 	mockCache.On("Delete", mock.Anything, cacheKey).Return(nil)
 
 	uc := NewUpdateUseCase(mockRepo).WithCache(mockCache)

@@ -1,10 +1,11 @@
-package entity_example
+package user
 
 import (
 	"context"
 
-	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
+	userdomain "bitbucket.org/appmax-space/go-boilerplate/internal/domain/user"
+
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/user/vo"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -17,36 +18,36 @@ type MockRepository struct {
 	mock.Mock
 }
 
-func (m *MockRepository) Create(ctx context.Context, e *entity.Entity) error {
+func (m *MockRepository) Create(ctx context.Context, e *userdomain.User) error {
 	args := m.Called(ctx, e)
 	return args.Error(0)
 }
 
-func (m *MockRepository) FindByID(ctx context.Context, id vo.ID) (*entity.Entity, error) {
+func (m *MockRepository) FindByID(ctx context.Context, id vo.ID) (*userdomain.User, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*entity.Entity), args.Error(1)
+	return args.Get(0).(*userdomain.User), args.Error(1)
 }
 
-func (m *MockRepository) FindByEmail(ctx context.Context, email vo.Email) (*entity.Entity, error) {
+func (m *MockRepository) FindByEmail(ctx context.Context, email vo.Email) (*userdomain.User, error) {
 	args := m.Called(ctx, email)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*entity.Entity), args.Error(1)
+	return args.Get(0).(*userdomain.User), args.Error(1)
 }
 
-func (m *MockRepository) List(ctx context.Context, filter entity.ListFilter) (*entity.ListResult, error) {
+func (m *MockRepository) List(ctx context.Context, filter userdomain.ListFilter) (*userdomain.ListResult, error) {
 	args := m.Called(ctx, filter)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*entity.ListResult), args.Error(1)
+	return args.Get(0).(*userdomain.ListResult), args.Error(1)
 }
 
-func (m *MockRepository) Update(ctx context.Context, e *entity.Entity) error {
+func (m *MockRepository) Update(ctx context.Context, e *userdomain.User) error {
 	args := m.Called(ctx, e)
 	return args.Error(0)
 }

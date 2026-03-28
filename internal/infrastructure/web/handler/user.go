@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/telemetry"
-	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
+	useruc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/dto"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil/httpgin"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel"
@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 )
 
-// EntityHandler agrupa todos os handlers relacionados a Entity.
+// UserHandler agrupa todos os handlers relacionados a Entity.
 // Segue o padrão de injeção de dependência (UseCases injetados via struct).
 //
 // Design choice: this handler depends on concrete use case types for simplicity.
@@ -21,25 +21,25 @@ import (
 // adds ceremony without clear benefit — handlers are validated via E2E tests, not unit
 // tests with mocked use cases. Teams needing handler-level unit tests should define
 // interfaces (e.g., Creator, Getter) and accept them here instead.
-type EntityHandler struct {
-	CreateUC *entityuc.CreateUseCase
-	GetUC    *entityuc.GetUseCase
-	ListUC   *entityuc.ListUseCase
-	UpdateUC *entityuc.UpdateUseCase
-	DeleteUC *entityuc.DeleteUseCase
+type UserHandler struct {
+	CreateUC *useruc.CreateUseCase
+	GetUC    *useruc.GetUseCase
+	ListUC   *useruc.ListUseCase
+	UpdateUC *useruc.UpdateUseCase
+	DeleteUC *useruc.DeleteUseCase
 	Metrics  *telemetry.Metrics
 }
 
-// NewEntityHandler cria um novo EntityHandler com todos os use cases.
-func NewEntityHandler(
-	createUC *entityuc.CreateUseCase,
-	getUC *entityuc.GetUseCase,
-	listUC *entityuc.ListUseCase,
-	updateUC *entityuc.UpdateUseCase,
-	deleteUC *entityuc.DeleteUseCase,
+// NewUserHandler cria um novo UserHandler com todos os use cases.
+func NewUserHandler(
+	createUC *useruc.CreateUseCase,
+	getUC *useruc.GetUseCase,
+	listUC *useruc.ListUseCase,
+	updateUC *useruc.UpdateUseCase,
+	deleteUC *useruc.DeleteUseCase,
 	metrics *telemetry.Metrics,
-) *EntityHandler {
-	return &EntityHandler{
+) *UserHandler {
+	return &UserHandler{
 		CreateUC: createUC,
 		GetUC:    getUC,
 		ListUC:   listUC,
@@ -52,7 +52,7 @@ func NewEntityHandler(
 // Create godoc
 // @Summary      Create a new entity
 // @Description  Create a new entity with the input payload
-// @Tags         entities
+// @Tags         users
 // @Accept       json
 // @Produce      json
 // @Param        request body dto.CreateInput true "Entity info"
@@ -62,8 +62,8 @@ func NewEntityHandler(
 // @Security     ServiceName
 // @Security     ServiceKey
 // @Router       /entities [post]
-func (h *EntityHandler) Create(c *gin.Context) {
-	ctx, span := otel.Tracer("http-handler").Start(c.Request.Context(), "EntityHandler.Create")
+func (h *UserHandler) Create(c *gin.Context) {
+	ctx, span := otel.Tracer("http-handler").Start(c.Request.Context(), "UserHandler.Create")
 	defer span.End()
 
 	var req dto.CreateInput
@@ -96,7 +96,7 @@ func (h *EntityHandler) Create(c *gin.Context) {
 // GetByID godoc
 // @Summary      Get an entity by ID
 // @Description  Get entity details by unique ID
-// @Tags         entities
+// @Tags         users
 // @Produce      json
 // @Param        id   path      string  true  "Entity ID"
 // @Success      200  {object}  dto.GetOutput
@@ -105,8 +105,8 @@ func (h *EntityHandler) Create(c *gin.Context) {
 // @Security     ServiceName
 // @Security     ServiceKey
 // @Router       /entities/{id} [get]
-func (h *EntityHandler) GetByID(c *gin.Context) {
-	ctx, span := otel.Tracer("http-handler").Start(c.Request.Context(), "EntityHandler.GetByID")
+func (h *UserHandler) GetByID(c *gin.Context) {
+	ctx, span := otel.Tracer("http-handler").Start(c.Request.Context(), "UserHandler.GetByID")
 	defer span.End()
 
 	id := c.Param("id")
@@ -124,7 +124,7 @@ func (h *EntityHandler) GetByID(c *gin.Context) {
 // List godoc
 // @Summary      List entities
 // @Description  Get a paginated list of entities
-// @Tags         entities
+// @Tags         users
 // @Produce      json
 // @Param        page    query     int     false  "Page number"
 // @Param        limit   query     int     false  "Items per page"
@@ -136,8 +136,8 @@ func (h *EntityHandler) GetByID(c *gin.Context) {
 // @Security     ServiceName
 // @Security     ServiceKey
 // @Router       /entities [get]
-func (h *EntityHandler) List(c *gin.Context) {
-	ctx, span := otel.Tracer("http-handler").Start(c.Request.Context(), "EntityHandler.List")
+func (h *UserHandler) List(c *gin.Context) {
+	ctx, span := otel.Tracer("http-handler").Start(c.Request.Context(), "UserHandler.List")
 	defer span.End()
 
 	var req dto.ListInput
@@ -165,7 +165,7 @@ func (h *EntityHandler) List(c *gin.Context) {
 // Update godoc
 // @Summary      Update an entity
 // @Description  Update entity details by ID
-// @Tags         entities
+// @Tags         users
 // @Accept       json
 // @Produce      json
 // @Param        id       path      string          true  "Entity ID"
@@ -177,8 +177,8 @@ func (h *EntityHandler) List(c *gin.Context) {
 // @Security     ServiceName
 // @Security     ServiceKey
 // @Router       /entities/{id} [put]
-func (h *EntityHandler) Update(c *gin.Context) {
-	ctx, span := otel.Tracer("http-handler").Start(c.Request.Context(), "EntityHandler.Update")
+func (h *UserHandler) Update(c *gin.Context) {
+	ctx, span := otel.Tracer("http-handler").Start(c.Request.Context(), "UserHandler.Update")
 	defer span.End()
 
 	id := c.Param("id")
@@ -209,7 +209,7 @@ func (h *EntityHandler) Update(c *gin.Context) {
 // Delete godoc
 // @Summary      Delete an entity
 // @Description  Soft delete an entity by ID
-// @Tags         entities
+// @Tags         users
 // @Produce      json
 // @Param        id   path      string  true  "Entity ID"
 // @Success      200  {object}  dto.DeleteOutput
@@ -218,8 +218,8 @@ func (h *EntityHandler) Update(c *gin.Context) {
 // @Security     ServiceName
 // @Security     ServiceKey
 // @Router       /entities/{id} [delete]
-func (h *EntityHandler) Delete(c *gin.Context) {
-	ctx, span := otel.Tracer("http-handler").Start(c.Request.Context(), "EntityHandler.Delete")
+func (h *UserHandler) Delete(c *gin.Context) {
+	ctx, span := otel.Tracer("http-handler").Start(c.Request.Context(), "UserHandler.Delete")
 	defer span.End()
 
 	id := c.Param("id")

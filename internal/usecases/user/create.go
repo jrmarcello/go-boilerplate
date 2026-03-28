@@ -1,13 +1,13 @@
-package entity_example
+package user
 
 import (
 	"context"
 	"time"
 
-	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/interfaces"
+	userdomain "bitbucket.org/appmax-space/go-boilerplate/internal/domain/user"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/user/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/dto"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/interfaces"
 )
 
 // CreateUseCase implementa o caso de uso de criação de entity.
@@ -35,7 +35,7 @@ func (uc *CreateUseCase) Execute(ctx context.Context, input dto.CreateInput) (*d
 	}
 
 	// PASSO 2: Criar Entidade usando a Factory
-	e := entity.NewEntity(input.Name, emailVO)
+	e := userdomain.NewUser(input.Name, emailVO)
 
 	// PASSO 3: Persistir no banco via Repository
 	if err := uc.Repo.Create(ctx, e); err != nil {

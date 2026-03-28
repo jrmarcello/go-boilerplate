@@ -1,13 +1,13 @@
-package entity_example
+package user
 
 import (
 	"context"
 	"log/slog"
 	"time"
 
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/interfaces"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/user/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/dto"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/interfaces"
 )
 
 // DeleteUseCase implementa o caso de uso de deleção (soft delete) de entity.
@@ -49,7 +49,7 @@ func (uc *DeleteUseCase) Execute(ctx context.Context, input dto.DeleteInput) (*d
 
 	// 3. Invalidar cache
 	if uc.Cache != nil {
-		cacheKey := "entity:" + input.ID
+		cacheKey := "user:" + input.ID
 		if err := uc.Cache.Delete(ctx, cacheKey); err != nil {
 			slog.Warn("failed to invalidate cache", "key", cacheKey, "error", err)
 		}

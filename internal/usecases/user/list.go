@@ -1,13 +1,13 @@
-package entity_example
+package user
 
 import (
 	"context"
 	"math"
 	"time"
 
-	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/interfaces"
+	userdomain "bitbucket.org/appmax-space/go-boilerplate/internal/domain/user"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/dto"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/interfaces"
 )
 
 // ListUseCase implementa o caso de uso de listar entities.
@@ -23,7 +23,7 @@ func NewListUseCase(repo interfaces.Repository) *ListUseCase {
 // Execute retorna uma lista paginada de entities.
 func (uc *ListUseCase) Execute(ctx context.Context, input dto.ListInput) (*dto.ListOutput, error) {
 	// Converter input para filtro de domínio
-	filter := entity.ListFilter{
+	filter := userdomain.ListFilter{
 		Page:       input.Page,
 		Limit:      input.Limit,
 		Name:       input.Name,
@@ -38,8 +38,8 @@ func (uc *ListUseCase) Execute(ctx context.Context, input dto.ListInput) (*dto.L
 	}
 
 	// Converter para DTOs de saída
-	items := make([]dto.GetOutput, 0, len(result.Entities))
-	for _, e := range result.Entities {
+	items := make([]dto.GetOutput, 0, len(result.Users))
+	for _, e := range result.Users {
 		items = append(items, dto.GetOutput{
 			ID:        e.ID.String(),
 			Name:      e.Name,

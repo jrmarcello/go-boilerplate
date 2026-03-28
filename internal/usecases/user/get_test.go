@@ -1,4 +1,4 @@
-package entity_example
+package user
 
 import (
 	"context"
@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
-	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
+	userdomain "bitbucket.org/appmax-space/go-boilerplate/internal/domain/user"
+
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/user/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/dto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -19,7 +20,7 @@ func TestGetUseCase_Execute_Success(t *testing.T) {
 	id := vo.NewID()
 	email, _ := vo.NewEmail("joao@example.com")
 
-	expectedEntity := &entity.Entity{
+	expectedEntity := &userdomain.User{
 		ID:        id,
 		Name:      "João Silva",
 		Email:     email,
@@ -49,7 +50,7 @@ func TestGetUseCase_Execute_NotFound(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockRepository)
 	mockRepo.On("FindByID", mock.Anything, mock.AnythingOfType("vo.ID")).
-		Return(nil, entity.ErrEntityNotFound)
+		Return(nil, userdomain.ErrUserNotFound)
 
 	uc := NewGetUseCase(mockRepo)
 	input := dto.GetInput{ID: "018e4a2c-6b4d-7000-9410-abcdef123456"}
@@ -60,7 +61,7 @@ func TestGetUseCase_Execute_NotFound(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Nil(t, output)
-	assert.True(t, errors.Is(err, entity.ErrEntityNotFound))
+	assert.True(t, errors.Is(err, userdomain.ErrUserNotFound))
 	mockRepo.AssertExpectations(t)
 }
 
@@ -89,7 +90,7 @@ func TestGetUseCase_Execute_CacheHit(t *testing.T) {
 	mockCache := new(MockCache)
 
 	id := "018e4a2c-6b4d-7000-9410-abcdef123456"
-	cacheKey := "entity:" + id
+	cacheKey := "user:" + id
 
 	// Simula cache hit - Get retorna sucesso
 	mockCache.On("Get", mock.Anything, cacheKey, mock.AnythingOfType("*dto.GetOutput")).
@@ -125,10 +126,10 @@ func TestGetUseCase_Execute_CacheMiss_ThenSet(t *testing.T) {
 	mockCache := new(MockCache)
 
 	id := vo.NewID()
-	cacheKey := "entity:" + id.String()
+	cacheKey := "user:" + id.String()
 	email, _ := vo.NewEmail("joao@example.com")
 
-	expectedEntity := &entity.Entity{
+	expectedEntity := &userdomain.User{
 		ID:        id,
 		Name:      "João Silva",
 		Email:     email,
@@ -170,10 +171,10 @@ func TestGetUseCase_Execute_CacheSetError_StillReturnsData(t *testing.T) {
 	mockCache := new(MockCache)
 
 	id := vo.NewID()
-	cacheKey := "entity:" + id.String()
+	cacheKey := "user:" + id.String()
 	email, _ := vo.NewEmail("joao@example.com")
 
-	expectedEntity := &entity.Entity{
+	expectedEntity := &userdomain.User{
 		ID:        id,
 		Name:      "João Silva",
 		Email:     email,

@@ -1,14 +1,14 @@
-package entity_example
+package user
 
 import (
 	"time"
 
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/user/vo"
 )
 
 // Entity é a Entidade principal (Aggregate Root) do domínio.
 // Estrutura simplificada para o boilerplate.
-type Entity struct {
+type User struct {
 	ID        vo.ID
 	Name      string
 	Email     vo.Email
@@ -17,9 +17,9 @@ type Entity struct {
 	UpdatedAt time.Time
 }
 
-// NewEntity cria uma nova Entity com valores padrão.
-func NewEntity(name string, email vo.Email) *Entity {
-	return &Entity{
+// NewUser cria uma nova Entity com valores padrão.
+func NewUser(name string, email vo.Email) *User {
+	return &User{
 		ID:        vo.NewID(),
 		Name:      name,
 		Email:     email,
@@ -30,25 +30,25 @@ func NewEntity(name string, email vo.Email) *Entity {
 }
 
 // Deactivate desativa a entity (soft delete).
-func (e *Entity) Deactivate() {
+func (e *User) Deactivate() {
 	e.Active = false
 	e.UpdatedAt = time.Now()
 }
 
 // Activate reativa a entity.
-func (e *Entity) Activate() {
+func (e *User) Activate() {
 	e.Active = true
 	e.UpdatedAt = time.Now()
 }
 
 // UpdateEmail atualiza o email da entity.
-func (e *Entity) UpdateEmail(email vo.Email) {
+func (e *User) UpdateEmail(email vo.Email) {
 	e.Email = email
 	e.UpdatedAt = time.Now()
 }
 
 // UpdateName atualiza o nome da entity.
-func (e *Entity) UpdateName(name string) {
+func (e *User) UpdateName(name string) {
 	e.Name = name
 	e.UpdatedAt = time.Now()
 }

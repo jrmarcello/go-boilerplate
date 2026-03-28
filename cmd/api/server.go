@@ -17,7 +17,7 @@ import (
 	infratelemetry "bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/telemetry"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/handler"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/router"
-	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example"
+	useruc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/cache"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/cache/redisclient"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/database"
@@ -168,7 +168,7 @@ func shutdownTelemetry(tp *pkgtelemetry.Provider, logger *slog.Logger) {
 
 func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx.DB, cfg *config.Config, httpMetrics *pkgtelemetry.HTTPMetrics, businessMetrics *infratelemetry.Metrics) router.Dependencies {
 	// Repositories (sqlx wrappers over stdlib *sql.DB connections)
-	repo := repository.NewEntityRepository(sqlxWriter, sqlxReader)
+	repo := repository.NewUserRepository(sqlxWriter, sqlxReader)
 
 	// Cache (optional)
 	redisClient, cacheErr := redisclient.NewRedisClient(redisclient.RedisConfig{
@@ -205,11 +205,11 @@ func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx
 	flightGroup := cache.NewFlightGroup()
 
 	// Use Cases (with optional cache via builder pattern)
-	createUC := entityuc.NewCreateUseCase(repo)
-	getUC := entityuc.NewGetUseCase(repo).WithCache(redisClient).WithFlight(flightGroup)
-	listUC := entityuc.NewListUseCase(repo)
-	updateUC := entityuc.NewUpdateUseCase(repo).WithCache(redisClient)
-	deleteUC := entityuc.NewDeleteUseCase(repo).WithCache(redisClient)
+	createUC := useruc.NewCreateUseCase(repo)
+	getUC := useruc.NewGetUseCase(repo).WithCache(redisClient).WithFlight(flightGroup)
+	listUC := useruc.NewListUseCase(repo)
+	updateUC := useruc.NewUpdateUseCase(repo).WithCache(redisClient)
+	deleteUC := useruc.NewDeleteUseCase(repo).WithCache(redisClient)
 
 	// Idempotency Store (optional — uses Redis when enabled)
 	var idempotencyStore idempotency.Store
@@ -222,11 +222,11 @@ func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx
 	}
 
 	// Handlers
-	entityHandler := handler.NewEntityHandler(createUC, getUC, listUC, updateUC, deleteUC, businessMetrics)
+	entityHandler := handler.NewUserHandler(createUC, getUC, listUC, updateUC, deleteUC, businessMetrics)
 
 	return router.Dependencies{
 		HealthChecker:    checker,
-		EntityHandler:    entityHandler,
+		UserHandler:      entityHandler,
 		HTTPMetrics:      httpMetrics,
 		IdempotencyStore: idempotencyStore,
 		Config: router.Config{

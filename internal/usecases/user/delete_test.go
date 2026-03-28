@@ -1,13 +1,14 @@
-package entity_example
+package user
 
 import (
 	"context"
 	"errors"
 	"testing"
 
-	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
+	userdomain "bitbucket.org/appmax-space/go-boilerplate/internal/domain/user"
+
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/user/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/dto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -37,7 +38,7 @@ func TestDeleteUseCase_Execute_NotFound(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockRepository)
 	mockRepo.On("Delete", mock.Anything, mock.AnythingOfType("vo.ID")).
-		Return(entity.ErrEntityNotFound)
+		Return(userdomain.ErrUserNotFound)
 
 	uc := NewDeleteUseCase(mockRepo)
 	input := dto.DeleteInput{ID: "018e4a2c-6b4d-7000-9410-abcdef123456"}
@@ -48,7 +49,7 @@ func TestDeleteUseCase_Execute_NotFound(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Nil(t, output)
-	assert.True(t, errors.Is(err, entity.ErrEntityNotFound))
+	assert.True(t, errors.Is(err, userdomain.ErrUserNotFound))
 	mockRepo.AssertExpectations(t)
 }
 
@@ -72,7 +73,7 @@ func TestDeleteUseCase_Execute_CacheInvalidation(t *testing.T) {
 	mockRepo := new(MockRepository)
 	mockCache := new(MockCache)
 	id := vo.NewID()
-	cacheKey := "entity:" + id.String()
+	cacheKey := "user:" + id.String()
 
 	mockRepo.On("Delete", mock.Anything, id).Return(nil)
 	mockCache.On("Delete", mock.Anything, cacheKey).Return(nil)

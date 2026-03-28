@@ -1,12 +1,12 @@
-package entity_example
+package user
 
 import (
 	"context"
 	"errors"
 	"testing"
 
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/user/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/dto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -14,7 +14,7 @@ import (
 func TestCreateUseCase_Execute_Success(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockRepository)
-	mockRepo.On("Create", mock.Anything, mock.AnythingOfType("*entity_example.Entity")).Return(nil)
+	mockRepo.On("Create", mock.Anything, mock.AnythingOfType("*user.User")).Return(nil)
 
 	uc := NewCreateUseCase(mockRepo)
 	input := dto.CreateInput{
@@ -55,7 +55,7 @@ func TestCreateUseCase_Execute_InvalidEmail(t *testing.T) {
 func TestCreateUseCase_Execute_RepositoryError(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockRepository)
-	mockRepo.On("Create", mock.Anything, mock.AnythingOfType("*entity_example.Entity")).
+	mockRepo.On("Create", mock.Anything, mock.AnythingOfType("*user.User")).
 		Return(errors.New("database connection failed"))
 
 	uc := NewCreateUseCase(mockRepo)

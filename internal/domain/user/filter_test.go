@@ -1,4 +1,4 @@
-package entity_example
+package user
 
 import (
 	"testing"

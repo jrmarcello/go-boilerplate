@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
+	userdomain "bitbucket.org/appmax-space/go-boilerplate/internal/domain/user"
+
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/user/vo"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ import (
 func TestEntityDB_ToEntity_Success(t *testing.T) {
 	// Arrange
 	now := time.Now().Truncate(time.Microsecond)
-	dbModel := entityDB{
+	dbModel := userDB{
 		ID:        "018e4a2c-6b4d-7000-9410-abcdef123456",
 		Name:      "João Silva",
 		Email:     "joao@example.com",
@@ -31,48 +32,48 @@ func TestEntityDB_ToEntity_Success(t *testing.T) {
 	}
 
 	// Act
-	entity, err := dbModel.toEntity()
+	u, err := dbModel.toUser()
 
 	// Assert
 	assert.NoError(t, err)
-	assert.NotNil(t, entity)
-	assert.Equal(t, "018e4a2c-6b4d-7000-9410-abcdef123456", entity.ID.String())
-	assert.Equal(t, "João Silva", entity.Name)
-	assert.Equal(t, "joao@example.com", entity.Email.String())
-	assert.True(t, entity.Active)
+	assert.NotNil(t, u)
+	assert.Equal(t, "018e4a2c-6b4d-7000-9410-abcdef123456", u.ID.String())
+	assert.Equal(t, "João Silva", u.Name)
+	assert.Equal(t, "joao@example.com", u.Email.String())
+	assert.True(t, u.Active)
 }
 
 func TestEntityDB_ToEntity_InvalidID(t *testing.T) {
 	// Arrange
-	dbModel := entityDB{
+	dbModel := userDB{
 		ID:    "invalid-id",
 		Name:  "Test",
 		Email: "test@example.com",
 	}
 
 	// Act
-	entity, err := dbModel.toEntity()
+	u, err := dbModel.toUser()
 
 	// Assert
 	assert.Error(t, err)
-	assert.Nil(t, entity)
+	assert.Nil(t, u)
 	assert.Contains(t, err.Error(), "parsing ID")
 }
 
 func TestEntityDB_ToEntity_InvalidEmail(t *testing.T) {
 	// Arrange
-	dbModel := entityDB{
+	dbModel := userDB{
 		ID:    "018e4a2c-6b4d-7000-9410-abcdef123456",
 		Name:  "Test",
 		Email: "invalid-email",
 	}
 
 	// Act
-	entity, err := dbModel.toEntity()
+	u, err := dbModel.toUser()
 
 	// Assert
 	assert.Error(t, err)
-	assert.Nil(t, entity)
+	assert.Nil(t, u)
 	assert.Contains(t, err.Error(), "parsing email")
 }
 
@@ -81,7 +82,7 @@ func TestFromDomainEntity(t *testing.T) {
 	email, _ := vo.NewEmail("joao@example.com")
 	now := time.Now().Truncate(time.Microsecond)
 
-	domainEntity := &entity.Entity{
+	domainEntity := &userdomain.User{
 		ID:        vo.NewID(),
 		Name:      "João Silva",
 		Email:     email,
@@ -91,7 +92,7 @@ func TestFromDomainEntity(t *testing.T) {
 	}
 
 	// Act
-	dbModel := fromDomainEntity(domainEntity)
+	dbModel := fromDomainUser(domainEntity)
 
 	// Assert
 	assert.Equal(t, domainEntity.ID.String(), dbModel.ID)
@@ -106,7 +107,7 @@ func TestFromDomainEntity_InactiveEntity(t *testing.T) {
 	// Arrange
 	email, _ := vo.NewEmail("inactive@example.com")
 
-	domainEntity := &entity.Entity{
+	domainEntity := &userdomain.User{
 		ID:        vo.NewID(),
 		Name:      "Inactive User",
 		Email:     email,
@@ -116,7 +117,7 @@ func TestFromDomainEntity_InactiveEntity(t *testing.T) {
 	}
 
 	// Act
-	dbModel := fromDomainEntity(domainEntity)
+	dbModel := fromDomainUser(domainEntity)
 
 	// Assert
 	assert.False(t, dbModel.Active)
@@ -127,7 +128,7 @@ func TestFromDomainEntity_RoundTrip(t *testing.T) {
 	email, _ := vo.NewEmail("roundtrip@example.com")
 	now := time.Now().Truncate(time.Microsecond)
 
-	original := &entity.Entity{
+	original := &userdomain.User{
 		ID:        vo.NewID(),
 		Name:      "Round Trip Test",
 		Email:     email,
@@ -137,10 +138,10 @@ func TestFromDomainEntity_RoundTrip(t *testing.T) {
 	}
 
 	// Convert to DB model
-	dbModel := fromDomainEntity(original)
+	dbModel := fromDomainUser(original)
 
 	// Convert back to entity
-	restored, err := dbModel.toEntity()
+	restored, err := dbModel.toUser()
 
 	// Assert
 	assert.NoError(t, err)
@@ -157,11 +158,11 @@ func TestFromDomainEntity_RoundTrip(t *testing.T) {
 // Helpers for sqlmock tests
 // =============================================================================
 
-func buildTestEntity() *entity.Entity {
+func buildTestEntity() *userdomain.User {
 	email, _ := vo.NewEmail("test@example.com")
 	now := time.Now().Truncate(time.Microsecond)
 
-	return &entity.Entity{
+	return &userdomain.User{
 		ID:        vo.NewID(),
 		Name:      "Test Entity",
 		Email:     email,
@@ -172,21 +173,21 @@ func buildTestEntity() *entity.Entity {
 }
 
 // =============================================================================
-// Unit Tests for EntityRepository with sqlmock
+// Unit Tests for UserRepository with sqlmock
 // =============================================================================
 
 // --- Create ------------------------------------------------------------------
 
-func TestEntityRepository_Create(t *testing.T) {
+func TestUserRepository_Create(t *testing.T) {
 	db, mock, mockErr := sqlmock.New()
 	require.NoError(t, mockErr)
 	defer db.Close()
 
 	sqlxDB := sqlx.NewDb(db, "postgres")
-	repo := NewEntityRepository(sqlxDB, sqlxDB)
+	repo := NewUserRepository(sqlxDB, sqlxDB)
 
 	t.Run("success", func(t *testing.T) {
-		mock.ExpectExec("INSERT INTO entities").
+		mock.ExpectExec("INSERT INTO users").
 			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 
@@ -198,7 +199,7 @@ func TestEntityRepository_Create(t *testing.T) {
 	})
 
 	t.Run("database error", func(t *testing.T) {
-		mock.ExpectExec("INSERT INTO entities").
+		mock.ExpectExec("INSERT INTO users").
 			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnError(sql.ErrConnDone)
 
@@ -213,13 +214,13 @@ func TestEntityRepository_Create(t *testing.T) {
 
 // --- FindByID ----------------------------------------------------------------
 
-func TestEntityRepository_FindByID(t *testing.T) {
+func TestUserRepository_FindByID(t *testing.T) {
 	db, mock, mockErr := sqlmock.New()
 	require.NoError(t, mockErr)
 	defer db.Close()
 
 	sqlxDB := sqlx.NewDb(db, "postgres")
-	repo := NewEntityRepository(sqlxDB, sqlxDB)
+	repo := NewUserRepository(sqlxDB, sqlxDB)
 
 	now := time.Now().Truncate(time.Microsecond)
 	testID := vo.NewID()
@@ -228,7 +229,7 @@ func TestEntityRepository_FindByID(t *testing.T) {
 		rows := sqlmock.NewRows([]string{"id", "name", "email", "active", "created_at", "updated_at"}).
 			AddRow(testID.String(), "Test Entity", "test@example.com", true, now, now)
 
-		mock.ExpectQuery("SELECT .+ FROM entities WHERE id").
+		mock.ExpectQuery("SELECT .+ FROM users WHERE id").
 			WithArgs(testID.String()).
 			WillReturnRows(rows)
 
@@ -244,19 +245,19 @@ func TestEntityRepository_FindByID(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		mock.ExpectQuery("SELECT .+ FROM entities WHERE id").
+		mock.ExpectQuery("SELECT .+ FROM users WHERE id").
 			WithArgs(testID.String()).
 			WillReturnError(sql.ErrNoRows)
 
 		result, findErr := repo.FindByID(context.Background(), testID)
 
 		assert.Nil(t, result)
-		assert.ErrorIs(t, findErr, entity.ErrEntityNotFound)
+		assert.ErrorIs(t, findErr, userdomain.ErrUserNotFound)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("database error", func(t *testing.T) {
-		mock.ExpectQuery("SELECT .+ FROM entities WHERE id").
+		mock.ExpectQuery("SELECT .+ FROM users WHERE id").
 			WithArgs(testID.String()).
 			WillReturnError(sql.ErrConnDone)
 
@@ -271,13 +272,13 @@ func TestEntityRepository_FindByID(t *testing.T) {
 
 // --- FindByEmail -------------------------------------------------------------
 
-func TestEntityRepository_FindByEmail(t *testing.T) {
+func TestUserRepository_FindByEmail(t *testing.T) {
 	db, mock, mockErr := sqlmock.New()
 	require.NoError(t, mockErr)
 	defer db.Close()
 
 	sqlxDB := sqlx.NewDb(db, "postgres")
-	repo := NewEntityRepository(sqlxDB, sqlxDB)
+	repo := NewUserRepository(sqlxDB, sqlxDB)
 
 	now := time.Now().Truncate(time.Microsecond)
 	testID := vo.NewID()
@@ -287,7 +288,7 @@ func TestEntityRepository_FindByEmail(t *testing.T) {
 		rows := sqlmock.NewRows([]string{"id", "name", "email", "active", "created_at", "updated_at"}).
 			AddRow(testID.String(), "Test Entity", "test@example.com", true, now, now)
 
-		mock.ExpectQuery("SELECT .+ FROM entities WHERE email").
+		mock.ExpectQuery("SELECT .+ FROM users WHERE email").
 			WithArgs(testEmail.String()).
 			WillReturnRows(rows)
 
@@ -303,19 +304,19 @@ func TestEntityRepository_FindByEmail(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		mock.ExpectQuery("SELECT .+ FROM entities WHERE email").
+		mock.ExpectQuery("SELECT .+ FROM users WHERE email").
 			WithArgs(testEmail.String()).
 			WillReturnError(sql.ErrNoRows)
 
 		result, findErr := repo.FindByEmail(context.Background(), testEmail)
 
 		assert.Nil(t, result)
-		assert.ErrorIs(t, findErr, entity.ErrEntityNotFound)
+		assert.ErrorIs(t, findErr, userdomain.ErrUserNotFound)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("database error", func(t *testing.T) {
-		mock.ExpectQuery("SELECT .+ FROM entities WHERE email").
+		mock.ExpectQuery("SELECT .+ FROM users WHERE email").
 			WithArgs(testEmail.String()).
 			WillReturnError(sql.ErrConnDone)
 
@@ -330,13 +331,13 @@ func TestEntityRepository_FindByEmail(t *testing.T) {
 
 // --- List --------------------------------------------------------------------
 
-func TestEntityRepository_List(t *testing.T) {
+func TestUserRepository_List(t *testing.T) {
 	db, mock, mockErr := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, mockErr)
 	defer db.Close()
 
 	sqlxDB := sqlx.NewDb(db, "postgres")
-	repo := NewEntityRepository(sqlxDB, sqlxDB)
+	repo := NewUserRepository(sqlxDB, sqlxDB)
 
 	now := time.Now().Truncate(time.Microsecond)
 	testID := vo.NewID()
@@ -345,17 +346,17 @@ func TestEntityRepository_List(t *testing.T) {
 		mock.ExpectBegin()
 
 		countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
-		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM entities").
+		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM users").
 			WillReturnRows(countRows)
 
 		dataRows := sqlmock.NewRows([]string{"id", "name", "email", "active", "created_at", "updated_at"}).
 			AddRow(testID.String(), "Test Entity", "test@example.com", true, now, now)
-		mock.ExpectQuery("SELECT .+ FROM entities").
+		mock.ExpectQuery("SELECT .+ FROM users").
 			WillReturnRows(dataRows)
 
 		mock.ExpectCommit()
 
-		filter := entity.ListFilter{Page: 1, Limit: 20}
+		filter := userdomain.ListFilter{Page: 1, Limit: 20}
 		result, listErr := repo.List(context.Background(), filter)
 
 		assert.NoError(t, listErr)
@@ -363,9 +364,9 @@ func TestEntityRepository_List(t *testing.T) {
 		assert.Equal(t, 1, result.Total)
 		assert.Equal(t, 1, result.Page)
 		assert.Equal(t, 20, result.Limit)
-		require.Len(t, result.Entities, 1)
-		assert.Equal(t, testID, result.Entities[0].ID)
-		assert.Equal(t, "Test Entity", result.Entities[0].Name)
+		require.Len(t, result.Users, 1)
+		assert.Equal(t, testID, result.Users[0].ID)
+		assert.Equal(t, "Test Entity", result.Users[0].Name)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
@@ -373,22 +374,22 @@ func TestEntityRepository_List(t *testing.T) {
 		mock.ExpectBegin()
 
 		countRows := sqlmock.NewRows([]string{"count"}).AddRow(0)
-		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM entities").
+		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM users").
 			WillReturnRows(countRows)
 
 		dataRows := sqlmock.NewRows([]string{"id", "name", "email", "active", "created_at", "updated_at"})
-		mock.ExpectQuery("SELECT .+ FROM entities").
+		mock.ExpectQuery("SELECT .+ FROM users").
 			WillReturnRows(dataRows)
 
 		mock.ExpectCommit()
 
-		filter := entity.ListFilter{Page: 1, Limit: 20}
+		filter := userdomain.ListFilter{Page: 1, Limit: 20}
 		result, listErr := repo.List(context.Background(), filter)
 
 		assert.NoError(t, listErr)
 		require.NotNil(t, result)
 		assert.Equal(t, 0, result.Total)
-		assert.Empty(t, result.Entities)
+		assert.Empty(t, result.Users)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
@@ -396,23 +397,23 @@ func TestEntityRepository_List(t *testing.T) {
 		mock.ExpectBegin()
 
 		countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
-		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM entities WHERE name ILIKE").
+		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM users WHERE name ILIKE").
 			WillReturnRows(countRows)
 
 		dataRows := sqlmock.NewRows([]string{"id", "name", "email", "active", "created_at", "updated_at"}).
 			AddRow(testID.String(), "Test Entity", "test@example.com", true, now, now)
-		mock.ExpectQuery("SELECT .+ FROM entities.+WHERE name ILIKE").
+		mock.ExpectQuery("SELECT .+ FROM users.+WHERE name ILIKE").
 			WillReturnRows(dataRows)
 
 		mock.ExpectCommit()
 
-		filter := entity.ListFilter{Page: 1, Limit: 20, Name: "Test"}
+		filter := userdomain.ListFilter{Page: 1, Limit: 20, Name: "Test"}
 		result, listErr := repo.List(context.Background(), filter)
 
 		assert.NoError(t, listErr)
 		require.NotNil(t, result)
 		assert.Equal(t, 1, result.Total)
-		require.Len(t, result.Entities, 1)
+		require.Len(t, result.Users, 1)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
@@ -420,23 +421,23 @@ func TestEntityRepository_List(t *testing.T) {
 		mock.ExpectBegin()
 
 		countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
-		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM entities WHERE email ILIKE").
+		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM users WHERE email ILIKE").
 			WillReturnRows(countRows)
 
 		dataRows := sqlmock.NewRows([]string{"id", "name", "email", "active", "created_at", "updated_at"}).
 			AddRow(testID.String(), "Test Entity", "test@example.com", true, now, now)
-		mock.ExpectQuery("SELECT .+ FROM entities.+WHERE email ILIKE").
+		mock.ExpectQuery("SELECT .+ FROM users.+WHERE email ILIKE").
 			WillReturnRows(dataRows)
 
 		mock.ExpectCommit()
 
-		filter := entity.ListFilter{Page: 1, Limit: 20, Email: "test@"}
+		filter := userdomain.ListFilter{Page: 1, Limit: 20, Email: "test@"}
 		result, listErr := repo.List(context.Background(), filter)
 
 		assert.NoError(t, listErr)
 		require.NotNil(t, result)
 		assert.Equal(t, 1, result.Total)
-		require.Len(t, result.Entities, 1)
+		require.Len(t, result.Users, 1)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
@@ -444,30 +445,30 @@ func TestEntityRepository_List(t *testing.T) {
 		mock.ExpectBegin()
 
 		countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
-		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM entities WHERE active = true").
+		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM users WHERE active = true").
 			WillReturnRows(countRows)
 
 		dataRows := sqlmock.NewRows([]string{"id", "name", "email", "active", "created_at", "updated_at"}).
 			AddRow(testID.String(), "Active Entity", "active@example.com", true, now, now)
-		mock.ExpectQuery("SELECT .+ FROM entities.+WHERE active = true").
+		mock.ExpectQuery("SELECT .+ FROM users.+WHERE active = true").
 			WillReturnRows(dataRows)
 
 		mock.ExpectCommit()
 
-		filter := entity.ListFilter{Page: 1, Limit: 20, ActiveOnly: true}
+		filter := userdomain.ListFilter{Page: 1, Limit: 20, ActiveOnly: true}
 		result, listErr := repo.List(context.Background(), filter)
 
 		assert.NoError(t, listErr)
 		require.NotNil(t, result)
 		assert.Equal(t, 1, result.Total)
-		require.Len(t, result.Entities, 1)
+		require.Len(t, result.Users, 1)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("transaction begin error", func(t *testing.T) {
 		mock.ExpectBegin().WillReturnError(sql.ErrConnDone)
 
-		filter := entity.ListFilter{Page: 1, Limit: 20}
+		filter := userdomain.ListFilter{Page: 1, Limit: 20}
 		result, listErr := repo.List(context.Background(), filter)
 
 		assert.Nil(t, result)
@@ -479,12 +480,12 @@ func TestEntityRepository_List(t *testing.T) {
 	t.Run("database error on count query", func(t *testing.T) {
 		mock.ExpectBegin()
 
-		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM entities").
+		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM users").
 			WillReturnError(sql.ErrConnDone)
 
 		mock.ExpectRollback()
 
-		filter := entity.ListFilter{Page: 1, Limit: 20}
+		filter := userdomain.ListFilter{Page: 1, Limit: 20}
 		result, listErr := repo.List(context.Background(), filter)
 
 		assert.Nil(t, result)
@@ -497,15 +498,15 @@ func TestEntityRepository_List(t *testing.T) {
 		mock.ExpectBegin()
 
 		countRows := sqlmock.NewRows([]string{"count"}).AddRow(5)
-		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM entities").
+		mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM users").
 			WillReturnRows(countRows)
 
-		mock.ExpectQuery("SELECT .+ FROM entities").
+		mock.ExpectQuery("SELECT .+ FROM users").
 			WillReturnError(sql.ErrConnDone)
 
 		mock.ExpectRollback()
 
-		filter := entity.ListFilter{Page: 1, Limit: 20}
+		filter := userdomain.ListFilter{Page: 1, Limit: 20}
 		result, listErr := repo.List(context.Background(), filter)
 
 		assert.Nil(t, result)
@@ -517,17 +518,17 @@ func TestEntityRepository_List(t *testing.T) {
 
 // --- Update ------------------------------------------------------------------
 
-func TestEntityRepository_Update(t *testing.T) {
+func TestUserRepository_Update(t *testing.T) {
 	db, mock, mockErr := sqlmock.New()
 	require.NoError(t, mockErr)
 	defer db.Close()
 
 	sqlxDB := sqlx.NewDb(db, "postgres")
-	repo := NewEntityRepository(sqlxDB, sqlxDB)
+	repo := NewUserRepository(sqlxDB, sqlxDB)
 
 	t.Run("success", func(t *testing.T) {
 		mock.ExpectBegin()
-		mock.ExpectExec("UPDATE entities SET").
+		mock.ExpectExec("UPDATE users SET").
 			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()
@@ -541,7 +542,7 @@ func TestEntityRepository_Update(t *testing.T) {
 
 	t.Run("not found - zero rows affected", func(t *testing.T) {
 		mock.ExpectBegin()
-		mock.ExpectExec("UPDATE entities SET").
+		mock.ExpectExec("UPDATE users SET").
 			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnResult(sqlmock.NewResult(0, 0))
 		mock.ExpectRollback()
@@ -549,13 +550,13 @@ func TestEntityRepository_Update(t *testing.T) {
 		e := buildTestEntity()
 		updateErr := repo.Update(context.Background(), e)
 
-		assert.ErrorIs(t, updateErr, entity.ErrEntityNotFound)
+		assert.ErrorIs(t, updateErr, userdomain.ErrUserNotFound)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("database error on exec", func(t *testing.T) {
 		mock.ExpectBegin()
-		mock.ExpectExec("UPDATE entities SET").
+		mock.ExpectExec("UPDATE users SET").
 			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnError(sql.ErrConnDone)
 		mock.ExpectRollback()
@@ -581,7 +582,7 @@ func TestEntityRepository_Update(t *testing.T) {
 
 	t.Run("transaction commit error", func(t *testing.T) {
 		mock.ExpectBegin()
-		mock.ExpectExec("UPDATE entities SET").
+		mock.ExpectExec("UPDATE users SET").
 			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit().WillReturnError(sql.ErrConnDone)
@@ -597,18 +598,18 @@ func TestEntityRepository_Update(t *testing.T) {
 
 // --- Delete ------------------------------------------------------------------
 
-func TestEntityRepository_Delete(t *testing.T) {
+func TestUserRepository_Delete(t *testing.T) {
 	db, mock, mockErr := sqlmock.New()
 	require.NoError(t, mockErr)
 	defer db.Close()
 
 	sqlxDB := sqlx.NewDb(db, "postgres")
-	repo := NewEntityRepository(sqlxDB, sqlxDB)
+	repo := NewUserRepository(sqlxDB, sqlxDB)
 
 	testID := vo.NewID()
 
 	t.Run("success", func(t *testing.T) {
-		mock.ExpectExec("UPDATE entities SET").
+		mock.ExpectExec("UPDATE users SET").
 			WithArgs(sqlmock.AnyArg(), testID.String()).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 
@@ -619,18 +620,18 @@ func TestEntityRepository_Delete(t *testing.T) {
 	})
 
 	t.Run("not found - zero rows affected", func(t *testing.T) {
-		mock.ExpectExec("UPDATE entities SET").
+		mock.ExpectExec("UPDATE users SET").
 			WithArgs(sqlmock.AnyArg(), testID.String()).
 			WillReturnResult(sqlmock.NewResult(0, 0))
 
 		deleteErr := repo.Delete(context.Background(), testID)
 
-		assert.ErrorIs(t, deleteErr, entity.ErrEntityNotFound)
+		assert.ErrorIs(t, deleteErr, userdomain.ErrUserNotFound)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
 	t.Run("database error", func(t *testing.T) {
-		mock.ExpectExec("UPDATE entities SET").
+		mock.ExpectExec("UPDATE users SET").
 			WithArgs(sqlmock.AnyArg(), testID.String()).
 			WillReturnError(sql.ErrConnDone)
 

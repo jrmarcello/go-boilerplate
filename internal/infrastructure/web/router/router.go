@@ -27,7 +27,7 @@ type Config struct {
 // Dependencies agrupa todas as dependências necessárias para o router
 type Dependencies struct {
 	HealthChecker    *health.Checker
-	EntityHandler    *handler.EntityHandler
+	UserHandler      *handler.UserHandler
 	HTTPMetrics      *telemetry.HTTPMetrics
 	IdempotencyStore idempotency.Store
 	Config           Config
@@ -67,7 +67,7 @@ func Setup(deps Dependencies) *gin.Engine {
 	}
 	protected := r.Group("")
 	protected.Use(middleware.ServiceKeyAuth(authConfig))
-	RegisterEntityRoutes(protected, deps.EntityHandler)
+	RegisterUserRoutes(protected, deps.UserHandler)
 
 	return r
 }

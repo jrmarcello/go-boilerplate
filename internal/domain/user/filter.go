@@ -1,4 +1,4 @@
-package entity_example
+package user
 
 // ListFilter contém os parâmetros para filtrar a listagem de entities.
 type ListFilter struct {
@@ -26,8 +26,8 @@ func (f *ListFilter) Offset() int {
 
 // ListResult contém o resultado da listagem paginada.
 type ListResult struct {
-	Entities []*Entity
-	Total    int
-	Page     int
-	Limit    int
+	Users []*User
+	Total int
+	Page  int
+	Limit int
 }

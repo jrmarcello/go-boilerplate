@@ -1,14 +1,14 @@
-package entity_example
+package user
 
 import (
 	"context"
 	"log/slog"
 	"time"
 
-	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/interfaces"
+	userdomain "bitbucket.org/appmax-space/go-boilerplate/internal/domain/user"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/user/vo"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/dto"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/interfaces"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/cache"
 )
 
@@ -51,7 +51,7 @@ func (uc *GetUseCase) Execute(ctx context.Context, input dto.GetInput) (*dto.Get
 		return nil, err
 	}
 
-	cacheKey := "entity:" + input.ID
+	cacheKey := "user:" + input.ID
 
 	// 1. Tentar cache primeiro
 	if uc.Cache != nil {
@@ -63,7 +63,7 @@ func (uc *GetUseCase) Execute(ctx context.Context, input dto.GetInput) (*dto.Get
 	}
 
 	// 2. Buscar no repositório (cache miss — with singleflight if configured)
-	var e *entity.Entity
+	var e *userdomain.User
 
 	if uc.Flight != nil {
 		val, flightErr, _ := uc.Flight.Do(input.ID, func() (any, error) {
@@ -72,7 +72,7 @@ func (uc *GetUseCase) Execute(ctx context.Context, input dto.GetInput) (*dto.Get
 		if flightErr != nil {
 			return nil, flightErr
 		}
-		e = val.(*entity.Entity)
+		e = val.(*userdomain.User)
 	} else {
 		var findErr error
 		e, findErr = uc.Repo.FindByID(ctx, id)

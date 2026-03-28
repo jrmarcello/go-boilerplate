@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
-	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
+	userdomain "bitbucket.org/appmax-space/go-boilerplate/internal/domain/user"
+	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/user/vo"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/apperror"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil/httpgin"
 	"github.com/gin-gonic/gin"
@@ -69,7 +69,7 @@ func translateError(err error) (status int, code, message string) {
 		return http.StatusBadRequest, apperror.CodeInvalidRequest, "invalid email"
 	case errors.Is(err, vo.ErrInvalidID):
 		return http.StatusBadRequest, apperror.CodeInvalidRequest, "invalid ID"
-	case errors.Is(err, entity.ErrEntityNotFound):
+	case errors.Is(err, userdomain.ErrUserNotFound):
 		return http.StatusNotFound, apperror.CodeNotFound, "entity not found"
 	default:
 		return http.StatusInternalServerError, apperror.CodeInternalError, "internal server error"
