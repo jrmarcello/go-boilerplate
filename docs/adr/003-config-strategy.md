@@ -184,13 +184,16 @@ Variáveis de replica fazem fallback para os valores do writer quando não defin
 | ------------ | ------- | ------- |
 | `Otel.ServiceName` | `OTEL_SERVICE_NAME` | `entity-service` |
 | `Otel.CollectorURL` | `OTEL_COLLECTOR_URL` | *(vazio)* |
+| `Otel.Insecure` | `OTEL_INSECURE` | `true` |
+| `Auth.Enabled` | `SERVICE_KEYS_ENABLED` | `false` |
 | `Auth.ServiceKeys` | `SERVICE_KEYS` | *(vazio)* |
 | `Swagger.Enabled` | `SWAGGER_ENABLED` | `false` |
+| `Swagger.Host` | `SWAGGER_HOST` | *(vazio — fallback: localhost:PORT)* |
 
 ### Exemplo de ConfigMap (Kubernetes)
 
 ```yaml
-# deploy/overlays/develop/configmap.yaml
+# deploy/overlays/develop/configmap.yaml (dados não sensíveis)
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -200,8 +203,6 @@ data:
   SERVER_PORT: "8080"
   DB_HOST: "postgres-service"
   DB_PORT: "5432"
-  DB_USER: "user"
-  DB_PASSWORD: "password"
   DB_NAME: "entities"
   DB_SSLMODE: "disable"
   DB_MAX_OPEN_CONNS: "25"
@@ -213,4 +214,17 @@ data:
   REDIS_URL: "redis://redis-service:6379"
   REDIS_TTL: "5m"
   REDIS_ENABLED: "true"
+  SERVICE_KEYS_ENABLED: "true"    # fail-closed: sem keys no Secret = 503
+```
+
+```yaml
+# deploy/overlays/develop/secret.yaml (credenciais — em HML/PRD via ExternalSecret)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: go-boilerplate-secrets
+stringData:
+  DB_USER: "user"
+  DB_PASSWORD: "password"
+  SERVICE_KEYS: "dev-service:sk_dev_service_key_12345"
 ```
