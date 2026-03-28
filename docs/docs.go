@@ -30,7 +30,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "entities"
+                    "users"
                 ],
                 "summary": "List entities",
                 "parameters": [
@@ -69,7 +69,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.ListOutput"
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.ListOutput"
                         }
                     },
                     "500": {
@@ -97,7 +97,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "entities"
+                    "users"
                 ],
                 "summary": "Create a new entity",
                 "parameters": [
@@ -107,7 +107,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.CreateInput"
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.CreateInput"
                         }
                     }
                 ],
@@ -115,7 +115,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.CreateOutput"
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.CreateOutput"
                         }
                     },
                     "400": {
@@ -148,7 +148,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "entities"
+                    "users"
                 ],
                 "summary": "Get an entity by ID",
                 "parameters": [
@@ -164,7 +164,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.GetOutput"
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.GetOutput"
                         }
                     },
                     "404": {
@@ -198,7 +198,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "entities"
+                    "users"
                 ],
                 "summary": "Update an entity",
                 "parameters": [
@@ -215,7 +215,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.UpdateInput"
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.UpdateInput"
                         }
                     }
                 ],
@@ -223,7 +223,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.UpdateOutput"
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.UpdateOutput"
                         }
                     },
                     "400": {
@@ -260,7 +260,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "entities"
+                    "users"
                 ],
                 "summary": "Delete an entity",
                 "parameters": [
@@ -276,7 +276,168 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.DeleteOutput"
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.DeleteOutput"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/roles": {
+            "get": {
+                "security": [
+                    {
+                        "ServiceName": []
+                    },
+                    {
+                        "ServiceKey": []
+                    }
+                ],
+                "description": "Get a paginated list of roles",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "roles"
+                ],
+                "summary": "List roles",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by name",
+                        "name": "name",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_role_dto.ListOutput"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ServiceName": []
+                    },
+                    {
+                        "ServiceKey": []
+                    }
+                ],
+                "description": "Create a new role with the input payload",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "roles"
+                ],
+                "summary": "Create a new role",
+                "parameters": [
+                    {
+                        "description": "Role info",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_role_dto.CreateInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_role_dto.CreateOutput"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_infrastructure_web_handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/roles/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "ServiceName": []
+                    },
+                    {
+                        "ServiceKey": []
+                    }
+                ],
+                "description": "Delete a role by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "roles"
+                ],
+                "summary": "Delete a role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Role ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_role_dto.DeleteOutput"
                         }
                     },
                     "404": {
@@ -296,7 +457,101 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.CreateInput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_role_dto.CreateInput": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "description": "Descricao da role",
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "name": {
+                    "description": "Nome da role",
+                    "type": "string",
+                    "maxLength": 100
+                }
+            }
+        },
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_role_dto.CreateOutput": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "description": "Timestamp no formato RFC3339",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "ID gerado (UUID v7)",
+                    "type": "string"
+                }
+            }
+        },
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_role_dto.DeleteOutput": {
+            "type": "object",
+            "properties": {
+                "deleted_at": {
+                    "description": "Timestamp da delecao",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_role_dto.ListOutput": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_role_dto.RoleOutput"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_role_dto.PaginationOutput"
+                }
+            }
+        },
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_role_dto.PaginationOutput": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_role_dto.RoleOutput": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.CreateInput": {
             "type": "object",
             "required": [
                 "email",
@@ -315,7 +570,7 @@ const docTemplate = `{
                 }
             }
         },
-        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.CreateOutput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.CreateOutput": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -328,7 +583,7 @@ const docTemplate = `{
                 }
             }
         },
-        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.DeleteOutput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.DeleteOutput": {
             "type": "object",
             "properties": {
                 "deleted_at": {
@@ -340,7 +595,7 @@ const docTemplate = `{
                 }
             }
         },
-        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.GetOutput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.GetOutput": {
             "type": "object",
             "properties": {
                 "active": {
@@ -363,21 +618,21 @@ const docTemplate = `{
                 }
             }
         },
-        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.ListOutput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.ListOutput": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.GetOutput"
+                        "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.GetOutput"
                     }
                 },
                 "pagination": {
-                    "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.PaginationOutput"
+                    "$ref": "#/definitions/bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.PaginationOutput"
                 }
             }
         },
-        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.PaginationOutput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.PaginationOutput": {
             "type": "object",
             "properties": {
                 "limit": {
@@ -394,7 +649,7 @@ const docTemplate = `{
                 }
             }
         },
-        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.UpdateInput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.UpdateInput": {
             "type": "object",
             "properties": {
                 "email": {
@@ -409,7 +664,7 @@ const docTemplate = `{
                 }
             }
         },
-        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_entity_example_dto.UpdateOutput": {
+        "bitbucket_org_appmax-space_go-boilerplate_internal_usecases_user_dto.UpdateOutput": {
             "type": "object",
             "properties": {
                 "active": {

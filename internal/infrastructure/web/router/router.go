@@ -28,6 +28,7 @@ type Config struct {
 type Dependencies struct {
 	HealthChecker    *health.Checker
 	UserHandler      *handler.UserHandler
+	RoleHandler      *handler.RoleHandler
 	HTTPMetrics      *telemetry.HTTPMetrics
 	IdempotencyStore idempotency.Store
 	Config           Config
@@ -68,6 +69,7 @@ func Setup(deps Dependencies) *gin.Engine {
 	protected := r.Group("")
 	protected.Use(middleware.ServiceKeyAuth(authConfig))
 	RegisterUserRoutes(protected, deps.UserHandler)
+	RegisterRoleRoutes(protected, deps.RoleHandler)
 
 	return r
 }

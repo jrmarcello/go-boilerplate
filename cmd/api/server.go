@@ -17,6 +17,7 @@ import (
 	infratelemetry "bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/telemetry"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/handler"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/router"
+	roleuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/role"
 	useruc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/cache"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/cache/redisclient"
@@ -221,12 +222,20 @@ func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx
 		}
 	}
 
-	// Handlers
-	entityHandler := handler.NewUserHandler(createUC, getUC, listUC, updateUC, deleteUC, businessMetrics)
+	// --- Role Domain (simpler, no cache/singleflight) ---
+	roleRepo := repository.NewRoleRepository(sqlxWriter, sqlxReader)
+	roleCreateUC := roleuc.NewCreateUseCase(roleRepo)
+	roleListUC := roleuc.NewListUseCase(roleRepo)
+	roleDeleteUC := roleuc.NewDeleteUseCase(roleRepo)
+	roleHandler := handler.NewRoleHandler(roleCreateUC, roleListUC, roleDeleteUC)
+
+	// --- Handlers ---
+	userHandler := handler.NewUserHandler(createUC, getUC, listUC, updateUC, deleteUC, businessMetrics)
 
 	return router.Dependencies{
 		HealthChecker:    checker,
-		UserHandler:      entityHandler,
+		UserHandler:      userHandler,
+		RoleHandler:      roleHandler,
 		HTTPMetrics:      httpMetrics,
 		IdempotencyStore: idempotencyStore,
 		Config: router.Config{
