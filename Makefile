@@ -392,6 +392,10 @@ else
   SANDBOX_SSH :=
 endif
 
+# Git identity from host (passed to container for commits)
+SANDBOX_GIT_EMAIL := $(shell git config user.email 2>/dev/null || echo "dev@boilerplate.local")
+SANDBOX_GIT_NAME  := $(shell git config user.name 2>/dev/null || echo "Developer")
+
 SANDBOX_RUN_ARGS := -it --rm \
 	--name $(SANDBOX_CONTAINER) \
 	--cap-add=NET_ADMIN \
@@ -399,6 +403,10 @@ SANDBOX_RUN_ARGS := -it --rm \
 	-e NODE_OPTIONS="--max-old-space-size=4096" \
 	-e CLAUDE_CONFIG_DIR="/home/node/.claude" \
 	-e GOPATH="/home/node/go" \
+	-e GIT_AUTHOR_EMAIL="$(SANDBOX_GIT_EMAIL)" \
+	-e GIT_AUTHOR_NAME="$(SANDBOX_GIT_NAME)" \
+	-e GIT_COMMITTER_EMAIL="$(SANDBOX_GIT_EMAIL)" \
+	-e GIT_COMMITTER_NAME="$(SANDBOX_GIT_NAME)" \
 	-v $(APP_NAME)-bashhistory:/commandhistory \
 	-v $(APP_NAME)-claude-config:/home/node/.claude \
 	-v $(APP_NAME)-gopath:/home/node/go \
@@ -406,7 +414,7 @@ SANDBOX_RUN_ARGS := -it --rm \
 	-p $(SANDBOX_PORT):8080 \
 	$(SANDBOX_SSH)
 
-SANDBOX_INIT := sudo /usr/local/bin/init-firewall.sh && (sudo chmod 666 /ssh-agent 2>/dev/null || true)
+SANDBOX_INIT := sudo /usr/local/bin/init-firewall.sh && (sudo chmod 666 /ssh-agent 2>/dev/null || true) && git config --global user.email "$$GIT_AUTHOR_EMAIL" && git config --global user.name "$$GIT_AUTHOR_NAME"
 
 sandbox-build: ## Build sandbox image
 	docker build -t $(SANDBOX_IMAGE) -f .devcontainer/Dockerfile .devcontainer
