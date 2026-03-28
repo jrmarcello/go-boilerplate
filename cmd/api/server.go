@@ -28,6 +28,8 @@ import (
 	pkgtelemetry "bitbucket.org/appmax-space/go-boilerplate/pkg/telemetry"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/telemetry/otelgrpc"
 	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 	"go.opentelemetry.io/otel"
 )
 
@@ -49,6 +51,7 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	}
 
 	// 2. Telemetry (OpenTelemetry Traces + Metrics)
+	// Graceful degradation: if OTel setup fails, app continues without telemetry.
 	var exporterOpts []pkgtelemetry.Option
 	if cfg.Otel.CollectorURL != "" {
 		grpcOpts, exporterErr := otelgrpc.Exporters(ctx, otelgrpc.Config{
@@ -56,9 +59,10 @@ func Start(ctx context.Context, cfg *config.Config) error {
 			Insecure:     cfg.Otel.Insecure,
 		})
 		if exporterErr != nil {
-			return fmt.Errorf("creating telemetry exporters: %w", exporterErr)
+			slog.Warn("Telemetry exporter setup failed, continuing without observability", "error", exporterErr)
+		} else {
+			exporterOpts = grpcOpts
 		}
-		exporterOpts = grpcOpts
 	}
 
 	tp, tpErr := pkgtelemetry.Setup(ctx, pkgtelemetry.Config{
@@ -66,12 +70,15 @@ func Start(ctx context.Context, cfg *config.Config) error {
 		Enabled:     cfg.Otel.CollectorURL != "",
 	}, exporterOpts...)
 	if tpErr != nil {
-		return tpErr
+		slog.Warn("Telemetry setup failed, continuing without observability", "error", tpErr)
 	}
-	defer shutdownTelemetry(tp, logger)
+	if tp != nil {
+		defer shutdownTelemetry(tp, logger)
+	}
 
 	// 3. Database (Writer/Reader Cluster)
 	writerCfg := database.Config{
+		Driver:          "postgres",
 		DSN:             cfg.DB.GetWriterDSN(),
 		MaxOpenConns:    cfg.DB.MaxOpenConns,
 		MaxIdleConns:    cfg.DB.MaxIdleConns,
@@ -82,6 +89,7 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	var readerCfg *database.Config
 	if cfg.DB.ReplicaEnabled {
 		readerCfg = &database.Config{
+			Driver:          "postgres",
 			DSN:             cfg.DB.GetReaderDSN(),
 			MaxOpenConns:    cfg.DB.ReplicaMaxOpenConns,
 			MaxIdleConns:    cfg.DB.ReplicaMaxIdleConns,
@@ -96,18 +104,22 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	}
 	defer cluster.Close()
 
+	// Wrap stdlib connections for sqlx-based repositories
+	sqlxWriter := sqlx.NewDb(cluster.Writer(), "postgres")
+	sqlxReader := sqlx.NewDb(cluster.Reader(), "postgres")
+
 	// SSL mode warning for non-development environments
 	if cfg.DB.SSLMode == "disable" && cfg.Server.Env != "development" {
 		slog.Warn("database connection using sslmode=disable in non-development environment")
 	}
 
 	// 4. Register DB Pool Metrics
-	if regErr := pkgtelemetry.RegisterDBPoolMetrics(ctx, cfg.Otel.ServiceName, cluster.Writer().DB, "writer"); regErr != nil {
+	if regErr := pkgtelemetry.RegisterDBPoolMetrics(ctx, cfg.Otel.ServiceName, cluster.Writer(), "writer"); regErr != nil {
 		slog.Warn("Failed to register DB pool metrics", "error", regErr)
 	}
 
 	if cluster.HasSeparateReader() {
-		if regErr := pkgtelemetry.RegisterDBPoolMetrics(ctx, cfg.Otel.ServiceName, cluster.Reader().DB, "reader"); regErr != nil {
+		if regErr := pkgtelemetry.RegisterDBPoolMetrics(ctx, cfg.Otel.ServiceName, cluster.Reader(), "reader"); regErr != nil {
 			slog.Warn("Failed to register reader DB pool metrics", "error", regErr)
 		}
 	}
@@ -123,7 +135,7 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	if tp != nil {
 		httpMetrics = tp.HTTPMetrics()
 	}
-	deps := buildDependencies(cluster, cfg, httpMetrics, businessMetrics)
+	deps := buildDependencies(cluster, sqlxWriter, sqlxReader, cfg, httpMetrics, businessMetrics)
 
 	// Swagger Dynamic Config
 	if cfg.Swagger.Host != "" {
@@ -154,9 +166,9 @@ func shutdownTelemetry(tp *pkgtelemetry.Provider, logger *slog.Logger) {
 	}
 }
 
-func buildDependencies(cluster *database.DBCluster, cfg *config.Config, httpMetrics *pkgtelemetry.HTTPMetrics, businessMetrics *infratelemetry.Metrics) router.Dependencies {
-	// Repositories (cluster handles Writer/Reader routing internally)
-	repo := repository.NewEntityRepository(cluster)
+func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx.DB, cfg *config.Config, httpMetrics *pkgtelemetry.HTTPMetrics, businessMetrics *infratelemetry.Metrics) router.Dependencies {
+	// Repositories (sqlx wrappers over stdlib *sql.DB connections)
+	repo := repository.NewEntityRepository(sqlxWriter, sqlxReader)
 
 	// Cache (optional)
 	redisClient, cacheErr := redisclient.NewRedisClient(redisclient.RedisConfig{

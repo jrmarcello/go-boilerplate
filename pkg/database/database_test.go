@@ -1,11 +1,11 @@
 package database
 
 import (
+	"database/sql"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,13 +13,14 @@ import (
 func TestDefaultConfig(t *testing.T) {
 	t.Run("returns config with provided DSN", func(t *testing.T) {
 		dsn := "postgres://user:pass@localhost:5432/testdb?sslmode=disable"
-		cfg := DefaultConfig(dsn)
+		cfg := DefaultConfig("postgres", dsn)
 
+		assert.Equal(t, "postgres", cfg.Driver)
 		assert.Equal(t, dsn, cfg.DSN)
 	})
 
 	t.Run("returns sensible default values", func(t *testing.T) {
-		cfg := DefaultConfig("any-dsn")
+		cfg := DefaultConfig("postgres", "any-dsn")
 
 		assert.Equal(t, 25, cfg.MaxOpenConns)
 		assert.Equal(t, 10, cfg.MaxIdleConns)
@@ -28,18 +29,23 @@ func TestDefaultConfig(t *testing.T) {
 	})
 
 	t.Run("accepts empty DSN", func(t *testing.T) {
-		cfg := DefaultConfig("")
+		cfg := DefaultConfig("postgres", "")
 
 		assert.Equal(t, "", cfg.DSN)
 		assert.Equal(t, 25, cfg.MaxOpenConns)
 	})
 }
 
-func newMockDB(t *testing.T) (*sqlx.DB, sqlmock.Sqlmock) {
+func TestDefaultConfig_Driver(t *testing.T) {
+	cfg := DefaultConfig("mysql", "dsn")
+	assert.Equal(t, "mysql", cfg.Driver)
+}
+
+func newMockDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 	t.Helper()
 	mockDB, mock, mockErr := sqlmock.New()
 	require.NoError(t, mockErr)
-	return sqlx.NewDb(mockDB, "sqlmock"), mock
+	return mockDB, mock
 }
 
 func TestNewDBClusterFromDB(t *testing.T) {
@@ -152,17 +158,16 @@ func TestDBCluster_Close(t *testing.T) {
 
 func TestNewConnection(t *testing.T) {
 	t.Run("empty DSN returns error", func(t *testing.T) {
-		cfg := Config{DSN: ""}
+		cfg := Config{Driver: "postgres", DSN: ""}
 
 		db, connErr := NewConnection(cfg)
 
 		assert.Nil(t, db)
 		assert.Error(t, connErr)
-		assert.Contains(t, connErr.Error(), "failed to connect to database")
 	})
 
 	t.Run("invalid DSN returns error", func(t *testing.T) {
-		cfg := Config{DSN: "not-a-valid-dsn://!!!"}
+		cfg := Config{Driver: "postgres", DSN: "not-a-valid-dsn://!!!"}
 
 		db, connErr := NewConnection(cfg)
 

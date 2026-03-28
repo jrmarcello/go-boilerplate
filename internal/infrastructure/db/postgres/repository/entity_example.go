@@ -10,7 +10,6 @@ import (
 
 	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
-	"bitbucket.org/appmax-space/go-boilerplate/pkg/database"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -63,12 +62,13 @@ func fromDomainEntity(e *entity.Entity) entityDB {
 
 // EntityRepository implementa a interface Repository para Entity.
 type EntityRepository struct {
-	cluster *database.DBCluster
+	writer *sqlx.DB
+	reader *sqlx.DB
 }
 
 // NewEntityRepository cria uma nova instância do repositório.
-func NewEntityRepository(cluster *database.DBCluster) *EntityRepository {
-	return &EntityRepository{cluster: cluster}
+func NewEntityRepository(writer, reader *sqlx.DB) *EntityRepository {
+	return &EntityRepository{writer: writer, reader: reader}
 }
 
 func (r *EntityRepository) Create(ctx context.Context, e *entity.Entity) error {
@@ -81,7 +81,7 @@ func (r *EntityRepository) Create(ctx context.Context, e *entity.Entity) error {
 	`
 
 	dbModel := fromDomainEntity(e)
-	_, execErr := r.cluster.Writer().NamedExecContext(ctx, query, dbModel)
+	_, execErr := r.writer.NamedExecContext(ctx, query, dbModel)
 	return execErr
 }
 
@@ -93,7 +93,7 @@ func (r *EntityRepository) FindByID(ctx context.Context, id vo.ID) (*entity.Enti
 	`
 
 	var dbModel entityDB
-	selectErr := r.cluster.Reader().GetContext(ctx, &dbModel, query, id.String())
+	selectErr := r.reader.GetContext(ctx, &dbModel, query, id.String())
 	if selectErr != nil {
 		if errors.Is(selectErr, sql.ErrNoRows) {
 			return nil, entity.ErrEntityNotFound
@@ -112,7 +112,7 @@ func (r *EntityRepository) FindByEmail(ctx context.Context, email vo.Email) (*en
 	`
 
 	var dbModel entityDB
-	selectErr := r.cluster.Reader().GetContext(ctx, &dbModel, query, email.String())
+	selectErr := r.reader.GetContext(ctx, &dbModel, query, email.String())
 	if selectErr != nil {
 		if errors.Is(selectErr, sql.ErrNoRows) {
 			return nil, entity.ErrEntityNotFound
@@ -150,7 +150,7 @@ func (r *EntityRepository) List(ctx context.Context, filter entity.ListFilter) (
 	// Wrap COUNT + SELECT in a read-only transaction for consistent pagination.
 	// Without a transaction, rows could be inserted/deleted between the two queries,
 	// causing total count to be inconsistent with the returned data.
-	tx, txErr := r.cluster.Reader().BeginTxx(ctx, &sql.TxOptions{ReadOnly: true})
+	tx, txErr := r.reader.BeginTxx(ctx, &sql.TxOptions{ReadOnly: true})
 	if txErr != nil {
 		return nil, fmt.Errorf("beginning read transaction: %w", txErr)
 	}
@@ -221,7 +221,7 @@ func (r *EntityRepository) List(ctx context.Context, filter entity.ListFilter) (
 }
 
 func (r *EntityRepository) Update(ctx context.Context, e *entity.Entity) error {
-	tx, txErr := r.cluster.Writer().BeginTxx(ctx, nil)
+	tx, txErr := r.writer.BeginTxx(ctx, nil)
 	if txErr != nil {
 		return fmt.Errorf("beginning transaction: %w", txErr)
 	}
@@ -267,7 +267,7 @@ func (r *EntityRepository) Delete(ctx context.Context, id vo.ID) error {
 		WHERE id = $2 AND active = true
 	`
 
-	result, execErr := r.cluster.Writer().ExecContext(ctx, query, time.Now(), id.String())
+	result, execErr := r.writer.ExecContext(ctx, query, time.Now(), id.String())
 	if execErr != nil {
 		return execErr
 	}

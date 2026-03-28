@@ -8,7 +8,6 @@ import (
 
 	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
-	"bitbucket.org/appmax-space/go-boilerplate/pkg/database"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -184,8 +183,7 @@ func TestEntityRepository_Create(t *testing.T) {
 	defer db.Close()
 
 	sqlxDB := sqlx.NewDb(db, "postgres")
-	cluster := database.NewDBClusterFromDB(sqlxDB)
-	repo := NewEntityRepository(cluster)
+	repo := NewEntityRepository(sqlxDB, sqlxDB)
 
 	t.Run("success", func(t *testing.T) {
 		mock.ExpectExec("INSERT INTO entities").
@@ -221,8 +219,7 @@ func TestEntityRepository_FindByID(t *testing.T) {
 	defer db.Close()
 
 	sqlxDB := sqlx.NewDb(db, "postgres")
-	cluster := database.NewDBClusterFromDB(sqlxDB)
-	repo := NewEntityRepository(cluster)
+	repo := NewEntityRepository(sqlxDB, sqlxDB)
 
 	now := time.Now().Truncate(time.Microsecond)
 	testID := vo.NewID()
@@ -280,8 +277,7 @@ func TestEntityRepository_FindByEmail(t *testing.T) {
 	defer db.Close()
 
 	sqlxDB := sqlx.NewDb(db, "postgres")
-	cluster := database.NewDBClusterFromDB(sqlxDB)
-	repo := NewEntityRepository(cluster)
+	repo := NewEntityRepository(sqlxDB, sqlxDB)
 
 	now := time.Now().Truncate(time.Microsecond)
 	testID := vo.NewID()
@@ -340,8 +336,7 @@ func TestEntityRepository_List(t *testing.T) {
 	defer db.Close()
 
 	sqlxDB := sqlx.NewDb(db, "postgres")
-	cluster := database.NewDBClusterFromDB(sqlxDB)
-	repo := NewEntityRepository(cluster)
+	repo := NewEntityRepository(sqlxDB, sqlxDB)
 
 	now := time.Now().Truncate(time.Microsecond)
 	testID := vo.NewID()
@@ -528,8 +523,7 @@ func TestEntityRepository_Update(t *testing.T) {
 	defer db.Close()
 
 	sqlxDB := sqlx.NewDb(db, "postgres")
-	cluster := database.NewDBClusterFromDB(sqlxDB)
-	repo := NewEntityRepository(cluster)
+	repo := NewEntityRepository(sqlxDB, sqlxDB)
 
 	t.Run("success", func(t *testing.T) {
 		mock.ExpectBegin()
@@ -609,8 +603,7 @@ func TestEntityRepository_Delete(t *testing.T) {
 	defer db.Close()
 
 	sqlxDB := sqlx.NewDb(db, "postgres")
-	cluster := database.NewDBClusterFromDB(sqlxDB)
-	repo := NewEntityRepository(cluster)
+	repo := NewEntityRepository(sqlxDB, sqlxDB)
 
 	testID := vo.NewID()
 

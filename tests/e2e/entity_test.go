@@ -16,7 +16,6 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/handler"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/middleware"
 	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example"
-	"bitbucket.org/appmax-space/go-boilerplate/pkg/database"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil/httpgin"
 )
 
@@ -26,7 +25,7 @@ func setupTestRouter() *gin.Engine {
 
 	db := GetTestDB()
 	cache := GetTestCache()
-	repo := repository.NewEntityRepository(database.NewDBClusterFromDB(db))
+	repo := repository.NewEntityRepository(db, db)
 
 	// Use Cases (with cache)
 	createUC := entityuc.NewCreateUseCase(repo)
@@ -69,7 +68,7 @@ func setupTestRouterWithAuth() *gin.Engine {
 
 	db := GetTestDB()
 	cache := GetTestCache()
-	repo := repository.NewEntityRepository(database.NewDBClusterFromDB(db))
+	repo := repository.NewEntityRepository(db, db)
 
 	createUC := entityuc.NewCreateUseCase(repo)
 	getUC := entityuc.NewGetUseCase(repo).WithCache(cache)

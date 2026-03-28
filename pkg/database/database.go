@@ -2,16 +2,15 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"time"
-
-	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 )
 
 // Config holds database connection configuration.
 type Config struct {
+	Driver          string // "postgres", "mysql", "sqlite3", etc.
 	DSN             string
 	MaxOpenConns    int
 	MaxIdleConns    int
@@ -20,8 +19,9 @@ type Config struct {
 }
 
 // DefaultConfig returns a Config with sensible defaults.
-func DefaultConfig(dsn string) Config {
+func DefaultConfig(driver, dsn string) Config {
 	return Config{
+		Driver:          driver,
 		DSN:             dsn,
 		MaxOpenConns:    25,
 		MaxIdleConns:    10,
@@ -33,15 +33,15 @@ func DefaultConfig(dsn string) Config {
 // DBCluster provides Writer/Reader split with automatic fallback.
 // If no reader is configured, reader operations fall back to the writer.
 type DBCluster struct {
-	writer *sqlx.DB
-	reader *sqlx.DB
+	writer *sql.DB
+	reader *sql.DB
 }
 
 // NewConnection creates a single database connection.
-func NewConnection(cfg Config) (*sqlx.DB, error) {
-	db, connectErr := sqlx.Connect("postgres", cfg.DSN)
-	if connectErr != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", connectErr)
+func NewConnection(cfg Config) (*sql.DB, error) {
+	db, openErr := sql.Open(cfg.Driver, cfg.DSN)
+	if openErr != nil {
+		return nil, fmt.Errorf("failed to open database: %w", openErr)
 	}
 
 	db.SetMaxOpenConns(cfg.MaxOpenConns)
@@ -53,6 +53,7 @@ func NewConnection(cfg Config) (*sqlx.DB, error) {
 	defer cancel()
 
 	if pingErr := db.PingContext(ctx); pingErr != nil {
+		db.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", pingErr)
 	}
 
@@ -82,21 +83,21 @@ func NewDBCluster(writerCfg Config, readerCfg *Config) (*DBCluster, error) {
 	return cluster, nil
 }
 
-// NewDBClusterFromDB creates a DBCluster from an existing *sqlx.DB connection.
+// NewDBClusterFromDB creates a DBCluster from an existing *sql.DB connection.
 // The same connection is used for both writer and reader.
 // Useful for tests where a single connection is sufficient.
-func NewDBClusterFromDB(db *sqlx.DB) *DBCluster {
+func NewDBClusterFromDB(db *sql.DB) *DBCluster {
 	return &DBCluster{writer: db}
 }
 
 // Writer returns the writer database connection.
-func (c *DBCluster) Writer() *sqlx.DB {
+func (c *DBCluster) Writer() *sql.DB {
 	return c.writer
 }
 
 // Reader returns the reader database connection.
 // Falls back to writer if no reader is configured.
-func (c *DBCluster) Reader() *sqlx.DB {
+func (c *DBCluster) Reader() *sql.DB {
 	if c.reader != nil {
 		return c.reader
 	}
