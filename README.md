@@ -7,6 +7,8 @@
 
 Template production-ready para microserviços Go com Clean Architecture, cache Redis, observabilidade e deploy Kubernetes.
 
+Resumo baseado no docs/presentation.md aqui... 
+
 ---
 
 ## ✨ O que está incluído
