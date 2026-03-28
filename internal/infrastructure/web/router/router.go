@@ -11,7 +11,7 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/handler"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/middleware"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/health"
-	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil/httpgin"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/idempotency"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/telemetry"
 )
@@ -81,7 +81,7 @@ func registerSwaggerRoutes(r *gin.Engine) {
 func registerHealthRoutes(r *gin.Engine, deps Dependencies) {
 	// Liveness - always ok (K8s restart if process is dead)
 	r.GET("/health", func(c *gin.Context) {
-		httputil.SendSuccess(c, http.StatusOK, gin.H{
+		httpgin.SendSuccess(c, http.StatusOK, gin.H{
 			"status":  "ok",
 			"service": deps.Config.ServiceName,
 		})
@@ -103,6 +103,6 @@ func registerHealthRoutes(r *gin.Engine, deps Dependencies) {
 		if !healthy {
 			status = http.StatusServiceUnavailable
 		}
-		httputil.SendSuccess(c, status, result)
+		httpgin.SendSuccess(c, status, result)
 	})
 }

@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil/httpgin"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/logutil"
 )
 
@@ -87,7 +87,7 @@ func ServiceKeyAuth(config ServiceKeyConfig) gin.HandlerFunc {
 		// Fail-closed: auth habilitada mas sem chaves configuradas.
 		// Impede que um deploy sem SERVICE_KEYS em HML/PRD exponha o serviço.
 		if len(config.Keys) == 0 {
-			httputil.SendError(c, http.StatusServiceUnavailable, "service authentication not configured")
+			httpgin.SendError(c, http.StatusServiceUnavailable, "service authentication not configured")
 			c.Abort()
 			return
 		}
@@ -97,7 +97,7 @@ func ServiceKeyAuth(config ServiceKeyConfig) gin.HandlerFunc {
 
 		// Validate headers present
 		if serviceName == "" || serviceKey == "" {
-			httputil.SendError(c, http.StatusUnauthorized, "unauthorized")
+			httpgin.SendError(c, http.StatusUnauthorized, "unauthorized")
 			c.Abort()
 			return
 		}
@@ -105,13 +105,13 @@ func ServiceKeyAuth(config ServiceKeyConfig) gin.HandlerFunc {
 		// Validar chave do serviço
 		expectedKey, exists := config.Keys[serviceName]
 		if !exists {
-			httputil.SendError(c, http.StatusUnauthorized, "unauthorized")
+			httpgin.SendError(c, http.StatusUnauthorized, "unauthorized")
 			c.Abort()
 			return
 		}
 
 		if subtle.ConstantTimeCompare([]byte(expectedKey), []byte(serviceKey)) != 1 {
-			httputil.SendError(c, http.StatusUnauthorized, "unauthorized")
+			httpgin.SendError(c, http.StatusUnauthorized, "unauthorized")
 			c.Abort()
 			return
 		}

@@ -17,7 +17,7 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/middleware"
 	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/database"
-	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil/httpgin"
 )
 
 // setupTestRouter configura o router para testes e2e
@@ -42,15 +42,15 @@ func setupTestRouter() *gin.Engine {
 
 	// Public routes
 	r.GET("/health", func(c *gin.Context) {
-		httputil.SendSuccess(c, http.StatusOK, gin.H{"status": "ok"})
+		httpgin.SendSuccess(c, http.StatusOK, gin.H{"status": "ok"})
 	})
 
 	r.GET("/ready", func(c *gin.Context) {
 		if pingErr := db.Ping(); pingErr != nil {
-			httputil.SendError(c, http.StatusServiceUnavailable, "database connection failed")
+			httpgin.SendError(c, http.StatusServiceUnavailable, "database connection failed")
 			return
 		}
-		httputil.SendSuccess(c, http.StatusOK, gin.H{"status": "ready"})
+		httpgin.SendSuccess(c, http.StatusOK, gin.H{"status": "ready"})
 	})
 
 	// CRUD Routes (without auth for backward compatibility)
@@ -92,7 +92,7 @@ func setupTestRouterWithAuth() *gin.Engine {
 
 	// Public routes
 	r.GET("/health", func(c *gin.Context) {
-		httputil.SendSuccess(c, http.StatusOK, gin.H{"status": "ok"})
+		httpgin.SendSuccess(c, http.StatusOK, gin.H{"status": "ok"})
 	})
 
 	// Protected routes

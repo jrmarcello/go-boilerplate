@@ -7,7 +7,7 @@ import (
 	entity "bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/domain/entity_example/vo"
 	"bitbucket.org/appmax-space/go-boilerplate/pkg/apperror"
-	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil/httpgin"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -46,7 +46,7 @@ func HandleError(c *gin.Context, span trace.Span, err error) {
 		if status >= 500 {
 			span.RecordError(err)
 		}
-		httputil.SendError(c, status, appErr.Message)
+		httpgin.SendError(c, status, appErr.Message)
 		return
 	}
 
@@ -58,7 +58,7 @@ func HandleError(c *gin.Context, span trace.Span, err error) {
 		span.RecordError(err)
 	}
 
-	httputil.SendError(c, status, message)
+	httpgin.SendError(c, status, message)
 }
 
 // translateError maps domain errors to HTTP status codes.

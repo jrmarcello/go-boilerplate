@@ -1,4 +1,4 @@
-package httputil
+package httpgin
 
 import (
 	"encoding/json"
@@ -6,26 +6,50 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestWriteSuccess(t *testing.T) {
+func setupTestRouter(handler gin.HandlerFunc) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/test", handler)
+	return r
+}
+
+func performRequest(t *testing.T, r *gin.Engine) *httptest.ResponseRecorder {
+	t.Helper()
+	w := httptest.NewRecorder()
+	req, reqErr := http.NewRequest("GET", "/test", nil)
+	require.NoError(t, reqErr)
+	r.ServeHTTP(w, req)
+	return w
+}
+
+func TestSendSuccess(t *testing.T) {
 	t.Run("returns data with status 200", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		WriteSuccess(w, http.StatusOK, map[string]any{"id": "123", "name": "Test"})
+		r := setupTestRouter(func(c *gin.Context) {
+			SendSuccess(c, http.StatusOK, gin.H{"id": "123", "name": "Test"})
+		})
+
+		w := performRequest(t, r)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var resp SuccessResponse
+		var resp httputil.SuccessResponse
 		parseErr := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, parseErr)
 		assert.NotNil(t, resp.Data)
 	})
 
 	t.Run("returns nil data", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		WriteSuccess(w, http.StatusOK, nil)
+		r := setupTestRouter(func(c *gin.Context) {
+			SendSuccess(c, http.StatusOK, nil)
+		})
+
+		w := performRequest(t, r)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -36,34 +60,46 @@ func TestWriteSuccess(t *testing.T) {
 	})
 
 	t.Run("returns status 201 Created", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		WriteSuccess(w, http.StatusCreated, map[string]any{"id": "456"})
+		r := setupTestRouter(func(c *gin.Context) {
+			SendSuccess(c, http.StatusCreated, gin.H{"id": "456"})
+		})
+
+		w := performRequest(t, r)
 
 		assert.Equal(t, http.StatusCreated, w.Code)
 
-		var resp SuccessResponse
+		var resp httputil.SuccessResponse
 		parseErr := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, parseErr)
 		assert.NotNil(t, resp.Data)
 	})
 
 	t.Run("returns status 204 No Content with nil data", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		WriteSuccess(w, http.StatusNoContent, nil)
+		r := setupTestRouter(func(c *gin.Context) {
+			SendSuccess(c, http.StatusNoContent, nil)
+		})
+
+		w := performRequest(t, r)
 
 		assert.Equal(t, http.StatusNoContent, w.Code)
 	})
 
 	t.Run("response Content-Type is application/json", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		WriteSuccess(w, http.StatusOK, map[string]any{"ok": true})
+		r := setupTestRouter(func(c *gin.Context) {
+			SendSuccess(c, http.StatusOK, gin.H{"ok": true})
+		})
+
+		w := performRequest(t, r)
 
 		assert.Contains(t, w.Header().Get("Content-Type"), "application/json")
 	})
 
 	t.Run("meta and links are omitted when not provided", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		WriteSuccess(w, http.StatusOK, map[string]any{"id": "1"})
+		r := setupTestRouter(func(c *gin.Context) {
+			SendSuccess(c, http.StatusOK, gin.H{"id": "1"})
+		})
+
+		w := performRequest(t, r)
 
 		var raw map[string]any
 		parseErr := json.Unmarshal(w.Body.Bytes(), &raw)
@@ -75,7 +111,7 @@ func TestWriteSuccess(t *testing.T) {
 	})
 }
 
-func TestWriteError(t *testing.T) {
+func TestSendError(t *testing.T) {
 	statusCases := []struct {
 		name    string
 		status  int
@@ -90,13 +126,16 @@ func TestWriteError(t *testing.T) {
 
 	for _, tc := range statusCases {
 		t.Run(tc.name, func(t *testing.T) {
-			w := httptest.NewRecorder()
-			WriteError(w, tc.status, tc.message)
+			r := setupTestRouter(func(c *gin.Context) {
+				SendError(c, tc.status, tc.message)
+			})
+
+			w := performRequest(t, r)
 
 			assert.Equal(t, tc.status, w.Code)
 			assert.Contains(t, w.Header().Get("Content-Type"), "application/json")
 
-			var resp ErrorResponse
+			var resp httputil.ErrorResponse
 			parseErr := json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, parseErr)
 			assert.Equal(t, tc.message, resp.Errors.Message)
@@ -104,13 +143,16 @@ func TestWriteError(t *testing.T) {
 	}
 }
 
-func TestWriteSuccessWithMeta(t *testing.T) {
+func TestSendSuccessWithMeta(t *testing.T) {
 	t.Run("with meta and links populated", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		data := []string{"a", "b"}
-		meta := map[string]any{"total": 2, "page": 1}
-		links := map[string]any{"next": "/test?page=2", "prev": "/test?page=0"}
-		WriteSuccessWithMeta(w, http.StatusOK, data, meta, links)
+		r := setupTestRouter(func(c *gin.Context) {
+			data := []string{"a", "b"}
+			meta := gin.H{"total": 2, "page": 1}
+			links := gin.H{"next": "/test?page=2", "prev": "/test?page=0"}
+			SendSuccessWithMeta(c, http.StatusOK, data, meta, links)
+		})
+
+		w := performRequest(t, r)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -132,8 +174,11 @@ func TestWriteSuccessWithMeta(t *testing.T) {
 	})
 
 	t.Run("with nil meta", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		WriteSuccessWithMeta(w, http.StatusOK, []string{"x"}, nil, map[string]any{"self": "/test"})
+		r := setupTestRouter(func(c *gin.Context) {
+			SendSuccessWithMeta(c, http.StatusOK, []string{"x"}, nil, gin.H{"self": "/test"})
+		})
+
+		w := performRequest(t, r)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -146,8 +191,11 @@ func TestWriteSuccessWithMeta(t *testing.T) {
 	})
 
 	t.Run("with nil links", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		WriteSuccessWithMeta(w, http.StatusOK, []string{"x"}, map[string]any{"total": 1}, nil)
+		r := setupTestRouter(func(c *gin.Context) {
+			SendSuccessWithMeta(c, http.StatusOK, []string{"x"}, gin.H{"total": 1}, nil)
+		})
+
+		w := performRequest(t, r)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -160,8 +208,11 @@ func TestWriteSuccessWithMeta(t *testing.T) {
 	})
 
 	t.Run("with both meta and links nil", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		WriteSuccessWithMeta(w, http.StatusOK, map[string]any{"id": "1"}, nil, nil)
+		r := setupTestRouter(func(c *gin.Context) {
+			SendSuccessWithMeta(c, http.StatusOK, gin.H{"id": "1"}, nil, nil)
+		})
+
+		w := performRequest(t, r)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -176,21 +227,27 @@ func TestWriteSuccessWithMeta(t *testing.T) {
 	})
 
 	t.Run("response Content-Type is application/json", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		WriteSuccessWithMeta(w, http.StatusOK, "data", map[string]any{}, map[string]any{})
+		r := setupTestRouter(func(c *gin.Context) {
+			SendSuccessWithMeta(c, http.StatusOK, "data", gin.H{}, gin.H{})
+		})
+
+		w := performRequest(t, r)
 
 		assert.Contains(t, w.Header().Get("Content-Type"), "application/json")
 	})
 }
 
-func TestWriteErrorWithCode(t *testing.T) {
+func TestSendErrorWithCode(t *testing.T) {
 	t.Run("includes error code in response", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		WriteErrorWithCode(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "field is required")
+		r := setupTestRouter(func(c *gin.Context) {
+			SendErrorWithCode(c, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "field is required")
+		})
+
+		w := performRequest(t, r)
 
 		assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
 
-		var resp ErrorResponse
+		var resp httputil.ErrorResponse
 		parseErr := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, parseErr)
 		assert.Equal(t, "VALIDATION_ERROR", resp.Errors.Code)
@@ -198,25 +255,31 @@ func TestWriteErrorWithCode(t *testing.T) {
 	})
 
 	t.Run("response Content-Type is application/json", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		WriteErrorWithCode(w, http.StatusBadRequest, "BAD_REQUEST", "bad")
+		r := setupTestRouter(func(c *gin.Context) {
+			SendErrorWithCode(c, http.StatusBadRequest, "BAD_REQUEST", "bad")
+		})
+
+		w := performRequest(t, r)
 
 		assert.Contains(t, w.Header().Get("Content-Type"), "application/json")
 	})
 }
 
-func TestWriteErrorWithDetails(t *testing.T) {
+func TestSendErrorWithDetails(t *testing.T) {
 	t.Run("includes code and details in response", func(t *testing.T) {
 		details := map[string]any{
 			"field":  "email",
 			"reason": "invalid format",
 		}
-		w := httptest.NewRecorder()
-		WriteErrorWithDetails(w, http.StatusBadRequest, "VALIDATION_ERROR", "validation failed", details)
+		r := setupTestRouter(func(c *gin.Context) {
+			SendErrorWithDetails(c, http.StatusBadRequest, "VALIDATION_ERROR", "validation failed", details)
+		})
+
+		w := performRequest(t, r)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 
-		var resp ErrorResponse
+		var resp httputil.ErrorResponse
 		parseErr := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, parseErr)
 		assert.Equal(t, "VALIDATION_ERROR", resp.Errors.Code)
@@ -226,8 +289,11 @@ func TestWriteErrorWithDetails(t *testing.T) {
 	})
 
 	t.Run("with nil details", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		WriteErrorWithDetails(w, http.StatusBadRequest, "ERR", "error msg", nil)
+		r := setupTestRouter(func(c *gin.Context) {
+			SendErrorWithDetails(c, http.StatusBadRequest, "ERR", "error msg", nil)
+		})
+
+		w := performRequest(t, r)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 

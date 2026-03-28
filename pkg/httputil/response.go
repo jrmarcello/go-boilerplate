@@ -1,7 +1,8 @@
 package httputil
 
 import (
-	"github.com/gin-gonic/gin"
+	"encoding/json"
+	"net/http"
 )
 
 // SuccessResponse is the standard envelope for successful API responses.
@@ -25,30 +26,30 @@ type ErrorResponse struct {
 	Errors ErrorDetail `json:"errors"`
 }
 
-// SendSuccess sends a standardized success response.
-func SendSuccess(c *gin.Context, status int, data any) {
-	c.JSON(status, SuccessResponse{Data: data})
+// WriteSuccess writes a standardized success response using http.ResponseWriter.
+func WriteSuccess(w http.ResponseWriter, status int, data any) {
+	writeJSON(w, status, SuccessResponse{Data: data})
 }
 
-// SendSuccessWithMeta sends a standardized success response with metadata and links.
-func SendSuccessWithMeta(c *gin.Context, status int, data, meta, links any) {
-	c.JSON(status, SuccessResponse{
+// WriteSuccessWithMeta writes a standardized success response with metadata and links.
+func WriteSuccessWithMeta(w http.ResponseWriter, status int, data, meta, links any) {
+	writeJSON(w, status, SuccessResponse{
 		Data:  data,
 		Meta:  meta,
 		Links: links,
 	})
 }
 
-// SendError sends a standardized error response.
-func SendError(c *gin.Context, status int, message string) {
-	c.JSON(status, ErrorResponse{
+// WriteError writes a standardized error response using http.ResponseWriter.
+func WriteError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, ErrorResponse{
 		Errors: ErrorDetail{Message: message},
 	})
 }
 
-// SendErrorWithCode sends a standardized error response with an error code.
-func SendErrorWithCode(c *gin.Context, status int, code, message string) {
-	c.JSON(status, ErrorResponse{
+// WriteErrorWithCode writes a standardized error response with an error code.
+func WriteErrorWithCode(w http.ResponseWriter, status int, code, message string) {
+	writeJSON(w, status, ErrorResponse{
 		Errors: ErrorDetail{
 			Message: message,
 			Code:    code,
@@ -56,13 +57,20 @@ func SendErrorWithCode(c *gin.Context, status int, code, message string) {
 	})
 }
 
-// SendErrorWithDetails sends a standardized error response with code and details.
-func SendErrorWithDetails(c *gin.Context, status int, code, message string, details map[string]any) {
-	c.JSON(status, ErrorResponse{
+// WriteErrorWithDetails writes a standardized error response with code and details.
+func WriteErrorWithDetails(w http.ResponseWriter, status int, code, message string, details map[string]any) {
+	writeJSON(w, status, ErrorResponse{
 		Errors: ErrorDetail{
 			Message: message,
 			Code:    code,
 			Details: details,
 		},
 	})
+}
+
+// writeJSON encodes v as JSON and writes it to the ResponseWriter with the given status code.
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
 }

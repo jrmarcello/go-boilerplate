@@ -6,7 +6,7 @@ import (
 	"bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/telemetry"
 	entityuc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example"
 	"bitbucket.org/appmax-space/go-boilerplate/internal/usecases/entity_example/dto"
-	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil"
+	"bitbucket.org/appmax-space/go-boilerplate/pkg/httputil/httpgin"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -67,7 +67,7 @@ func (h *EntityHandler) Create(c *gin.Context) {
 	var req dto.CreateInput
 	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		span.SetStatus(codes.Error, "invalid request body")
-		httputil.SendError(c, http.StatusBadRequest, "invalid request body")
+		httpgin.SendError(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
@@ -88,7 +88,7 @@ func (h *EntityHandler) Create(c *gin.Context) {
 		h.Metrics.RecordCreate(ctx)
 	}
 
-	httputil.SendSuccess(c, http.StatusCreated, res)
+	httpgin.SendSuccess(c, http.StatusCreated, res)
 }
 
 // GetByID godoc
@@ -114,7 +114,7 @@ func (h *EntityHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	httputil.SendSuccess(c, http.StatusOK, res)
+	httpgin.SendSuccess(c, http.StatusOK, res)
 }
 
 // List godoc
@@ -137,7 +137,7 @@ func (h *EntityHandler) List(c *gin.Context) {
 	var req dto.ListInput
 	if bindErr := c.ShouldBindQuery(&req); bindErr != nil {
 		span.SetStatus(codes.Error, "invalid query parameters")
-		httputil.SendError(c, http.StatusBadRequest, "invalid query parameters")
+		httpgin.SendError(c, http.StatusBadRequest, "invalid query parameters")
 		return
 	}
 
@@ -153,7 +153,7 @@ func (h *EntityHandler) List(c *gin.Context) {
 	}
 
 	span.SetAttributes(attribute.Int("result.total", res.Pagination.Total))
-	httputil.SendSuccessWithMeta(c, http.StatusOK, res.Data, res.Pagination, nil)
+	httpgin.SendSuccessWithMeta(c, http.StatusOK, res.Data, res.Pagination, nil)
 }
 
 // Update godoc
@@ -179,7 +179,7 @@ func (h *EntityHandler) Update(c *gin.Context) {
 	var req dto.UpdateInput
 	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		span.SetStatus(codes.Error, "invalid request body")
-		httputil.SendError(c, http.StatusBadRequest, "invalid request body")
+		httpgin.SendError(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	req.ID = id // ID vem da URL
@@ -195,7 +195,7 @@ func (h *EntityHandler) Update(c *gin.Context) {
 		h.Metrics.RecordUpdate(ctx)
 	}
 
-	httputil.SendSuccess(c, http.StatusOK, res)
+	httpgin.SendSuccess(c, http.StatusOK, res)
 }
 
 // Delete godoc
@@ -226,5 +226,5 @@ func (h *EntityHandler) Delete(c *gin.Context) {
 		h.Metrics.RecordDelete(ctx)
 	}
 
-	httputil.SendSuccess(c, http.StatusOK, res)
+	httpgin.SendSuccess(c, http.StatusOK, res)
 }
