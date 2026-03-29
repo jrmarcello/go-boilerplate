@@ -13,154 +13,6 @@ DX pensado para produtividade: 40+ comandos make com verificação automática d
 
 O template é **pouco opinativo e fortemente extensível**: serve como base para vários tipos de projeto, e o desenvolvedor tem liberdade total para adicionar as bibliotecas e frameworks que desejar.
 
-```bash
-git clone https://bitbucket.org/appmax-space/go-boilerplate my-service
-cd my-service && make setup && make dev
-```
-
----
-
-## O que vem incluso
-
-### Código pronto para produção
-
-| Feature | O que faz | Por que importa |
-| ------- | --------- | --------------- |
-| **CRUD completo** | Create, Get, List, Update, Delete | Endpoint funcional de exemplo para copiar |
-| **PostgreSQL** | Writer/Reader split, pool tunado | Escala com read replicas sem mudar código |
-| **Redis Cache** | Cache-aside + singleflight + pool config | Performance com proteção contra cache stampede |
-| **Idempotência** | Redis-backed, SHA-256 fingerprint, fail-open | Requests duplicados não causam efeitos colaterais |
-| **UUID v7** | IDs ordenados por tempo, tipo nativo no Postgres | Performance de índice + unicidade global |
-| **OpenTelemetry** | Traces + metrics + logs integrados | Observabilidade completa desde o dia 1 |
-| **Service Key Auth** | Autenticação entre serviços via headers | Segurança entre microsserviços |
-| **Logging estruturado** | Contexto propagado + mascaramento de dados pessoais (email, CPF, telefone) | Logs rastreáveis e em conformidade com LGPD — dados sensíveis nunca aparecem em plaintext no ELK/Kibana |
-| **Health checks** | `/health` + `/ready` com verificação de dependências | Kubernetes liveness/readiness probes prontos |
-
-### Qualidade automatizada
-
-| Feature | O que faz | Quando roda |
-| ------- | --------- | ----------- |
-| **291+ testes unitários + 22 E2E** | Unit + sqlmock + E2E com TestContainers | `make test` |
-| **75%+ de cobertura** | Domain, usecases, middleware, pkg — tudo coberto (10 pacotes com 100%) | CI exige 60% mínimo |
-| **golangci-lint** | 50+ linters incluindo gosec | Pre-commit + CI |
-| **govulncheck** | Varredura de vulnerabilidades em dependências | Pre-push + CI |
-| **Lefthook** | 3 camadas: pre-commit (formatação), commit-msg (convenção), pre-push (lint+testes+vuln) | Automático |
-
-### DevOps pronto
-
-| Feature | O que faz | Comando |
-| ------- | --------- | ------- |
-| **Docker Compose** | DB + Redis + API tudo em Docker | `make run` |
-| **Hot Reload** | Air com rebuild automático | `make dev` |
-| **Kubernetes** | Kustomize overlays (dev, hml, prd) | `make kind-setup` |
-| **CI/CD** | 4 verificações paralelas + notificações Slack | Bitbucket Pipelines |
-| **Observabilidade** | ELK 8.13 + OTel + dashboard 20 painéis + 6 alertas | `make observability-up` |
-| **Load Tests** | k6 com 4 cenários (smoke, load, stress, spike) | `make load-smoke` |
-| **Migrations** | Goose SQL com ArgoCD PreSync | `make migrate-up` |
-
-### DX (Developer Experience)
-
-| Feature | O que faz |
-| ------- | --------- |
-| **40+ comandos make** | Tudo via Makefile com help categorizado |
-| **Verificação de pré-requisitos** | Falta Docker? k6? kind? O Makefile avisa como instalar |
-| **Claude Code** | Skills, hooks, agents, rules — IA integrada ao fluxo de trabalho |
-| **DevContainer** | Sandbox seguro com firewall default-deny |
-| **Conventional Commits** | Formato de commits padronizado e verificado automaticamente |
-
----
-
-## Números
-
-| Métrica | Valor |
-| ------- | ----- |
-| Testes passando | **313** (291 unit + 22 E2E) |
-| Cobertura (código com lógica) | **75%+** (10 pacotes com 100%) |
-| Arquivos Go | **111** |
-| Comandos make | **40+** |
-| ADRs documentados | **8** |
-| Guias | **6** |
-| Regras de alerta | **6** |
-| Painéis no dashboard | **20** |
-| Vulnerabilidades conhecidas | **0** |
-
----
-
-## Estrutura do projeto
-
-O código é organizado em **camadas com responsabilidades claras**. O domínio fica no centro, protegido de detalhes de infraestrutura — exatamente o padrão de dependência da Clean Architecture.
-
-```text
-               ┌─────────────────────────────┐
-               │      Infrastructure         │
-               │  (Banco, Cache, HTTP, OTel) │
-               │                             │
-               │   ┌─────────────────────┐   │
-               │   │     Use Cases       │   │
-               │   │ (Operações de       │   │
-               │   │  negócio, 1 por     │   │
-               │   │  arquivo)           │   │
-               │   │                     │   │
-               │   │   ┌─────────────┐   │   │
-               │   │   │   Domain    │   │   │
-               │   │   │ (Entidades, │   │   │
-               │   │   │  VOs, Erros)│   │   │
-               │   │   └─────────────┘   │   │
-               │   └─────────────────────┘   │
-               └─────────────────────────────┘
-
-Dependências apontam para dentro: Infrastructure → Use Cases → Domain
-Domain não conhece nada das camadas externas.
-```
-
-### Na prática, no código
-
-```text
-├── cmd/
-│   ├── api/              # Entrypoint HTTP server
-│   └── migrate/          # Binário de migrations (K8s Job)
-├── config/               # Configuração (godotenv + env vars)
-├── internal/
-│   ├── domain/           # Entidades, Value Objects, erros (zero deps externas)
-│   ├── usecases/         # Casos de uso + interfaces (1 arquivo por operação)
-│   └── infrastructure/   # Banco, cache, HTTP handlers, telemetria
-├── pkg/                  # Pacotes reutilizáveis entre serviços
-│   ├── apperror/         # Erros estruturados
-│   ├── cache/            # Redis + singleflight
-│   ├── database/         # DB Writer/Reader (driver-agnostic)
-│   ├── httputil/         # Respostas padronizadas + wrappers Gin (httpgin/)
-│   ├── idempotency/      # Idempotência distribuída
-│   ├── logutil/          # Logging + mascaramento de dados pessoais
-│   └── telemetry/        # OpenTelemetry setup
-├── deploy/               # Kubernetes (Kustomize overlays)
-├── docker/               # Dockerfile + docker-compose + observabilidade
-├── docs/                 # ADRs + guias
-└── tests/                # E2E (TestContainers) + load (k6)
-```
-
-**Por que isso importa na prática?**
-
-- **Testabilidade**: use cases testados com mocks simples, sem precisar de banco rodando
-- **Onboarding**: dev novo sabe exatamente onde colocar cada tipo de código
-- **Extensibilidade**: trocar Postgres por DynamoDB? Só muda a infra, use cases não mudam. Quer adicionar gRPC? Só mais um adapter na infrastructure
-- **Trabalho em paralelo**: 5 devs podem trabalhar em features diferentes sem conflito
-
-> **Nota**: a arquitetura em camadas é uma sugestão, não uma imposição. Para serviços mais simples, você pode colapsar as camadas. O valor real está na **padronização entre serviços** e na **liberdade de estender** sem quebrar o que já funciona.
-
----
-
-## Comparativo: sem template vs com template
-
-| Tarefa | Sem template | Com Go Boilerplate |
-| ------ | ------------ | ------------------ |
-| Setup do projeto | 1-2 dias | `make setup` (2 min) |
-| Primeiro endpoint | 1 dia | Já vem pronto (CRUD completo) |
-| CI/CD | 1 semana | Já configurado (Bitbucket Pipelines) |
-| Kubernetes | 1-2 semanas | `make kind-setup` (5 min) |
-| Observabilidade | "a gente vê depois" | `make observability-setup` (1 min) |
-| Testes | "a gente escreve depois" | 313 testes de exemplo |
-| **Padronização** | **Serviços diferentes** | **Mesmo DX e padrão de qualidade em todos** |
-
 ---
 
 ## Quick Start
@@ -276,6 +128,182 @@ Ver `.env.example` para a lista completa e [ADR-003](docs/adr/003-config-strateg
 
 ---
 
+## O que vem incluso
+
+### Código pronto para produção
+
+| Feature | O que faz | Por que importa |
+| ------- | --------- | --------------- |
+| **CRUD completo** | Create, Get, List, Update, Delete | Endpoint funcional de exemplo para copiar |
+| **PostgreSQL** | Writer/Reader split, pool tunado | Escala com read replicas sem mudar código |
+| **Redis Cache** | Cache-aside + singleflight + pool config | Performance com proteção contra cache stampede |
+| **Idempotência** | Redis-backed, SHA-256 fingerprint, fail-open | Requests duplicados não causam efeitos colaterais |
+| **UUID v7** | IDs ordenados por tempo, tipo nativo no Postgres | Performance de índice + unicidade global |
+| **OpenTelemetry** | Traces + metrics + logs integrados | Observabilidade completa desde o dia 1 |
+| **Service Key Auth** | Autenticação entre serviços via headers | Segurança entre microsserviços |
+| **Logging estruturado** | Contexto propagado + mascaramento de dados pessoais (email, CPF, telefone) | Logs rastreáveis e em conformidade com LGPD — dados sensíveis nunca aparecem em plaintext no ELK/Kibana |
+| **Health checks** | `/health` + `/ready` com verificação de dependências | Kubernetes liveness/readiness probes prontos |
+
+### Autenticação
+
+Rotas protegidas requerem headers `X-Service-Name` e `X-Service-Key`:
+
+```bash
+curl -X GET http://localhost:8080/users \
+  -H "X-Service-Name: myservice" \
+  -H "X-Service-Key: sk_myservice_abc123"
+```
+
+| Rota | Proteção |
+| ---- | -------- |
+| `/health`, `/ready` | Pública |
+| `/swagger/*` | Pública |
+| `/users/*` | Protegida |
+| `/roles/*` | Protegida |
+
+**Comportamento por ambiente:**
+
+| Ambiente | `SERVICE_KEYS_ENABLED` | `SERVICE_KEYS` | Resultado |
+| -------- | ---------------------- | -------------- | --------- |
+| Desenvolvimento | `false` (padrão) | qualquer | Tudo permitido |
+| HML/PRD | `true` | configurado | Valida normalmente |
+| HML/PRD | `true` | **vazio** | **503 Service Unavailable** (fail-closed) |
+
+### Qualidade automatizada
+
+| Feature | O que faz | Quando roda |
+| ------- | --------- | ----------- |
+| **291+ testes unitários + 22 E2E** | Unit + sqlmock + E2E com TestContainers | `make test` |
+| **75%+ de cobertura** | Domain, usecases, middleware, pkg — tudo coberto (10 pacotes com 100%) | CI exige 60% mínimo |
+| **golangci-lint** | 50+ linters incluindo gosec | Pre-commit + CI |
+| **govulncheck** | Varredura de vulnerabilidades em dependências | Pre-push + CI |
+| **Lefthook** | 3 camadas: pre-commit (formatação), commit-msg (convenção), pre-push (lint+testes+vuln) | Automático |
+
+### DevOps pronto
+
+| Feature | O que faz | Comando |
+| ------- | --------- | ------- |
+| **Docker Compose** | DB + Redis + API tudo em Docker | `make run` |
+| **Hot Reload** | Air com rebuild automático | `make dev` |
+| **Kubernetes** | Kustomize overlays (dev, hml, prd) | `make kind-setup` |
+| **CI/CD** | 4 verificações paralelas + notificações Slack | Bitbucket Pipelines |
+| **Observabilidade** | ELK 8.13 + OTel + dashboard 20 painéis + 6 alertas | `make observability-up` |
+| **Load Tests** | k6 com 4 cenários (smoke, load, stress, spike) | `make load-smoke` |
+| **Migrations** | Goose SQL com ArgoCD PreSync | `make migrate-up` |
+
+### Comparativo: sem template vs com template
+
+| Tarefa | Sem template | Com Go Boilerplate |
+| ------ | ------------ | ------------------ |
+| Setup do projeto | 1-2 dias | `make setup` (2 min) |
+| Primeiro endpoint | 1 dia | Já vem pronto (CRUD completo) |
+| CI/CD | 1 semana | Já configurado (Bitbucket Pipelines) |
+| Kubernetes | 1-2 semanas | `make kind-setup` (5 min) |
+| Observabilidade | "a gente vê depois" | `make observability-setup` (1 min) |
+| Testes | "a gente escreve depois" | 313 testes de exemplo |
+| **Padronização** | **Serviços diferentes** | **Mesmo DX e padrão de qualidade em todos** |
+
+---
+
+## Estrutura do projeto
+
+O código é organizado em **camadas com responsabilidades claras**. O domínio fica no centro, protegido de detalhes de infraestrutura — exatamente o padrão de dependência da Clean Architecture.
+
+```text
+               ┌─────────────────────────────┐
+               │      Infrastructure         │
+               │  (Banco, Cache, HTTP, OTel) │
+               │                             │
+               │   ┌─────────────────────┐   │
+               │   │     Use Cases       │   │
+               │   │ (Operações de       │   │
+               │   │  negócio, 1 por     │   │
+               │   │  arquivo)           │   │
+               │   │                     │   │
+               │   │   ┌─────────────┐   │   │
+               │   │   │   Domain    │   │   │
+               │   │   │ (Entidades, │   │   │
+               │   │   │  VOs, Erros)│   │   │
+               │   │   └─────────────┘   │   │
+               │   └─────────────────────┘   │
+               └─────────────────────────────┘
+
+Dependências apontam para dentro: Infrastructure → Use Cases → Domain
+Domain não conhece nada das camadas externas.
+```
+
+### Na prática, no código
+
+```text
+├── cmd/
+│   ├── api/              # Entrypoint HTTP server
+│   └── migrate/          # Binário de migrations (K8s Job)
+├── config/               # Configuração (godotenv + env vars)
+├── internal/
+│   ├── domain/           # Entidades, Value Objects, erros (zero deps externas)
+│   ├── usecases/         # Casos de uso + interfaces (1 arquivo por operação)
+│   └── infrastructure/   # Banco, cache, HTTP handlers, telemetria
+├── pkg/                  # Pacotes reutilizáveis entre serviços
+│   ├── apperror/         # Erros estruturados
+│   ├── cache/            # Redis + singleflight
+│   ├── database/         # DB Writer/Reader (driver-agnostic)
+│   ├── httputil/         # Respostas padronizadas + wrappers Gin (httpgin/)
+│   ├── idempotency/      # Idempotência distribuída
+│   ├── logutil/          # Logging + mascaramento de dados pessoais
+│   └── telemetry/        # OpenTelemetry setup
+├── deploy/               # Kubernetes (Kustomize overlays)
+├── docker/               # Dockerfile + docker-compose + observabilidade
+├── docs/                 # ADRs + guias
+└── tests/                # E2E (TestContainers) + load (k6)
+```
+
+### Arquitetura de infraestrutura
+
+```text
+                    ┌─────────────────┐
+                    │    Ingress      │
+                    │   (NGINX)       │
+                    └────────┬────────┘
+                             │
+                    ┌────────▼────────┐
+                    │   API Service   │
+                    │   (Go + Gin)    │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+     ┌────────▼────────┐ ┌───▼───┐ ┌───────▼───────┐
+     │   PostgreSQL    │ │ Redis │ │ OTel Collector│
+     │   (Dados)       │ │(Cache)│ │ (Telemetria)  │
+     └─────────────────┘ └───────┘ └───────────────┘
+```
+
+### Pacotes reutilizáveis (pkg/)
+
+Estes pacotes podem ser importados por **qualquer serviço Go** — não só quem usa o template:
+
+| Pacote | O que faz |
+| ------ | --------- |
+| `pkg/apperror` | Erros estruturados com código, mensagem e status HTTP |
+| `pkg/httputil` | Respostas JSON padronizadas (`WriteSuccess`, `WriteError`) + wrappers Gin em `httputil/httpgin/` (`SendSuccess`, `SendError`) |
+| `pkg/cache` | Interface de cache + Redis + singleflight (proteção contra stampede) |
+| `pkg/database` | Conexão de banco driver-agnostic (`database/sql`) com Writer/Reader cluster — suporta postgres, mysql, sqlite3, etc. |
+| `pkg/idempotency` | Idempotência distribuída via Redis (lock/unlock, fingerprint SHA-256) |
+| `pkg/logutil` | Logging estruturado com propagação de contexto e mascaramento de dados pessoais (LGPD) |
+| `pkg/telemetry` | Setup OTel (traces + HTTP metrics + DB pool metrics) |
+| `pkg/health` | Health checker com verificação de dependências e timeouts |
+
+**Por que isso importa na prática?**
+
+- **Testabilidade**: use cases testados com mocks simples, sem precisar de banco rodando
+- **Onboarding**: dev novo sabe exatamente onde colocar cada tipo de código
+- **Extensibilidade**: trocar Postgres por DynamoDB? Só muda a infra, use cases não mudam. Quer adicionar gRPC? Só mais um adapter na infrastructure
+- **Trabalho em paralelo**: 5 devs podem trabalhar em features diferentes sem conflito
+
+> **Nota**: a arquitetura em camadas é uma sugestão, não uma imposição. Para serviços mais simples, você pode colapsar as camadas. O valor real está na **padronização entre serviços** e na **liberdade de estender** sem quebrar o que já funciona.
+
+---
+
 ## Sandbox (DevContainer)
 
 O projeto inclui um **DevContainer** pré-configurado que cria um ambiente de desenvolvimento isolado com todas as ferramentas instaladas. Ideal para:
@@ -319,68 +347,9 @@ Isso garante que o Claude Code com `--dangerously-skip-permissions` não consiga
 
 ---
 
-## Autenticação
-
-Rotas protegidas requerem headers `X-Service-Name` e `X-Service-Key`:
-
-```bash
-curl -X GET http://localhost:8080/users \
-  -H "X-Service-Name: myservice" \
-  -H "X-Service-Key: sk_myservice_abc123"
-```
-
-| Rota | Proteção |
-| ---- | -------- |
-| `/health`, `/ready` | Pública |
-| `/swagger/*` | Pública |
-| `/users/*` | Protegida |
-| `/roles/*` | Protegida |
-
-**Comportamento por ambiente:**
-
-| `SERVICE_KEYS_ENABLED` | `SERVICE_KEYS` | Resultado |
-| ---------------------- | -------------- | --------- |
-| `false` (padrão) | qualquer | Tudo permitido (modo desenvolvimento) |
-| `true` | configurado | Valida normalmente |
-| `true` | **vazio** | **503 Service Unavailable** (fail-closed — protege HML/PRD) |
-
----
-
-## Pacotes reutilizáveis (pkg/)
-
-Estes pacotes podem ser importados por **qualquer serviço Go** — não só quem usa o template:
-
-| Pacote | O que faz |
-| ------ | --------- |
-| `pkg/apperror` | Erros estruturados com código, mensagem e status HTTP |
-| `pkg/httputil` | Respostas JSON padronizadas (`WriteSuccess`, `WriteError`) + wrappers Gin em `httputil/httpgin/` (`SendSuccess`, `SendError`) |
-| `pkg/cache` | Interface de cache + Redis + singleflight (proteção contra stampede) |
-| `pkg/database` | Conexão de banco driver-agnostic (`database/sql`) com Writer/Reader cluster — suporta postgres, mysql, sqlite3, etc. |
-| `pkg/idempotency` | Idempotência distribuída via Redis (lock/unlock, fingerprint SHA-256) |
-| `pkg/logutil` | Logging estruturado com propagação de contexto e mascaramento de dados pessoais (LGPD) |
-| `pkg/telemetry` | Setup OTel (traces + HTTP metrics + DB pool metrics) |
-| `pkg/health` | Health checker com verificação de dependências e timeouts |
-
----
-
 ## Documentação
 
-### Decisões Arquiteturais (ADRs)
-
-Cada decisão técnica tem um documento explicando o **por quê**:
-
-| ADR | Decisão |
-| --- | ------- |
-| [001](docs/adr/001-clean-architecture.md) | Organização em camadas com DI manual |
-| [002](docs/adr/002-ids.md) | UUID v7 para IDs (não auto-increment, não UUID v4) |
-| [003](docs/adr/003-config-strategy.md) | Configuração via env vars (não YAML, não Viper) |
-| [004](docs/adr/004-error-handling.md) | Erros de domínio puros (sem HTTP no domain) |
-| [005](docs/adr/005-service-key-auth.md) | Service Key para autenticação entre serviços |
-| [006](docs/adr/006-migration-strategy.md) | Migrations via ArgoCD PreSync Job |
-| [007](docs/adr/007-pkg-reusable-packages.md) | Pacotes reutilizáveis em pkg/ |
-| [008](docs/adr/008-api-response-format.md) | Formato padrão de resposta da API |
-
-### Guias
+O projeto inclui 8 ADRs (Architecture Decision Records) em `docs/adr/` explicando o **porquê** de cada decisão técnica, e guias práticos em `docs/guides/`:
 
 | Guia | Sobre |
 | ---- | ----- |
@@ -390,9 +359,7 @@ Cada decisão técnica tem um documento explicando o **por quê**:
 | [fx-dependency-injection.md](docs/guides/fx-dependency-injection.md) | Uber Fx como alternativa ao DI manual |
 | [multi-database.md](docs/guides/multi-database.md) | Estratégia para serviços com múltiplos bancos |
 
-### Para Agentes de IA
-
-Ver [AGENTS.md](AGENTS.md) para diretrizes de código e arquitetura, e [CLAUDE.md](CLAUDE.md) para orientação específica do Claude Code.
+Para agentes de IA, ver [AGENTS.md](AGENTS.md) e [CLAUDE.md](CLAUDE.md).
 
 ---
 
@@ -443,29 +410,6 @@ O template é um ponto de partida, não um fork contínuo. Acompanhe o [CHANGELO
 **"E a performance? Camadas não adicionam overhead?"**
 
 Não. As camadas são uma separação lógica de código, não uma separação runtime. Não há serialização, rede, ou cópia de dados entre camadas — são chamadas de função Go normais. O overhead é zero.
-
----
-
-## Arquitetura de infraestrutura
-
-```text
-                    ┌─────────────────┐
-                    │    Ingress      │
-                    │   (NGINX)       │
-                    └────────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │   API Service   │
-                    │   (Go + Gin)    │
-                    └────────┬────────┘
-                             │
-              ┌──────────────┼──────────────┐
-              │              │              │
-     ┌────────▼────────┐ ┌───▼───┐ ┌───────▼───────┐
-     │   PostgreSQL    │ │ Redis │ │ OTel Collector│
-     │   (Dados)       │ │(Cache)│ │ (Telemetria)  │
-     └─────────────────┘ └───────┘ └───────────────┘
-```
 
 ---
 
