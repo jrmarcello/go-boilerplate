@@ -131,6 +131,9 @@ Context7 is installed as a global MCP plugin. It fetches up-to-date documentatio
 | `/debug-logs` | Analyze logs from Kind/Docker | Quick log-based debugging |
 | `/debug-team` | Parallel bug investigation with competing hypotheses (Agent Team) | Complex bugs that resist sequential debugging |
 | `/load-test` | Run k6 load tests + analyze results | Performance validation and regression |
+| `/spec` | Create SDD specification (requirements, design, tasks) | Before implementing a new feature or complex change |
+| `/ralph-loop` | Autonomous task-by-task execution from a spec | After `/spec` approval, for autonomous implementation |
+| `/spec-review` | Review implementation against specification | After `/ralph-loop` completes or manual implementation |
 
 ### Agent Teams and Subagents
 
@@ -140,7 +143,7 @@ Agent Teams enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`). Team skills spawn 
 
 ### Rules
 
-Auto-applied by file pattern: Go conventions (`**/*.go`), security (`**/*`), migrations (`**/migration/**`).
+Auto-applied by file pattern: Go conventions (`**/*.go`), security (`**/*`), migrations (`**/migration/**`), SDD specs (`.specs/**`).
 
 ### Hooks
 
@@ -149,7 +152,8 @@ Three-layer quality enforcement:
 - **PreToolUse[Bash]** — `guard-bash.sh`: blocks .env staging, `git add -A`, DROP statements, `--no-verify`
 - **PostToolUse[Edit|Write]** — `lint-go-file.sh`: goimports/gopls diagnostics on every Go file edit
 - **PostToolUse[Edit|Write]** — `validate-migration.sh`: ensures Up + Down sections in migrations
-- **Stop** — `stop-validate.sh`: build + fmt + vet + swagger + lint + tests gate (auto-retry with tiered validation)
+- **Stop** — `ralph-loop.sh`: checks spec task progress, returns exit 2 to continue autonomous execution (transparent when no loop active)
+- **Stop** — `stop-validate.sh`: build + fmt + vet + swagger + lint + tests gate (auto-retry with tiered validation; skipped during active ralph-loop)
 - **WorktreeCreate/Remove** — automated git worktree setup and cleanup
 
 ### Execution Directives
@@ -157,3 +161,4 @@ Three-layer quality enforcement:
 1. **Prefer subagents and parallelization** — use subagents or Agent Teams for independent discovery/analysis. Merge findings before coding.
 2. **Mandatory cycle** for non-trivial tasks: **Plan** → **Implement** → **Test** → **Validate**. Do not finish without concrete validation evidence.
 3. **Post-implementation validation** — enforced automatically by the **Stop hook** (build + fmt + vet + swagger + lint + tests). The hook blocks completion until validation passes. For the full pipeline including E2E, Kind deploy, and smoke tests, run `/validate` explicitly.
+4. **SDD workflow** for complex features: `/spec` → approve → `/ralph-loop` → `/spec-review`. Specs live in `.specs/`. The ralph-loop uses the Stop hook (exit code 2) to iterate task-by-task within the same session. See `docs/guides/sdd-ralph-loop.md`.

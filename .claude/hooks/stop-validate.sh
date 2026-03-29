@@ -22,6 +22,12 @@ if [ "$COUNT" -ge 3 ]; then
   exit 0
 fi
 
+# ── Skip during active Ralph Loop (intermediate iterations) ───────
+SPECS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.specs"
+if find "$SPECS_DIR" -name "*.active.md" -type f 2>/dev/null | head -1 | grep -q .; then
+  exit 0
+fi
+
 # ── Detect Go changes ──────────────────────────────────────────────
 CHANGED_FILES=""
 CHANGED_FILES+=$(git diff --name-only 2>/dev/null || true)
