@@ -47,6 +47,18 @@ make lint         # Linters
 make run          # Tudo em Docker (sem Go local)
 ```
 
+### Template CLI
+
+Scaffold novos serviços e domínios com o CLI `boilerplate`:
+
+```bash
+go install bitbucket.org/appmax-space/go-boilerplate/cmd/cli@latest
+boilerplate new my-service    # Cria um novo serviço
+boilerplate add domain order  # Adiciona um domínio ao projeto
+```
+
+Consulte o [guia completo do Template CLI](docs/guides/template-cli.md) para detalhes.
+
 ### 4. Deploy
 
 ```bash
@@ -344,6 +356,8 @@ Para features complexas, o template oferece um fluxo spec-driven com execução 
   → Verifica implementação contra requisitos
 ```
 
+O `/spec` analisa automaticamente dependências entre tasks e gera **Parallel Batches** — tasks sem arquivos compartilhados nem dependências podem rodar em paralelo. Arquivos compartilhados são classificados como exclusivos, aditivos (accumulator pattern) ou mutativos (serializados).
+
 A spec é agnóstica de arquitetura — funciona tanto com camadas separadas quanto colapsadas. Ver [guia completo](docs/guides/sdd-ralph-loop.md).
 
 #### Hooks (qualidade automática)
@@ -436,7 +450,7 @@ O template está em evolução contínua. Próximos passos planejados:
 - [ ] Suporte a gRPC como alternativa ao REST
 - [ ] Feature flags com LaunchDarkly/Unleash
 - [ ] Uber Fx como opção de DI (guia já documentado)
-- [ ] CLI para scaffold automático (`boilerplate new my-service`)
+- [x] CLI para scaffold automático (`boilerplate new my-service`)
 
 Sugestões são bem-vindas via [Issues](https://bitbucket.org/appmax-space/go-boilerplate/issues).
 
