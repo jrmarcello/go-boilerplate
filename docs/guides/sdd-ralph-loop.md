@@ -125,6 +125,80 @@ stop-validate.sh:
 - **Emergency stop**: `rm .specs/*.active.md`
 - **Resume**: se interrompido, `/ralph-loop` retoma do último task incompleto
 
+## Paralelismo
+
+### Detecção de Batches
+
+O `/spec` analisa automaticamente as tasks e gera uma seção **Parallel Batches** na spec:
+
+```markdown
+## Tasks
+- [ ] TASK-1: Criar entity AuditEvent
+  - files: internal/domain/audit/entity.go, internal/domain/audit/errors.go
+- [ ] TASK-2: Criar use case CreateAuditEvent
+  - files: internal/usecases/audit/create.go, internal/usecases/audit/interfaces/repository.go
+  - depends: TASK-1
+- [ ] TASK-3: Criar use case ListAuditEvents
+  - files: internal/usecases/audit/list.go
+  - depends: TASK-1
+- [ ] TASK-4: Implementar repository PostgreSQL
+  - files: internal/infrastructure/db/postgres/repository/audit.go
+  - depends: TASK-1
+- [ ] TASK-5: Wiring no server.go
+  - files: cmd/api/server.go, internal/infrastructure/web/router/router.go
+  - depends: TASK-2, TASK-3, TASK-4
+
+## Parallel Batches
+
+Batch 1: [TASK-1]                    — foundation
+Batch 2: [TASK-2, TASK-3, TASK-4]    — parallel (no shared files)
+Batch 3: [TASK-5]                    — sequential (shared: cmd/api/server.go [additive])
+
+File overlap analysis:
+- Todos os arquivos do Batch 2 são exclusivos de uma task
+- cmd/api/server.go: só TASK-5 (sem conflito neste caso)
+```
+
+A análise considera dois critérios para definir que tasks **não podem** rodar em paralelo:
+
+1. **Dependência explícita** — `depends: TASK-N`
+2. **Overlap de arquivos** — mesma entrada em `files:`
+
+### Classificação de Arquivos Compartilhados
+
+| Classificação | Definição | Estratégia |
+| --- | --- | --- |
+| **Exclusive** | Só uma task toca o arquivo | Paralelo direto |
+| **Shared-additive** | Múltiplas tasks adicionam linhas (ex: DI wiring, rotas) | Accumulator pattern — fragments em `.specs/wiring/` |
+| **Shared-mutative** | Múltiplas tasks modificam código existente no mesmo arquivo | Serializar (nunca paralelo) |
+
+### Merge Strategy: Hybrid B+C
+
+Para arquivos **shared-additive** (como `server.go`), cada task paralela gera um **fragment** em vez de editar o arquivo compartilhado:
+
+```markdown
+<!-- .specs/wiring/task-2.md -->
+target: cmd/api/server.go
+function: buildDependencies
+adds:
+  - auditRepo := postgres.NewAuditRepository(dbCluster.Writer())
+  - createAuditUC := audit.NewCreateUseCase(auditRepo)
+```
+
+Uma task de merge dedicada (`TASK-MERGE`) lê todos os fragments e aplica as adições de uma vez. Fragments descrevem **intenção** (o que adicionar), não patches.
+
+Para arquivos **shared-mutative**, as tasks são serializadas automaticamente — colocadas em batches diferentes.
+
+### Execução (Hoje vs Futuro)
+
+| Versão | O que faz | Como |
+| --- | --- | --- |
+| **v1 (atual)** | Ralph loop sequencial | Tasks executadas uma por vez na mesma sessão |
+| **v1.1 (atual)** | `/spec` detecta batches e sugere paralelismo | Informativo — dev decide como executar |
+| **v2 (futuro)** | `/ralph-loop --parallel` executa batches em worktrees | Cada task do batch roda em worktree isolado, merge automático |
+
+Independente da versão, a execução **inter-spec** em paralelo já funciona: abra múltiplos terminais, cada um com um Claude rodando `/ralph-loop` em uma spec diferente, cada um em seu worktree.
+
 ## Integração com Workflows Existentes
 
 O SDD + Ralph Loop se integra sem quebrar nada:

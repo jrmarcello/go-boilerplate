@@ -32,7 +32,11 @@ The loop uses the Stop hook pattern:
 3. Verify no other ralph-loop is active (no other `.active.md` files in `.specs/`)
 4. Set status to `IN_PROGRESS` if not already
 5. Create state file: `.specs/<name>.active.md` containing the spec file path (this signals the Stop hook)
-6. Identify the next uncompleted `- [ ] TASK-N:` entry
+6. Check the **Parallel Batches** section to determine execution order:
+   - If batches exist: follow batch order (Batch 1 → Batch 2 → ...)
+   - Within a batch: execute tasks sequentially (parallel execution is v2 with worktrees)
+   - If no batches section: fall back to sequential `TASK-N` order
+7. Identify the next uncompleted `- [ ] TASK-N:` entry respecting batch order
 
 ## Per-Iteration Execution
 

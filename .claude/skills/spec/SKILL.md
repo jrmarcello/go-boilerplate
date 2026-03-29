@@ -41,12 +41,49 @@ Creates a structured specification document following Specification-Driven Devel
   - Ordered logically for the feature (not necessarily by architecture layer)
   - Small enough to complete in a single focused iteration
   - Self-contained — each task description should be understandable without reading previous tasks
+- Each task MUST include:
+  - `files:` — concrete file paths this task creates or modifies
+  - `depends:` — other TASK-N IDs that must complete first (omit if no dependencies)
 
-### 4. Present for Approval
+### 4. Analyze Parallelism
 
-- Display the spec to the user
+After generating tasks, build the **Parallel Batches** section:
+
+1. Build a dependency graph from `depends:` and `files:` metadata
+2. Two tasks **cannot** be parallel if:
+   - One appears in the other's `depends:` list
+   - They share any file in their `files:` lists
+3. Group tasks into sequential batches using topological sort:
+   - Batch 1: all tasks with no dependencies
+   - Batch 2: all tasks whose dependencies are fully satisfied by Batch 1
+   - Batch N: all tasks whose dependencies are fully satisfied by Batches 1..N-1
+4. Classify shared files:
+   - **Exclusive**: only one task touches it — safe for parallel
+   - **Shared-additive**: multiple tasks touch it, but all are additive (e.g., `server.go` wiring, `router.go` routes) — candidate for accumulator pattern (v2)
+   - **Shared-mutative**: multiple tasks modify existing code in the same file — must serialize
+5. Present the batches to the user with the classification
+
+Example output:
+
+```text
+## Parallel Batches
+
+Batch 1: [TASK-1]                    — foundation
+Batch 2: [TASK-2, TASK-3, TASK-4]    — parallel (no shared files)
+Batch 3: [TASK-5]                    — sequential (shared: cmd/api/server.go [additive])
+Batch 4: [TASK-6]                    — sequential (depends: TASK-2, TASK-3)
+
+File overlap analysis:
+- cmd/api/server.go: TASK-2, TASK-3, TASK-5 → classified as shared-additive (DI wiring)
+- All other files: exclusive to one task
+```
+
+### 5. Present for Approval
+
+- Display the spec to the user, highlighting the Parallel Batches section
 - Set status to `DRAFT`
 - Ask: "Review this spec. Edit anything you want, then approve to begin implementation."
+- If parallel batches exist, note: "Batches with multiple tasks can run in parallel via worktrees (v2) or sequentially via `/ralph-loop` (current)."
 - On approval, set status to `APPROVED`
 
 ## Rules
