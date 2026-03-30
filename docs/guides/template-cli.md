@@ -31,7 +31,7 @@ O **boilerplate CLI** é uma ferramenta de linha de comando que gera novos micro
 ### Instalando
 
 ```bash
-go install bitbucket.org/appmax-space/go-boilerplate/cmd/cli@latest
+go install github.com/jrmarcello/go-boilerplate/cmd/cli@latest
 ```
 
 ### Verificando
@@ -75,7 +75,7 @@ Ao executar `boilerplate new`, o CLI guia você por uma série de perguntas:
 | # | Prompt | Opções | Descrição |
 |---|--------|--------|-----------|
 | 1 | Nome do serviço | texto livre | Nome do diretório e referência interna (ex: `payment-service`) |
-| 2 | Module path | texto livre | Go module path completo (ex: `bitbucket.org/appmax-space/payment-service`) |
+| 2 | Module path | texto livre | Go module path completo (ex: `github.com/yourorg/payment-service`) |
 | 3 | Banco de dados | PostgreSQL / MySQL / SQLite3 / Outro | Driver de banco de dados que será configurado no projeto |
 | 4 | Protocolo | HTTP/REST (Gin) / ~~gRPC~~ | Protocolo de comunicação da API (gRPC em breve) |
 | 5 | Injeção de dependência | Manual / ~~Uber Fx~~ | Estratégia de DI (Uber Fx em breve) |
@@ -90,7 +90,7 @@ Ao executar `boilerplate new`, o CLI guia você por uma série de perguntas:
 $ boilerplate new payment-service
 
   Nome do serviço []: payment-service
-  Module path [github.com/appmax/payment-service]: bitbucket.org/appmax-space/payment-service
+  Module path [github.com/appmax/payment-service]: github.com/yourorg/payment-service
   Banco de dados (postgres/mysql/sqlite3/other) [postgres]: postgres
 
   Protocolo: HTTP/REST (Gin) [gRPC: em breve]
@@ -105,7 +105,7 @@ $ boilerplate new payment-service
   Resumo
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Serviço:      payment-service
-  Module:       bitbucket.org/appmax-space/payment-service
+  Module:       github.com/yourorg/payment-service
   Banco:        postgres
   Protocolo:    http
   DI:           manual
@@ -271,7 +271,7 @@ Para uso em CI/CD ou scripts, todas as opções podem ser passadas como flags, e
 
 | Flag | Tipo | Default | Descrição |
 |------|------|---------|-----------|
-| `--module` | string | — | Go module path (ex: `bitbucket.org/org/svc`) |
+| `--module` | string | — | Go module path (ex: `github.com/org/svc`) |
 | `--db` | string | `postgres` | Driver de banco: `postgres`, `mysql`, `sqlite3`, `other` |
 | `--template` | string | `.` | Path do diretório raiz do template |
 | `--no-redis` | bool | `false` | Desabilita cache Redis e pacotes relacionados |
@@ -288,7 +288,7 @@ Para uso em CI/CD ou scripts, todas as opções podem ser passadas como flags, e
 ```bash
 # Projeto minimal: sem Redis, sem auth, sem exemplos
 boilerplate new my-svc \
-  --module bitbucket.org/appmax-space/my-svc \
+  --module github.com/yourorg/my-svc \
   --db postgres \
   --no-redis \
   --no-auth \
@@ -297,7 +297,7 @@ boilerplate new my-svc \
 
 # Projeto com todos os defaults (Redis, auth, idempotência, exemplos)
 boilerplate new my-svc \
-  --module bitbucket.org/appmax-space/my-svc \
+  --module github.com/yourorg/my-svc \
   -y
 ```
 
@@ -442,10 +442,10 @@ export PATH="$PATH:$(go env GOPATH)/bin"
 
 - Verifique se o module path é válido e acessível
 - Confirme que você tem acesso à rede (para baixar dependências)
-- Para módulos privados (Bitbucket), configure `GOPRIVATE`:
+- Para módulos privados (GitHub), configure `GOPRIVATE`:
 
 ```bash
-export GOPRIVATE=bitbucket.org/appmax-space/*
+export GOPRIVATE=github.com/yourorg/*
 ```
 
 ### `permission denied` ao criar o projeto
@@ -475,7 +475,7 @@ O comando `boilerplate add domain` funciona em projetos existentes que seguem a 
 ### Como atualizo o CLI?
 
 ```bash
-go install bitbucket.org/appmax-space/go-boilerplate/cmd/cli@latest
+go install github.com/jrmarcello/go-boilerplate/cmd/cli@latest
 ```
 
 ### Funciona no Windows?
@@ -496,7 +496,7 @@ Sim. O modo mais enxuto possível:
 
 ```bash
 boilerplate new minimal-svc \
-  --module bitbucket.org/appmax-space/minimal-svc \
+  --module github.com/yourorg/minimal-svc \
   --db postgres \
   --no-redis \
   --no-auth \

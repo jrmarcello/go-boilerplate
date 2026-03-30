@@ -22,7 +22,7 @@ O template é **pouco opinativo e fortemente extensível**: serve como base para
 **Opção A — CLI (recomendado):**
 
 ```bash
-go install bitbucket.org/appmax-space/go-boilerplate/cmd/cli@latest
+go install github.com/jrmarcello/go-boilerplate/cmd/cli@latest
 boilerplate new my-service
 # Prompts interativos guiam a configuração: banco, cache, auth, etc.
 cd my-service
@@ -31,7 +31,7 @@ cd my-service
 **Opção B — Manual:**
 
 ```bash
-git clone https://bitbucket.org/appmax-space/go-boilerplate my-service
+git clone https://github.com/jrmarcello/go-boilerplate my-service
 cd my-service
 rm -rf .git && git init
 # Renomeie o module path e referências ao template (find+replace em todo o projeto)
@@ -200,7 +200,7 @@ curl -X GET http://localhost:8080/users \
 | **Docker Compose** | DB + Redis + API tudo em Docker | `make run` |
 | **Hot Reload** | Air com rebuild automático | `make dev` |
 | **Kubernetes** | Kustomize overlays (dev, hml, prd) | `make kind-setup` |
-| **CI/CD** | 4 verificações paralelas + notificações Slack | Bitbucket Pipelines |
+| **CI/CD** | 4 verificações paralelas + notificações Slack | GitHub Actions |
 | **Observabilidade** | ELK 8.13 + OTel + dashboard 20 painéis + 6 alertas | `make observability-up` |
 | **Load Tests** | k6 com 4 cenários (smoke, load, stress, spike) | `make load-smoke` |
 | **Migrations** | Goose SQL com ArgoCD PreSync | `make migrate-up` |
@@ -211,7 +211,7 @@ curl -X GET http://localhost:8080/users \
 | ------ | ------------ | ------------------ |
 | Setup do projeto | 1-2 dias | `make setup` (2 min) |
 | Primeiro endpoint | 1 dia | Já vem pronto (CRUD completo) |
-| CI/CD | 1 semana | Já configurado (Bitbucket Pipelines) |
+| CI/CD | 1 semana | Já configurado (GitHub Actions) |
 | Kubernetes | 1-2 semanas | `make kind-setup` (5 min) |
 | Observabilidade | "a gente vê depois" | `make observability-setup` (1 min) |
 | Testes | "a gente escreve depois" | 313 testes de exemplo |
@@ -388,7 +388,7 @@ Para mais detalhes sobre a configuração de IA, ver [CLAUDE.md](CLAUDE.md).
 
 O projeto inclui um **DevContainer** pré-configurado que cria um ambiente de desenvolvimento isolado com todas as ferramentas instaladas. Ideal para:
 
-- **Rodar o Claude Code com permissões irrestritas** sem risco para sua máquina — o container tem um firewall que bloqueia todo tráfego de rede exceto os domínios necessários (GitHub, Go modules, Bitbucket, Anthropic)
+- **Rodar o Claude Code com permissões irrestritas** sem risco para sua máquina — o container tem um firewall que bloqueia todo tráfego de rede exceto os domínios necessários (GitHub, Go modules, Anthropic)
 - **Onboarding instantâneo** — qualquer dev abre o projeto no VS Code e tem Go, linters, CLI tools e extensões prontos, sem instalar nada localmente
 - **Ambiente reproduzível** — todos desenvolvem com as mesmas versões de Go, golangci-lint, swag, goose, etc.
 
@@ -420,7 +420,7 @@ make sandbox-status   # Mostra status do container e volumes
 O container roda com `--cap-add=NET_ADMIN` e um script de firewall (`init-firewall.sh`) que:
 
 1. Bloqueia **todo** tráfego de saída por padrão
-2. Permite apenas domínios necessários: Anthropic (Claude), GitHub, Go modules, Bitbucket, Docker Hub, Kibana
+2. Permite apenas domínios necessários: Anthropic (Claude), GitHub, Go modules, Docker Hub, Kibana
 3. Permite tráfego local (host network, Docker network)
 
 Isso garante que o Claude Code com `--dangerously-skip-permissions` não consiga acessar serviços externos não autorizados.
@@ -457,7 +457,7 @@ O template está em evolução contínua. Próximos passos planejados:
 - [ ] Uber Fx como opção de DI (guia já documentado)
 - [x] CLI para scaffold automático (`boilerplate new my-service`)
 
-Sugestões são bem-vindas via [Issues](https://bitbucket.org/appmax-space/go-boilerplate/issues).
+Sugestões são bem-vindas via [Issues](https://github.com/jrmarcello/go-boilerplate/issues).
 
 ---
 

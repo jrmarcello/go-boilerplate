@@ -69,7 +69,7 @@ transacao do banco, e um processo separado (relay) faz o dispatch para o broker.
 
 | Aspecto              | Decisao                                                  |
 | -------------------- | -------------------------------------------------------- |
-| **Repositorio**      | `bitbucket.org/appmax-space/go-outbox` (modulo separado) |
+| **Repositorio**      | `github.com/jrmarcello/go-outbox` (modulo separado)      |
 | **Go version**       | 1.23+                                                    |
 | **Deps externas**    | Minimas — `database/sql`, `go.opentelemetry.io/otel`     |
 | **DB suportados**    | PostgreSQL (primario), MySQL (futuro)                    |
@@ -1104,7 +1104,7 @@ DROP TABLE IF EXISTS outbox;
 
 ```
 require (
-    bitbucket.org/appmax-space/go-outbox v0.1.0
+    github.com/jrmarcello/go-outbox v0.1.0
 )
 ```
 
@@ -1112,10 +1112,10 @@ require (
 
 ```go
 import (
-    "bitbucket.org/appmax-space/go-outbox"
-    "bitbucket.org/appmax-space/go-outbox/pgstore"
-    "bitbucket.org/appmax-space/go-outbox/relay"
-    "bitbucket.org/appmax-space/go-outbox/sqsdispatcher"
+    "github.com/jrmarcello/go-outbox"
+    "github.com/jrmarcello/go-outbox/pgstore"
+    "github.com/jrmarcello/go-outbox/relay"
+    "github.com/jrmarcello/go-outbox/sqsdispatcher"
 )
 
 func buildDependencies(...) router.Dependencies {
@@ -1221,7 +1221,7 @@ func (uc *CreateUseCase) WithOutbox(store interfaces.EventStore, db interfaces.D
 | Testes de integracao                      | TestContainers (Postgres)                |
 | README.md                                 | Documentacao + exemplos                  |
 
-**Entregavel**: `go get bitbucket.org/.../go-outbox` funcional com pgstore + relay.
+**Entregavel**: `go get github.com/jrmarcello/go-outbox` funcional com pgstore + relay.
 Dispatcher e um `interface` — o consumidor implementa.
 
 ### Fase 2 — Dispatchers + Observabilidade

@@ -153,7 +153,7 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - **Database**: PostgreSQL with Goose migrations
 - **Docker**: docker-compose (Postgres + Redis), multi-stage production Dockerfile (distroless)
 - **Kubernetes**: Kustomize overlays (develop, homologacao, producao), Kind support
-- **CI/CD**: Bitbucket Pipelines with lint, test, Docker build, ECR push, Kustomize tag update
+- **CI/CD**: GitHub Actions with lint, test, Docker build, ECR push, Kustomize tag update
 - **Observability**: OpenTelemetry traces + structured JSON logging
 - **Testing**: Unit tests + E2E with TestContainers
 - **Documentation**: README, ADRs (001-004), Swagger API docs, architecture guide

@@ -55,8 +55,8 @@ package db
 import (
     "go.uber.org/fx"
 
-    "bitbucket.org/appmax-space/go-boilerplate/config"
-    "bitbucket.org/appmax-space/go-boilerplate/pkg/database"
+    "github.com/jrmarcello/go-boilerplate/config"
+    "github.com/jrmarcello/go-boilerplate/pkg/database"
 )
 
 var Module = fx.Module("database",
@@ -92,8 +92,8 @@ package cache
 import (
     "go.uber.org/fx"
 
-    "bitbucket.org/appmax-space/go-boilerplate/config"
-    pkgcache "bitbucket.org/appmax-space/go-boilerplate/pkg/cache"
+    "github.com/jrmarcello/go-boilerplate/config"
+    pkgcache "github.com/jrmarcello/go-boilerplate/pkg/cache"
 )
 
 var Module = fx.Module("cache",
@@ -121,9 +121,9 @@ package usecases
 import (
     "go.uber.org/fx"
 
-    useruc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user"
-    "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/interfaces"
-    pkgcache "bitbucket.org/appmax-space/go-boilerplate/pkg/cache"
+    useruc "github.com/jrmarcello/go-boilerplate/internal/usecases/user"
+    "github.com/jrmarcello/go-boilerplate/internal/usecases/user/interfaces"
+    pkgcache "github.com/jrmarcello/go-boilerplate/pkg/cache"
 )
 
 var Module = fx.Module("usecases",
@@ -163,8 +163,8 @@ import (
 
     "go.uber.org/fx"
 
-    "bitbucket.org/appmax-space/go-boilerplate/config"
-    "bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web/router"
+    "github.com/jrmarcello/go-boilerplate/config"
+    "github.com/jrmarcello/go-boilerplate/internal/infrastructure/web/router"
 )
 
 var Module = fx.Module("http",
@@ -206,11 +206,11 @@ package main
 import (
     "go.uber.org/fx"
 
-    "bitbucket.org/appmax-space/go-boilerplate/config"
-    dbmodule "bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/db"
-    cachemodule "bitbucket.org/appmax-space/go-boilerplate/pkg/cache"
-    webmodule "bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/web"
-    ucmodule "bitbucket.org/appmax-space/go-boilerplate/internal/usecases"
+    "github.com/jrmarcello/go-boilerplate/config"
+    dbmodule "github.com/jrmarcello/go-boilerplate/internal/infrastructure/db"
+    cachemodule "github.com/jrmarcello/go-boilerplate/pkg/cache"
+    webmodule "github.com/jrmarcello/go-boilerplate/internal/infrastructure/web"
+    ucmodule "github.com/jrmarcello/go-boilerplate/internal/usecases"
 )
 
 func main() {

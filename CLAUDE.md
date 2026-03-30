@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Go boilerplate/template for microservices, part of the Appmax ecosystem. Uses Clean Architecture with PostgreSQL, Redis cache, and OpenTelemetry observability. Hosted on Bitbucket, deployed to AWS EKS via ArgoCD with Kustomize overlays.
+Go boilerplate/template for microservices, part of the Appmax ecosystem. Uses Clean Architecture with PostgreSQL, Redis cache, and OpenTelemetry observability. Hosted on GitHub, deployed to AWS EKS via ArgoCD with Kustomize overlays.
 
 This project serves as a **starter template** with two example domains: `user` (full CRUD with cache, singleflight, idempotency) and `role` (simpler multi-domain DI example). Clone it, use them as reference, and rename to your domain.
 
@@ -87,7 +87,7 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
 - **Tests**: Unit tests use hand-written mocks (`mocks_test.go` per package). E2E tests use TestContainers (Postgres + Redis).
 - **Import rule**: Never import `infrastructure` from `domain` or `usecases`. Never import `usecases` from `domain`.
 
-## CI Pipeline (Bitbucket)
+## CI Pipeline (GitHub Actions)
 
 PRs run: `swag init` -> `golangci-lint run` -> `go test ./internal/...` with coverage. Branch pushes to `develop`/`main` build Docker image, push to ECR, and update Kustomize image tags.
 

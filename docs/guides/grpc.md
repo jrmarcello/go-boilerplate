@@ -169,7 +169,7 @@ managed:
   enabled: true
   override:
     - file_option: go_package_prefix
-      value: bitbucket.org/appmax-space/go-boilerplate/gen/proto
+      value: github.com/jrmarcello/go-boilerplate/gen/proto
 plugins:
   - remote: buf.build/protocolbuffers/go
     out: gen/proto
@@ -388,8 +388,8 @@ import (
     "google.golang.org/grpc/reflection"
     "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 
-    "bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/grpc/handler"
-    "bitbucket.org/appmax-space/go-boilerplate/internal/infrastructure/grpc/interceptor"
+    "github.com/jrmarcello/go-boilerplate/internal/infrastructure/grpc/handler"
+    "github.com/jrmarcello/go-boilerplate/internal/infrastructure/grpc/interceptor"
 )
 
 // Config contém configuração do servidor gRPC.
@@ -469,10 +469,10 @@ import (
     "google.golang.org/protobuf/types/known/emptypb"
     "google.golang.org/protobuf/types/known/timestamppb"
 
-    userpb "bitbucket.org/appmax-space/go-boilerplate/gen/proto/appmax/user/v1"
-    userdomain "bitbucket.org/appmax-space/go-boilerplate/internal/domain/user"
-    useruc "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user"
-    "bitbucket.org/appmax-space/go-boilerplate/internal/usecases/user/dto"
+    userpb "github.com/jrmarcello/go-boilerplate/gen/proto/appmax/user/v1"
+    userdomain "github.com/jrmarcello/go-boilerplate/internal/domain/user"
+    useruc "github.com/jrmarcello/go-boilerplate/internal/usecases/user"
+    "github.com/jrmarcello/go-boilerplate/internal/usecases/user/dto"
 )
 
 // UserHandler implementa o serviço gRPC de User.
