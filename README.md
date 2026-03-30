@@ -7,7 +7,7 @@
 
 **Padronização e Developer Experience como padrão.** Template production-ready para microsserviços Go — de zero a produção em minutos, não semanas.
 
-Clone, use os domínios `user` e `role` como referência, renomeie para seu domínio, e comece a desenvolver. O template já é multi-domínio: `user` demonstra o fluxo completo (cache, singleflight, idempotência), enquanto `role` serve como exemplo de um segundo domínio mais simples com DI independente. A infraestrutura já está pronta: PostgreSQL com Writer/Reader split, Redis cache com singleflight, OpenTelemetry, idempotência, autenticação service-to-service, 291+ testes unitários e 22 E2E (75%+ de cobertura), CI/CD com notificações Slack, Kubernetes com Kustomize, e observabilidade completa com dashboard e alertas.
+Rode `boilerplate new my-service` e tenha um serviço configurado em segundos — com prompts interativos para escolher banco de dados, cache, autenticação e mais. O template vem com dois domínios de exemplo: `user` (CRUD completo com cache, singleflight, idempotência) e `role` (multi-domain DI). Use `boilerplate add domain` para criar novos domínios seguindo Clean Architecture automaticamente. A infraestrutura já está pronta: PostgreSQL com Writer/Reader split, Redis cache com singleflight, OpenTelemetry, idempotência, autenticação service-to-service, 291+ testes unitários e 22 E2E (75%+ de cobertura), CI/CD com notificações Slack, Kubernetes com Kustomize, e observabilidade completa com dashboard e alertas.
 
 DX pensado para produtividade: 40+ comandos make com verificação automática de pré-requisitos, hot reload, Lefthook com 3 camadas de verificação de qualidade (pre-commit, commit-msg, pre-push), e integração nativa com Claude Code — 14 skills (incluindo SDD + Ralph Loop para execução autônoma), 7 hooks de qualidade, 3 agentes especializados com memória persistente e 4 rules auto-aplicadas que atuam como um code reviewer contínuo enquanto você desenvolve.
 
@@ -17,18 +17,27 @@ O template é **pouco opinativo e fortemente extensível**: serve como base para
 
 ## Quick Start
 
-### 1. Clone e renomeie
+### 1. Crie seu serviço
+
+**Opção A — CLI (recomendado):**
+
+```bash
+go install bitbucket.org/appmax-space/go-boilerplate/cmd/cli@latest
+boilerplate new my-service
+# Prompts interativos guiam a configuração: banco, cache, auth, etc.
+cd my-service
+```
+
+**Opção B — Manual:**
 
 ```bash
 git clone https://bitbucket.org/appmax-space/go-boilerplate my-service
 cd my-service
 rm -rf .git && git init
-
-# O template vem com dois domínios de exemplo:
-# - user: CRUD completo com cache, singleflight e idempotência
-# - role: domínio mais simples, demonstra multi-domain DI
-# Renomeie "user" para seu domínio principal (find+replace em todo o projeto)
+# Renomeie o module path e referências ao template (find+replace em todo o projeto)
 ```
+
+> O template vem com dois domínios de exemplo (`user` e `role`). A CLI permite escolher se quer mantê-los como referência ou removê-los. Para adicionar novos domínios: `boilerplate add domain <nome>`. Veja o [guia completo do Template CLI](docs/guides/template-cli.md).
 
 ### 2. Configure
 
@@ -46,18 +55,6 @@ make test         # Testes
 make lint         # Linters
 make run          # Tudo em Docker (sem Go local)
 ```
-
-### Template CLI
-
-Scaffold novos serviços e domínios com o CLI `boilerplate`:
-
-```bash
-go install bitbucket.org/appmax-space/go-boilerplate/cmd/cli@latest
-boilerplate new my-service    # Cria um novo serviço
-boilerplate add domain order  # Adiciona um domínio ao projeto
-```
-
-Consulte o [guia completo do Template CLI](docs/guides/template-cli.md) para detalhes.
 
 ### 4. Deploy
 
@@ -102,6 +99,10 @@ make kind-setup        # Kubernetes local completo
 make load-smoke        # Validação básica (5 VUs)
 make load-test         # Carga progressiva (até 50 VUs)
 make load-stress       # Encontrar limites (até 200 VUs)
+
+# Template CLI
+make build-cli         # Compila CLI para bin/boilerplate
+make install-cli       # Instala CLI no $GOBIN
 ```
 
 ---
@@ -146,6 +147,7 @@ Ver `.env.example` para a lista completa e [ADR-003](docs/adr/003-config-strateg
 
 | Feature | O que faz | Por que importa |
 | ------- | --------- | --------------- |
+| **Template CLI** | `boilerplate new` + `boilerplate add domain` | Scaffold de serviços e domínios em segundos |
 | **CRUD completo** | Create, Get, List, Update, Delete | Endpoint funcional de exemplo para copiar |
 | **PostgreSQL** | Writer/Reader split, pool tunado | Escala com read replicas sem mudar código |
 | **Redis Cache** | Cache-aside + singleflight + pool config | Performance com proteção contra cache stampede |
@@ -431,6 +433,7 @@ O projeto inclui 8 ADRs (Architecture Decision Records) em `docs/adr/` explicand
 
 | Guia | Sobre |
 | ---- | ----- |
+| [template-cli.md](docs/guides/template-cli.md) | Template CLI — scaffold de serviços e domínios |
 | [architecture.md](docs/guides/architecture.md) | Diagramas e visão geral |
 | [cache.md](docs/guides/cache.md) | Cache com Redis, singleflight e pool config |
 | [kubernetes.md](docs/guides/kubernetes.md) | Deploy, Kind e operação |
