@@ -1,0 +1,33 @@
+package interfaces
+
+import (
+	"context"
+
+	"github.com/google/uuid"
+
+	{{.DomainNameCamel}}domain "{{.ModulePath}}/internal/domain/{{.DomainNameSnake}}"
+)
+
+// Repository defines the contract for {{.DomainNamePascal}} persistence.
+//
+// This is an INTERFACE defined in the USE CASES layer and IMPLEMENTED in INFRASTRUCTURE.
+// This is the essence of Dependency Inversion Principle.
+type Repository interface {
+	// Create persists a new {{.DomainNamePascal}} in the database.
+	Create(ctx context.Context, e *{{.DomainNameCamel}}domain.{{.DomainNamePascal}}) error
+
+	// FindByID fetches a {{.DomainNamePascal}} by ID (UUID v7).
+	// Returns Err{{.DomainNamePascal}}NotFound if not found.
+	FindByID(ctx context.Context, id uuid.UUID) (*{{.DomainNameCamel}}domain.{{.DomainNamePascal}}, error)
+
+	// List returns a paginated list of {{.DomainNamePascal}} with optional filters.
+	List(ctx context.Context, filter {{.DomainNameCamel}}domain.ListFilter) (*{{.DomainNameCamel}}domain.ListResult, error)
+
+	// Update updates an existing {{.DomainNamePascal}}.
+	// Returns Err{{.DomainNamePascal}}NotFound if the ID does not exist.
+	Update(ctx context.Context, e *{{.DomainNameCamel}}domain.{{.DomainNamePascal}}) error
+
+	// Delete removes a {{.DomainNamePascal}} by ID.
+	// Returns Err{{.DomainNamePascal}}NotFound if the ID does not exist.
+	Delete(ctx context.Context, id uuid.UUID) error
+}

@@ -65,6 +65,7 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
   - `idempotency/` - Idempotency Store interface and Redis implementation
 - **`config/`** - Configuration loading (godotenv + env vars)
 - **`cmd/api/`** - Application entrypoint and manual DI wiring in `server.go`
+- **`cmd/cli/`** - Template CLI (`boilerplate`) for scaffolding new services and domains. Contains Cobra commands, scaffold engine, and embedded templates. See `docs/guides/template-cli.md`.
 
 ### Key Patterns
 

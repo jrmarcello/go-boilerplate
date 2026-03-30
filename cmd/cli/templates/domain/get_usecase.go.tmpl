@@ -1,0 +1,41 @@
+package {{.DomainNameSnake}}
+
+import (
+	"context"
+	"time"
+
+	"github.com/google/uuid"
+
+	"{{.ModulePath}}/internal/usecases/{{.DomainNameSnake}}/dto"
+	"{{.ModulePath}}/internal/usecases/{{.DomainNameSnake}}/interfaces"
+)
+
+// GetUseCase implements the use case for fetching a {{.DomainNameSnake}} by ID.
+type GetUseCase struct {
+	Repo interfaces.Repository
+}
+
+// NewGetUseCase creates a new instance of GetUseCase.
+func NewGetUseCase(repo interfaces.Repository) *GetUseCase {
+	return &GetUseCase{Repo: repo}
+}
+
+// Execute fetches a {{.DomainNameSnake}} by ID.
+func (uc *GetUseCase) Execute(ctx context.Context, input dto.GetInput) (*dto.GetOutput, error) {
+	id, parseErr := uuid.Parse(input.ID)
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	e, findErr := uc.Repo.FindByID(ctx, id)
+	if findErr != nil {
+		return nil, findErr
+	}
+
+	return &dto.GetOutput{
+		ID:        e.ID.String(),
+		Name:      e.Name,
+		CreatedAt: e.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: e.UpdatedAt.Format(time.RFC3339),
+	}, nil
+}

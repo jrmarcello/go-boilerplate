@@ -1,0 +1,31 @@
+package {{.DomainNameSnake}}
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// {{.DomainNamePascal}} is the main entity (Aggregate Root) of the {{.DomainNameSnake}} domain.
+type {{.DomainNamePascal}} struct {
+	ID        uuid.UUID
+	Name      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+// New{{.DomainNamePascal}} creates a new {{.DomainNamePascal}} with default values.
+func New{{.DomainNamePascal}}(name string) *{{.DomainNamePascal}} {
+	return &{{.DomainNamePascal}}{
+		ID:        uuid.Must(uuid.NewV7()),
+		Name:      name,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+}
+
+// UpdateName updates the name of the {{.DomainNameSnake}}.
+func (e *{{.DomainNamePascal}}) UpdateName(name string) {
+	e.Name = name
+	e.UpdatedAt = time.Now()
+}

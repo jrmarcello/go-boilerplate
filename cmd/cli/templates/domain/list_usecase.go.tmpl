@@ -1,0 +1,61 @@
+package {{.DomainNameSnake}}
+
+import (
+	"context"
+	"math"
+	"time"
+
+	{{.DomainNameCamel}}domain "{{.ModulePath}}/internal/domain/{{.DomainNameSnake}}"
+	"{{.ModulePath}}/internal/usecases/{{.DomainNameSnake}}/dto"
+	"{{.ModulePath}}/internal/usecases/{{.DomainNameSnake}}/interfaces"
+)
+
+// ListUseCase implements the use case for listing {{.DomainNamePlural}}.
+type ListUseCase struct {
+	Repo interfaces.Repository
+}
+
+// NewListUseCase creates a new instance of ListUseCase.
+func NewListUseCase(repo interfaces.Repository) *ListUseCase {
+	return &ListUseCase{Repo: repo}
+}
+
+// Execute returns a paginated list of {{.DomainNamePlural}}.
+func (uc *ListUseCase) Execute(ctx context.Context, input dto.ListInput) (*dto.ListOutput, error) {
+	// Convert input to domain filter
+	filter := {{.DomainNameCamel}}domain.ListFilter{
+		Page:  input.Page,
+		Limit: input.Limit,
+		Name:  input.Name,
+	}
+
+	// Fetch from repository
+	result, listErr := uc.Repo.List(ctx, filter)
+	if listErr != nil {
+		return nil, listErr
+	}
+
+	// Convert to output DTOs
+	items := make([]dto.GetOutput, 0, len(result.Items))
+	for _, e := range result.Items {
+		items = append(items, dto.GetOutput{
+			ID:        e.ID.String(),
+			Name:      e.Name,
+			CreatedAt: e.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: e.UpdatedAt.Format(time.RFC3339),
+		})
+	}
+
+	// Calculate total pages
+	totalPages := int(math.Ceil(float64(result.Total) / float64(result.Limit)))
+
+	return &dto.ListOutput{
+		Data: items,
+		Pagination: dto.PaginationOutput{
+			Page:       result.Page,
+			Limit:      result.Limit,
+			Total:      result.Total,
+			TotalPages: totalPages,
+		},
+	}, nil
+}

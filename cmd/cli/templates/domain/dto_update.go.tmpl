@@ -1,0 +1,18 @@
+package dto
+
+// =============================================================================
+// Update {{.DomainNamePascal}} DTOs
+// =============================================================================
+
+// UpdateInput represents the input data for updating a {{.DomainNameSnake}}.
+type UpdateInput struct {
+	ID   string  `json:"-"`                                          // ID comes from the URL
+	Name *string `json:"name,omitempty" binding:"omitempty,max=255"` // Name (optional)
+}
+
+// UpdateOutput represents the output data after update.
+type UpdateOutput struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	UpdatedAt string `json:"updated_at"`
+}

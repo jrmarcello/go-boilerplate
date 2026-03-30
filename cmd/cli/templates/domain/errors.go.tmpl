@@ -1,0 +1,8 @@
+package {{.DomainNameSnake}}
+
+import "errors"
+
+// Domain errors for {{.DomainNamePascal}}.
+var (
+	Err{{.DomainNamePascal}}NotFound = errors.New("{{.DomainNameSnake}} not found")
+)

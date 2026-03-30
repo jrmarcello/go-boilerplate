@@ -1,0 +1,13 @@
+-- +goose Up
+CREATE TABLE {{.DomainNamePlural}} (
+    id UUID PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE INDEX idx_{{.DomainNamePlural}}_created ON {{.DomainNamePlural}}(created_at DESC);
+
+-- +goose Down
+DROP INDEX IF EXISTS idx_{{.DomainNamePlural}}_created;
+DROP TABLE IF EXISTS {{.DomainNamePlural}};

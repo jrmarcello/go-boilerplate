@@ -1,0 +1,16 @@
+package router
+
+import (
+	"github.com/gin-gonic/gin"
+
+	"{{.ModulePath}}/internal/infrastructure/web/handler"
+)
+
+// Register{{.DomainNamePascal}}Routes registers all routes related to {{.DomainNamePascal}}
+func Register{{.DomainNamePascal}}Routes(rg *gin.RouterGroup, h *handler.{{.DomainNamePascal}}Handler) {
+	rg.POST("/{{.DomainNamePlural}}", h.Create)
+	rg.GET("/{{.DomainNamePlural}}", h.List)
+	rg.GET("/{{.DomainNamePlural}}/:id", h.GetByID)
+	rg.PUT("/{{.DomainNamePlural}}/:id", h.Update)
+	rg.DELETE("/{{.DomainNamePlural}}/:id", h.Delete)
+}

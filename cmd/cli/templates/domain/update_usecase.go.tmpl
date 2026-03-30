@@ -1,0 +1,53 @@
+package {{.DomainNameSnake}}
+
+import (
+	"context"
+	"time"
+
+	"github.com/google/uuid"
+
+	"{{.ModulePath}}/internal/usecases/{{.DomainNameSnake}}/dto"
+	"{{.ModulePath}}/internal/usecases/{{.DomainNameSnake}}/interfaces"
+)
+
+// UpdateUseCase implements the {{.DomainNameSnake}} update use case.
+type UpdateUseCase struct {
+	Repo interfaces.Repository
+}
+
+// NewUpdateUseCase creates a new instance of UpdateUseCase.
+func NewUpdateUseCase(repo interfaces.Repository) *UpdateUseCase {
+	return &UpdateUseCase{Repo: repo}
+}
+
+// Execute updates an existing {{.DomainNameSnake}}.
+//
+// Flow:
+//  1. Fetch existing {{.DomainNameSnake}} by ID
+//  2. Apply partial updates
+//  3. Persist changes
+func (uc *UpdateUseCase) Execute(ctx context.Context, input dto.UpdateInput) (*dto.UpdateOutput, error) {
+	id, parseErr := uuid.Parse(input.ID)
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	e, findErr := uc.Repo.FindByID(ctx, id)
+	if findErr != nil {
+		return nil, findErr
+	}
+
+	if input.Name != nil {
+		e.UpdateName(*input.Name)
+	}
+
+	if saveErr := uc.Repo.Update(ctx, e); saveErr != nil {
+		return nil, saveErr
+	}
+
+	return &dto.UpdateOutput{
+		ID:        e.ID.String(),
+		Name:      e.Name,
+		UpdatedAt: e.UpdatedAt.Format(time.RFC3339),
+	}, nil
+}

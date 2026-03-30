@@ -1,5 +1,6 @@
 # Binários
 /bin/
+/boilerplate
 *.exe
 *.exe~
 *.dll
@@ -37,6 +38,7 @@ Thumbs.db
 
 # Temporários
 *.tmp
+test-mysql/
 
 # Review reports (generated, ephemeral)
 docs/review-report-*.md

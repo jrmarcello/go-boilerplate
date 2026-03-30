@@ -35,7 +35,7 @@ ENV_FILE := $(shell test -f .env && echo "--env-file .env" || echo "")
 
 # Declara todos os targets que não são arquivos
 .PHONY: help setup tools go-tools-check docker-check k6-check kind-check \
-        dev run run-stop build clean lint security vulncheck swagger \
+        dev run run-stop build build-cli install-cli clean lint security vulncheck swagger \
         test test-unit test-e2e test-coverage \
         load-smoke load-test load-stress load-spike load-kind load-clean \
         docker-up docker-down docker-build \
@@ -61,6 +61,9 @@ help: ## Exibe esta mensagem de ajuda
 	@echo ""
 	@echo "\033[1;33m  Development\033[0m"
 	@grep -Eh '^(dev|run|run-stop|build|clean|changelog):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "\033[1;33m  CLI\033[0m"
+	@grep -Eh '^(build-cli|install-cli):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;33m  Code Quality\033[0m"
 	@grep -Eh '^(lint|security|vulncheck|swagger):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -145,7 +148,17 @@ build: ## Compila binarios para bin/
 	@mkdir -p bin
 	go build -o bin/api ./cmd/api
 	go build -o bin/migrate ./cmd/migrate
-	@echo "Binaries: bin/api, bin/migrate"
+	go build -o bin/boilerplate ./cmd/cli
+	@echo "Binaries: bin/api, bin/migrate, bin/boilerplate"
+
+build-cli: ## Compila o CLI de scaffold para bin/
+	@mkdir -p bin
+	go build -o bin/boilerplate ./cmd/cli
+	@echo "Binary: bin/boilerplate"
+
+install-cli: ## Instala o CLI de scaffold no GOBIN
+	go install ./cmd/cli
+	@echo "Installed: $(GOBIN)/boilerplate"
 
 clean: ## Remove arquivos gerados
 	rm -rf bin/ tests/coverage/ tests/load/results/

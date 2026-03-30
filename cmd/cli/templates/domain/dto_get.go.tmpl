@@ -1,0 +1,18 @@
+package dto
+
+// =============================================================================
+// Get {{.DomainNamePascal}} DTOs
+// =============================================================================
+
+// GetInput represents the input data for fetching a {{.DomainNameSnake}}.
+type GetInput struct {
+	ID string `json:"id"` // UUID v7 of the {{.DomainNameSnake}}
+}
+
+// GetOutput represents the output data of the found {{.DomainNameSnake}}.
+type GetOutput struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}

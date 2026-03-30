@@ -8,11 +8,21 @@ user-invocable: true
 
 Scaffolds a new API endpoint following Clean Architecture patterns.
 
+> **Domínio inteiro?** Para criar um domínio completo (entity + usecases + infra + migration), use o CLI:
+> ```bash
+> go run ./cmd/cli add domain <name>
+> ```
+> Este skill é para adicionar endpoints individuais a domínios já existentes.
+
 ## Example
 
 ```
 /new-endpoint POST /api/v1/users "Create a new user"
 ```
+
+## Shared Patterns
+
+Both this skill and the CLI scaffold engine (`cmd/cli/scaffold/`) follow the same patterns defined in the existing `user` and `role` domains. Use them as reference for naming, structure, and conventions.
 
 ## Implementation Order (Clean Architecture inside-out)
 

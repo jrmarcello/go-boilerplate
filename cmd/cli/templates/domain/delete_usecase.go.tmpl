@@ -1,0 +1,38 @@
+package {{.DomainNameSnake}}
+
+import (
+	"context"
+	"time"
+
+	"github.com/google/uuid"
+
+	"{{.ModulePath}}/internal/usecases/{{.DomainNameSnake}}/dto"
+	"{{.ModulePath}}/internal/usecases/{{.DomainNameSnake}}/interfaces"
+)
+
+// DeleteUseCase implements the {{.DomainNameSnake}} deletion use case.
+type DeleteUseCase struct {
+	Repo interfaces.Repository
+}
+
+// NewDeleteUseCase creates a new instance of DeleteUseCase.
+func NewDeleteUseCase(repo interfaces.Repository) *DeleteUseCase {
+	return &DeleteUseCase{Repo: repo}
+}
+
+// Execute deletes a {{.DomainNameSnake}} by ID.
+func (uc *DeleteUseCase) Execute(ctx context.Context, input dto.DeleteInput) (*dto.DeleteOutput, error) {
+	id, parseErr := uuid.Parse(input.ID)
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	if deleteErr := uc.Repo.Delete(ctx, id); deleteErr != nil {
+		return nil, deleteErr
+	}
+
+	return &dto.DeleteOutput{
+		ID:        input.ID,
+		DeletedAt: time.Now().Format(time.RFC3339),
+	}, nil
+}

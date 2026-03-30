@@ -1,0 +1,16 @@
+package dto
+
+// =============================================================================
+// Create {{.DomainNamePascal}} DTOs
+// =============================================================================
+
+// CreateInput represents the input data for creating a {{.DomainNameSnake}}.
+type CreateInput struct {
+	Name string `json:"name" binding:"required,max=255"` // Name of the {{.DomainNameSnake}}
+}
+
+// CreateOutput represents the output data after creation.
+type CreateOutput struct {
+	ID        string `json:"id"`         // Generated ID (UUID v7)
+	CreatedAt string `json:"created_at"` // Timestamp in RFC3339 format
+}

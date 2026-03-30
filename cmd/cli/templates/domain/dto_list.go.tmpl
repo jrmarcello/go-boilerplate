@@ -1,0 +1,26 @@
+package dto
+
+// =============================================================================
+// List {{.DomainNamePascal}} DTOs
+// =============================================================================
+
+// ListInput represents the input data for listing {{.DomainNamePlural}}.
+type ListInput struct {
+	Page  int    `form:"page"`                   // Current page (1-indexed)
+	Limit int    `form:"limit"`                  // Items per page
+	Name  string `form:"name" binding:"max=255"` // Filter by name
+}
+
+// ListOutput represents the output data of the listing.
+type ListOutput struct {
+	Data       []GetOutput      `json:"data"`
+	Pagination PaginationOutput `json:"pagination"`
+}
+
+// PaginationOutput represents the pagination data.
+type PaginationOutput struct {
+	Page       int `json:"page"`
+	Limit      int `json:"limit"`
+	Total      int `json:"total"`
+	TotalPages int `json:"total_pages"`
+}

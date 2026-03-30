@@ -1,0 +1,42 @@
+package {{.DomainNameSnake}}
+
+import (
+	"context"
+	"time"
+
+	{{.DomainNameCamel}}domain "{{.ModulePath}}/internal/domain/{{.DomainNameSnake}}"
+	"{{.ModulePath}}/internal/usecases/{{.DomainNameSnake}}/dto"
+	"{{.ModulePath}}/internal/usecases/{{.DomainNameSnake}}/interfaces"
+)
+
+// CreateUseCase implements the {{.DomainNameSnake}} creation use case.
+type CreateUseCase struct {
+	Repo interfaces.Repository
+}
+
+// NewCreateUseCase creates a new instance of CreateUseCase.
+func NewCreateUseCase(repo interfaces.Repository) *CreateUseCase {
+	return &CreateUseCase{Repo: repo}
+}
+
+// Execute executes the {{.DomainNameSnake}} creation use case.
+//
+// Flow:
+//  1. Create the {{.DomainNamePascal}} entity using the Factory
+//  2. Persist in the database via Repository
+//  3. Return DTO with ID and timestamp
+func (uc *CreateUseCase) Execute(ctx context.Context, input dto.CreateInput) (*dto.CreateOutput, error) {
+	// Step 1: Create Entity using the Factory
+	e := {{.DomainNameCamel}}domain.New{{.DomainNamePascal}}(input.Name)
+
+	// Step 2: Persist in the database via Repository
+	if saveErr := uc.Repo.Create(ctx, e); saveErr != nil {
+		return nil, saveErr
+	}
+
+	// Step 3: Return Output DTO
+	return &dto.CreateOutput{
+		ID:        e.ID.String(),
+		CreatedAt: e.CreatedAt.Format(time.RFC3339),
+	}, nil
+}

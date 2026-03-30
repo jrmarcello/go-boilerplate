@@ -1,0 +1,31 @@
+package {{.DomainNameSnake}}
+
+// ListFilter contains the parameters for filtering the {{.DomainNameSnake}} listing.
+type ListFilter struct {
+	Page  int
+	Limit int
+	Name  string
+}
+
+// Normalize applies default values to pagination parameters.
+func (f *ListFilter) Normalize() {
+	if f.Page < 1 {
+		f.Page = 1
+	}
+	if f.Limit < 1 || f.Limit > 100 {
+		f.Limit = 20
+	}
+}
+
+// Offset calculates the offset for the SQL query.
+func (f *ListFilter) Offset() int {
+	return (f.Page - 1) * f.Limit
+}
+
+// ListResult contains the paginated listing result.
+type ListResult struct {
+	Items []*{{.DomainNamePascal}}
+	Total int
+	Page  int
+	Limit int
+}

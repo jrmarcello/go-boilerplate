@@ -1,0 +1,16 @@
+package dto
+
+// =============================================================================
+// Delete {{.DomainNamePascal}} DTOs
+// =============================================================================
+
+// DeleteInput represents the input data for deleting a {{.DomainNameSnake}}.
+type DeleteInput struct {
+	ID string `json:"id"` // UUID v7 of the {{.DomainNameSnake}}
+}
+
+// DeleteOutput represents the output data after deletion.
+type DeleteOutput struct {
+	ID        string `json:"id"`
+	DeletedAt string `json:"deleted_at"` // Deletion timestamp
+}
