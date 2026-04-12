@@ -13,6 +13,53 @@
 - [ ] REQ-1: ...
 - [ ] REQ-2: ...
 
+## Test Plan
+
+<!-- Derive test cases from Requirements and Design.
+     Coverage Rules (every spec MUST satisfy):
+     - Every REQ has >= 1 TC
+     - Every domain error has >= 1 TC
+     - Every validated field has boundary TCs (valid, invalid, edge)
+     - Every external dependency has >= 1 infra-failure TC
+     - Every conditional branch has TCs for both paths
+
+     TC-ID convention:
+     - TC-D-NN   = Domain layer tests
+     - TC-UC-NN  = Use Case layer tests
+     - TC-E2E-NN = End-to-end tests
+     - TC-S-NN   = Smoke tests (k6)
+
+     Categories: happy, validation, business, edge, infra, concurrency, idempotency, security
+-->
+
+### Domain Tests
+
+| TC | REQ | Category | Description | Expected |
+|----|-----|----------|-------------|----------|
+| TC-D-01 | REQ-1 | happy | ... | ... |
+
+### Use Case Tests
+
+| TC | REQ | Category | Description | Expected |
+|----|-----|----------|-------------|----------|
+| TC-UC-01 | REQ-1 | happy | ... | ... |
+
+### E2E Tests
+
+| TC | REQ | Category | Description | Expected |
+|----|-----|----------|-------------|----------|
+| TC-E2E-01 | REQ-1 | happy | ... | ... |
+
+### Smoke Tests (k6)
+
+<!-- Smoke tests validate deployed behavior via k6.
+     Executed by TASK-SMOKE, NOT via TDD RED/GREEN cycle.
+     Files: tests/load/users.js, tests/load/main.js, tests/load/helpers.js -->
+
+| TC | REQ | Category | Description | Expected |
+|----|-----|----------|-------------|----------|
+| TC-S-01 | REQ-1 | happy | ... | ... |
+
 ## Design
 
 ### Architecture Decisions
@@ -38,16 +85,28 @@
 <!-- Order tasks logically for the feature — no mandatory architecture layer ordering -->
 <!-- `files:` lists files this task creates or modifies — used for parallelism detection -->
 <!-- `depends:` lists tasks that must complete before this one can start -->
+<!-- `tests:` lists TC-IDs this task must satisfy (triggers TDD cycle in ralph-loop) -->
 <!-- Tasks with no shared files and no dependency can run in parallel -->
 
 - [ ] TASK-1: ...
   - files: ...
+  - tests: TC-UC-01
 - [ ] TASK-2: ...
   - files: ...
   - depends: TASK-1
+  - tests: TC-UC-02, TC-UC-03
 - [ ] TASK-3: ...
   - files: ...
   - depends: TASK-1
+
+<!-- Smoke tests are executed directly (not TDD). Add a TASK-SMOKE at the end: -->
+
+- [ ] TASK-SMOKE: Execute smoke tests
+  - Run `k6 run --env SCENARIO=smoke tests/load/main.js`
+  - If app not running: log `SMOKE: DEFERRED`
+  - files: (none — execution only)
+  - tests: TC-S-01, TC-S-02
+  - depends: TASK-N
 
 ## Parallel Batches
 

@@ -1,6 +1,6 @@
 # Spec: DX — SDD + TDD + Paralelismo com Multi-Agents
 
-## Status: DRAFT
+## Status: DONE
 
 ## Context
 
@@ -121,7 +121,7 @@ N/A — Esta spec altera apenas arquivos de configuracao e documentacao (.claude
 
 ## Tasks
 
-- [ ] TASK-1: Atualizar .specs/TEMPLATE.md com Test Plan + task metadata
+- [x] TASK-1: Atualizar .specs/TEMPLATE.md com Test Plan + task metadata
   - Adicionar secao `## Test Plan` entre Requirements e Design
   - Incluir subsecoes: Domain Tests, Use Case Tests, E2E Tests, Smoke Tests (k6) — cada com tabela template
   - Incluir comentarios explicativos sobre Coverage Rules
@@ -130,7 +130,7 @@ N/A — Esta spec altera apenas arquivos de configuracao e documentacao (.claude
   - Referencia: banking-service-yield `.specs/TEMPLATE.md`
   - files: `.specs/TEMPLATE.md`
 
-- [ ] TASK-2: Atualizar .claude/rules/sdd.md com TDD + Test Plan + Smoke
+- [x] TASK-2: Atualizar .claude/rules/sdd.md com TDD + Test Plan + Smoke
   - Adicionar a `## Task Metadata`: item sobre `tests:` sub-item obrigatorio para tasks com codigo testavel
   - Adicionar secao `## Test Plan` completa: formato, TC-ID convention, Coverage Rules com header `### Coverage Rules` (sem "non-negotiable for financial service" — adaptar para linguagem generica)
   - Adicionar subsecao `### Mutability` — TCs podem ser adicionados durante IN_PROGRESS, nunca removidos
@@ -140,7 +140,7 @@ N/A — Esta spec altera apenas arquivos de configuracao e documentacao (.claude
   - Referencia: banking-service-yield `.claude/rules/sdd.md`
   - files: `.claude/rules/sdd.md`
 
-- [ ] TASK-3: Atualizar .claude/rules/go-conventions.md com Error Handling + Span Classification
+- [x] TASK-3: Atualizar .claude/rules/go-conventions.md com Error Handling + Span Classification
   - Expandir secao `## Error Handling`:
     - Adicionar: use cases retornam `*apperror.AppError` via local `toAppError()`
     - Adicionar: `apperror.Wrap(err, code, message)` preserva chain (errors.Is via Unwrap)
@@ -159,7 +159,7 @@ N/A — Esta spec altera apenas arquivos de configuracao e documentacao (.claude
   - Referencia: banking-service-yield `.claude/rules/go-conventions.md`
   - files: `.claude/rules/go-conventions.md`
 
-- [ ] TASK-4: Atualizar .claude/skills/ralph-loop/SKILL.md com Parallel Execution + TDD
+- [x] TASK-4: Atualizar .claude/skills/ralph-loop/SKILL.md com Parallel Execution + TDD
   - Adicionar secao `## Parallel Execution (multi-task batches)` apos Startup:
     - Decision Flow: 1 task -> sequential, 2+ tasks -> parallel agents in worktrees
     - How to Parallelize: identify tasks, launch Agent calls with `isolation: "worktree"` em single message, wait, collect, merge, verify, mark complete, log
@@ -178,7 +178,7 @@ N/A — Esta spec altera apenas arquivos de configuracao e documentacao (.claude
   - Referencia: banking-service-yield `.claude/skills/ralph-loop/SKILL.md`
   - files: `.claude/skills/ralph-loop/SKILL.md`
 
-- [ ] TASK-5: Atualizar .claude/skills/spec/SKILL.md com Test Plan + Parallelism
+- [x] TASK-5: Atualizar .claude/skills/spec/SKILL.md com Test Plan + Parallelism
   - Adicionar step `### 4. Generate Test Plan`:
     - Derivar TCs dos Requirements e Design
     - Para cada REQ: happy-path + error/edge TCs
@@ -200,7 +200,7 @@ N/A — Esta spec altera apenas arquivos de configuracao e documentacao (.claude
   - Referencia: banking-service-yield `.claude/skills/spec/SKILL.md`
   - files: `.claude/skills/spec/SKILL.md`
 
-- [ ] TASK-6: Atualizar .claude/agents/code-reviewer.md com Span Classification
+- [x] TASK-6: Atualizar .claude/agents/code-reviewer.md com Span Classification
   - **Identidade do agent**: ja esta correta ("reviewing code for a Clean Architecture microservice boilerplate") — manter como esta
   - Verificar dominio de referencia: deve usar `user` (nao `savings`)
   - Adicionar secao `### Observability & Span Error Classification` ao Review Focus:
@@ -214,7 +214,7 @@ N/A — Esta spec altera apenas arquivos de configuracao e documentacao (.claude
   - Manter secao "Template Quality" existente (exclusiva do boilerplate — nao existe no yield)
   - files: `.claude/agents/code-reviewer.md`
 
-- [ ] TASK-7: Atualizar CLAUDE.md + criar settings.local.json
+- [x] TASK-7: Atualizar CLAUDE.md + criar settings.local.json
   - CLAUDE.md — secao `### Key Patterns` (apos "Singleflight"):
     - Adicionar bullet: **Span Error Classification**: Use case classifica erros via `shared.ClassifyError()`. Expected errors -> `telemetry.WarnSpan` (span Ok), Unexpected -> `telemetry.FailSpan` (span Error). Handler nao toca spans. Ref: ADR-009, `docs/guides/error-handling.md`
   - CLAUDE.md — secao `### Key Patterns`, bullet **Error Handling** existente:
@@ -269,3 +269,31 @@ File overlap analysis:
 ## Execution Log
 
 <!-- Ralph Loop appends here automatically — do not edit manually -->
+
+### Iteration 1 — TASK-1 (2026-04-11 16:45)
+
+Rewrote `.specs/TEMPLATE.md` adding Test Plan section with 4 subsections (Domain, Use Case, E2E, Smoke) each with table templates, Coverage Rules comments, TC-ID convention docs, `tests:` metadata in task examples, and TASK-SMOKE example.
+
+### Iteration 2 — TASK-2 (2026-04-11 16:48)
+
+Rewrote `.claude/rules/sdd.md` adding: `tests:` to Task Metadata, "Mandatory review before testing" to Task Execution, full Test Plan section (format, TC-ID convention, Coverage Rules with generic wording, Mutability rules, Smoke Tests with `users.js`/`roles.js`/`main.js`/`helpers.js` references), and full TDD Execution section (RED/GREEN/REFACTOR cycle, compilation failure = valid RED, Execution Log format, smoke exception).
+
+### Iteration 3 — TASK-3 (2026-04-11 16:50)
+
+Updated `.claude/rules/go-conventions.md`: expanded Error Handling section with `toAppError()`, `apperror.Wrap`, generic handler resolution via `errors.As()` + `codeToStatus` map. Added new Span Error Classification (OTel) section documenting FailSpan/WarnSpan, expectedErrors pattern, use-case-decides-span-status rule. Added future-reference note for error-handling-refactor spec files. Fixed handler reference to `httpgin.SendSuccess`/`httpgin.SendError`.
+
+### Iteration 4 — TASK-4 (2026-04-11 16:53)
+
+Rewrote `.claude/skills/ralph-loop/SKILL.md` adding: Parallel Execution section (decision flow, how to parallelize with worktree agents, agent prompt template, when NOT to parallelize, merge strategy). Rewrote Per-Iteration Execution to include 3 modes: TDD cycle (RED/GREEN/REFACTOR for `tests:` tasks), Smoke execution (k6, no TDD), Normal execution (no tests). Added TDD Edge Cases section. Updated Rules with parallel batch agent launching.
+
+### Iteration 5 — TASK-5 (2026-04-11 16:55)
+
+Updated `.claude/skills/spec/SKILL.md`: added step 4 (Generate Test Plan) with exhaustive TC derivation rules per REQ, domain error, validated field, external dependency, and conditional branch. Added smoke TC generation for new endpoints. Updated step 3 to include `tests:` metadata in task requirements. Renumbered Analyze Parallelism to step 5, Present for Approval to step 6. Updated step 6 to highlight Test Plan and Parallel Batches. Replaced `savings`/`deposit` domain references with `user`/`role`.
+
+### Iteration 6 — TASK-6 (2026-04-11 16:57)
+
+Updated `.claude/agents/code-reviewer.md`: added Error Handling section (toAppError, apperror.Wrap, generic handler resolution), added Observability & Span Error Classification section (WarnSpan/FailSpan, expectedErrors, ClassifyError, handler never touches spans). Updated handler ref to `httpgin.SendSuccess`/`httpgin.SendError`. Updated Value Objects to UUID v7. Updated mocks file to `mocks_test.go`. Kept Template Quality section. Identity already correct — no change needed.
+
+### Iteration 7 — TASK-7 (2026-04-11 16:59)
+
+Updated `CLAUDE.md`: expanded Error Handling bullet with `toAppError()`, `errors.As()` + `codeToStatus` map, ADR-009 ref. Added new Span Error Classification bullet after Error Handling. Added error handling guide reference to Conventions section. Created `.claude/settings.local.json` with Docker permission allows (docker pull, manifest, hooks, stop).

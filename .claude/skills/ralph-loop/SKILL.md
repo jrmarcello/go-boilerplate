@@ -33,31 +33,116 @@ The loop uses the Stop hook pattern:
 4. Set status to `IN_PROGRESS` if not already
 5. Create state file: `.specs/<name>.active.md` containing the spec file path (this signals the Stop hook)
 6. Check the **Parallel Batches** section to determine execution order:
-   - If batches exist: follow batch order (Batch 1 → Batch 2 → ...)
-   - Within a batch: execute tasks sequentially (parallel execution is v2 with worktrees)
+   - If batches exist: follow batch order (Batch 1 -> Batch 2 -> ...)
+   - Within a batch: check if parallel execution applies (see below)
    - If no batches section: fall back to sequential `TASK-N` order
 7. Identify the next uncompleted `- [ ] TASK-N:` entry respecting batch order
 
+## Parallel Execution (multi-task batches)
+
+When a batch contains 2+ tasks, evaluate whether to parallelize:
+
+### Decision Flow
+
+1. **1 task in batch** -> sequential (normal execution)
+2. **2+ tasks in batch** -> check if all files are exclusive (no shared files)
+3. **All exclusive** -> launch parallel agents in worktrees
+4. **Shared files exist** -> execute sequentially within the batch
+
+### How to Parallelize
+
+1. Identify all uncompleted tasks in the current batch
+2. For each task, launch an Agent call with `isolation: "worktree"` — ALL Agent calls MUST be in a single message (this ensures real parallelism)
+3. Wait for all agents to complete
+4. Collect results — each agent returns its worktree path (if changes were made)
+5. Merge worktrees sequentially into main working directory
+6. Verify: `go build ./...` and `go test ./...` pass after merge
+7. Mark all completed tasks as `[x]` in the spec
+8. Log all tasks in a single Execution Log entry
+
+### Agent Prompt Template
+
+Each parallel agent receives:
+
+- The task description (from spec)
+- The `files:` list for the task
+- The `tests:` TC-IDs (if any — triggers TDD cycle)
+- Project conventions summary
+- Instruction to follow TDD if `tests:` present
+
+### When NOT to Parallelize
+
+- Tasks share **mutative** files (both modify existing code in the same file)
+- Worktree isolation is unavailable
+- Tasks are trivial (< 1 minute each) — overhead of worktrees outweighs benefit
+- Fewer than 2 tasks in the batch
+
+### Merge Strategy
+
+- **All succeeded**: merge worktrees sequentially, verify build + tests
+- **Some failed**: merge successful ones, leave failed tasks unchecked, log failures
+- **Merge conflicts**: resolve manually, verify build + tests after resolution
+
 ## Per-Iteration Execution
 
-**CRITICAL: Execute exactly ONE task per iteration. Do not batch tasks.**
+**CRITICAL: Execute exactly ONE task per iteration (unless parallelizing a batch).**
 
 For each task:
 
 1. **Read the spec file** to find the current task (first unchecked `- [ ] TASK-N:`)
 2. **Read relevant code** referenced in the spec's Design section
-3. **Execute the task** as described — follow project conventions and existing patterns
-4. **Verify**: run `go build ./...` to confirm compilation passes
-5. **Mark complete**: change `- [ ] TASK-N:` to `- [x] TASK-N:` in the spec file
-6. **Log**: append to the Execution Log section:
+3. **Check `tests:` metadata** on the task to determine execution mode:
+
+### If task has `tests:` (with non-smoke TCs) -> TDD Cycle
+
+**RED Phase:**
+1. Write the test file FIRST (before production code)
+2. Tests reference the function/type to be implemented
+3. Run `go test` — tests MUST fail (compilation failure = valid RED)
+
+**GREEN Phase:**
+1. Write MINIMUM production code to make tests pass
+2. Follow existing patterns: hand-written mocks in `mocks_test.go`, table-driven tests
+3. Run `go test` — all TCs in `tests:` MUST pass
+
+**REFACTOR Phase:**
+1. Clean up: remove duplication, improve naming
+2. Run `go test` + `go build ./...` — must pass
+
+### If task has `tests: TC-S-*` (smoke only) -> Smoke Execution
+
+1. Write k6 smoke checks as described
+2. Run `k6 run --env SCENARIO=smoke tests/load/main.js`
+3. If app not running: log `SMOKE: DEFERRED`
+4. Do NOT follow RED/GREEN cycle
+
+### If task has no `tests:` -> Normal Execution
+
+1. Execute the task as described
+2. Verify: `go build ./...`
+
+### After execution (all modes):
+
+4. **Mandatory review**: re-read task description, verify files and patterns match conventions
+5. **Mark complete**: change `- [ ] TASK-N:` to `- [x] TASK-N:`
+6. **Log**: append to Execution Log:
 
 ```markdown
 ### Iteration N — TASK-N (YYYY-MM-DD HH:MM)
 
-<1-2 sentence summary of what was done and which files were created/modified>
+<1-2 sentence summary>
+TDD: RED(N failing) -> GREEN(N passing) -> REFACTOR(clean)  <!-- if TDD -->
 ```
 
 7. **Stop** — let the hook decide whether to continue or finish
+
+## TDD Edge Cases
+
+- **Compilation failure counts as valid RED** — the test file exists but can't compile because the production type/function doesn't exist yet
+- **Test file before production file** — always create `*_test.go` before the implementation file
+- **Mocks**: add to existing `mocks_test.go` in the package, or create one if it doesn't exist
+- **Existing tests break**: fix immediately before proceeding to GREEN
+- **Multiple TCs in one task**: all TCs must pass in GREEN phase
 
 ## On Final Task
 
@@ -79,7 +164,8 @@ If a loop was interrupted (Ctrl+C, crash, etc.):
 
 ## Rules
 
-- **ONE task per iteration** — never try to do multiple tasks in one go
+- **ONE task per iteration** — unless parallelizing a batch (then all batch tasks in one iteration)
+- **Parallel batches launch multiple agents** in a single message with `isolation: "worktree"`
 - **Read the spec file first** every iteration — it is the single source of truth
 - Never modify the spec's Requirements or Design sections during execution
 - If a task is unclear or blocked, mark it `BLOCKED` in the spec, remove the `.active.md` file, and stop

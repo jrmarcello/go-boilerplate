@@ -17,6 +17,7 @@ applies-to: ".specs/**"
 - Tasks are architecture-agnostic — no mandatory layer ordering
 - Order tasks logically for the feature, respecting the project's chosen structure
 - If a task is unclear, mark it `BLOCKED` with a reason and stop execution
+- **Mandatory review before testing**: re-read the task description and verify files/patterns match conventions before writing tests
 
 ## Task Metadata
 
@@ -24,6 +25,84 @@ applies-to: ".specs/**"
 - Tasks with dependencies MUST have a `depends:` sub-item listing prerequisite TASK-N IDs
 - `depends:` must form a DAG (no circular dependencies)
 - Tasks that share files in their `files:` lists cannot be in the same parallel batch
+- Tasks with testable code MUST have a `tests:` sub-item listing TC-IDs from the Test Plan (triggers TDD cycle in ralph-loop)
+
+## Test Plan
+
+Every spec MUST include a `## Test Plan` section between Requirements and Design. The Test Plan contains tables grouped by layer:
+
+- **Domain Tests** (TC-D-NN): pure domain logic, value objects, entity invariants
+- **Use Case Tests** (TC-UC-NN): application logic, dependency interactions, error mapping
+- **E2E Tests** (TC-E2E-NN): full HTTP round-trip via TestContainers
+- **Smoke Tests** (TC-S-NN): k6-based validation of deployed behavior
+
+Each TC row has: `| TC-ID | REQ | Category | Description | Expected |`
+
+Categories: `happy`, `validation`, `business`, `edge`, `infra`, `concurrency`, `idempotency`, `security`
+
+For non-code specs (config/docs only), the Test Plan may be `N/A` with a justification.
+
+### Coverage Rules
+
+Every spec MUST satisfy all of the following:
+
+- Every REQ has >= 1 TC
+- Every domain error has >= 1 TC
+- Every validated field has boundary TCs (valid, invalid, edge)
+- Every external dependency has >= 1 infra-failure TC
+- Every conditional branch has TCs for both paths
+
+### Mutability
+
+- TCs may be **added** during IN_PROGRESS (new edge cases discovered during implementation)
+- TCs may NEVER be **removed** — if a TC is no longer applicable, mark it as `SKIPPED` with a reason
+- REQ references in TCs must remain valid
+
+### Smoke Tests (k6)
+
+- TC-S-* are validated by running `k6 run --env SCENARIO=smoke tests/load/main.js`
+- Smoke tests are executed by `TASK-SMOKE` — a dedicated task at the end of the spec
+- Smoke tests do NOT follow the TDD RED/GREEN cycle (they are executed directly)
+- If the app is not running, log `SMOKE: DEFERRED` in the Execution Log
+- Smoke file convention: `tests/load/users.js`, `tests/load/roles.js`, `tests/load/main.js`, `tests/load/helpers.js`
+
+## TDD Execution
+
+When a task has `tests:` metadata, the ralph-loop follows the TDD cycle:
+
+### RED Phase
+
+1. Write the test file FIRST (before the production code)
+2. Tests reference the function/type that will be implemented
+3. Run `go test` — tests MUST fail (compilation failure counts as valid RED)
+4. If tests pass before implementation: the test is not testing the right thing — fix it
+
+### GREEN Phase
+
+1. Write the MINIMUM production code to make tests pass
+2. Follow existing patterns: hand-written mocks in `mocks_test.go`, table-driven tests
+3. Run `go test` — all tests listed in `tests:` MUST pass
+4. If other tests break: fix immediately before proceeding
+
+### REFACTOR Phase
+
+1. Clean up production code: remove duplication, improve naming, extract helpers
+2. Run `go test` again — all tests MUST still pass
+3. Run `go build ./...` — must compile cleanly
+
+### Execution Log Format
+
+When a task follows TDD, the Execution Log entry includes:
+
+```
+TDD: RED(N failing) -> GREEN(N passing) -> REFACTOR(clean)
+```
+
+### Exceptions
+
+- **Smoke tests** (TC-S-*): executed directly via k6, not via TDD cycle
+- **Non-code tasks** (docs, config): no TDD — normal execution
+- **Tasks without `tests:` metadata**: normal execution (no TDD cycle required)
 
 ## Parallel Batches
 

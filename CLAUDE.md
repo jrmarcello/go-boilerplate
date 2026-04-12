@@ -73,7 +73,8 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
 - **ID Strategy**: UUID v7 for all entity IDs. See `docs/adr/002-ids.md`.
 - **DB Cluster**: Writer/Reader split via `pkg/database.DBCluster`. Reader is optional, falls back to writer.
 - **API Response Format**: Gin handlers use `httpgin.SendSuccess(c, status, data)` and `httpgin.SendError(c, status, message)`. Core helpers (`httputil.WriteSuccess`/`httputil.WriteError`) work with stdlib `http.ResponseWriter`. Responses wrap in `{"data": ...}` or `{"errors": {"message": ...}}`.
-- **Error Handling**: Domain defines pure errors (`user.ErrNotFound`, etc.). `pkg/apperror.AppError` provides structured errors with HTTP status. Handlers translate errors via `handler.HandleError()`. Never return HTTP concepts from domain layer.
+- **Error Handling**: Domain defines pure errors (`user.ErrNotFound`, etc.). Use cases return `*apperror.AppError` via local `toAppError()`. Handler resolves generically via `errors.As()` + `codeToStatus` map — zero domain imports. Ref: ADR-009, `docs/guides/error-handling.md` (created by spec `error-handling-refactor`).
+- **Span Error Classification**: Use case classifies errors via `shared.ClassifyError()`. Expected errors (validation, not found, conflict) -> `telemetry.WarnSpan` (span stays Ok). Unexpected errors (DB timeout, infra) -> `telemetry.FailSpan` (span marked Error). Handler never touches spans. Ref: ADR-009, `docs/guides/error-handling.md` (created by spec `error-handling-refactor`).
 - **Service Key Auth**: Optional service-to-service authentication via `X-Service-Name` + `X-Service-Key` headers. See `docs/adr/005-service-key-auth.md`.
 - **Singleflight**: GetUseCase uses `golang.org/x/sync/singleflight` to prevent cache stampede on concurrent reads for the same entity.
 - **Idempotency**: Redis-backed idempotency via `pkg/idempotency.Store`, wired as optional middleware. Uses SHA-256 fingerprint + lock/unlock pattern.
@@ -86,6 +87,7 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
 - **Migrations**: Goose SQL files in `internal/infrastructure/db/postgres/migration/`
 - **Tests**: Unit tests use hand-written mocks (`mocks_test.go` per package). E2E tests use TestContainers (Postgres + Redis).
 - **Import rule**: Never import `infrastructure` from `domain` or `usecases`. Never import `usecases` from `domain`.
+- **Error handling guide**: See `docs/guides/error-handling.md` for the practical guide on adding new errors, mapping patterns, and span classification (created by spec `error-handling-refactor`).
 
 ## CI Pipeline (GitHub Actions)
 
