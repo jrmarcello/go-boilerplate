@@ -15,13 +15,9 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/jrmarcello/go-boilerplate/config"
 	docs "github.com/jrmarcello/go-boilerplate/docs"
-	"github.com/jrmarcello/go-boilerplate/internal/infrastructure/db/postgres/repository"
+	"github.com/jrmarcello/go-boilerplate/internal/bootstrap"
 	infratelemetry "github.com/jrmarcello/go-boilerplate/internal/infrastructure/telemetry"
-	"github.com/jrmarcello/go-boilerplate/internal/infrastructure/web/handler"
 	"github.com/jrmarcello/go-boilerplate/internal/infrastructure/web/router"
-	roleuc "github.com/jrmarcello/go-boilerplate/internal/usecases/role"
-	useruc "github.com/jrmarcello/go-boilerplate/internal/usecases/user"
-	"github.com/jrmarcello/go-boilerplate/pkg/cache"
 	"github.com/jrmarcello/go-boilerplate/pkg/cache/redisclient"
 	"github.com/jrmarcello/go-boilerplate/pkg/database"
 	"github.com/jrmarcello/go-boilerplate/pkg/health"
@@ -168,10 +164,7 @@ func shutdownTelemetry(tp *pkgtelemetry.Provider, logger *slog.Logger) {
 }
 
 func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx.DB, cfg *config.Config, httpMetrics *pkgtelemetry.HTTPMetrics, businessMetrics *infratelemetry.Metrics) router.Dependencies {
-	// Repositories (sqlx wrappers over stdlib *sql.DB connections)
-	repo := repository.NewUserRepository(sqlxWriter, sqlxReader)
-
-	// Cache (optional)
+	// Cache (optional — config-dependent, stays in server.go)
 	redisClient, cacheErr := redisclient.NewRedisClient(redisclient.RedisConfig{
 		URL:          cfg.Redis.URL,
 		TTL:          cfg.Redis.TTL,
@@ -186,7 +179,7 @@ func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx
 		slog.Warn("Redis cache disabled", "error", cacheErr)
 	}
 
-	// Health Checker
+	// Health Checker (cross-cutting, stays in server.go)
 	checker := health.New()
 	checker.Register("database_writer", true, func(ctx context.Context) error {
 		return cluster.Writer().PingContext(ctx)
@@ -202,17 +195,10 @@ func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx
 		})
 	}
 
-	// Singleflight protection (prevents cache stampede on concurrent reads)
-	flightGroup := cache.NewFlightGroup()
+	// Bootstrap container (repos, use cases, handlers for all domains)
+	c := bootstrap.New(sqlxWriter, sqlxReader, redisClient, businessMetrics)
 
-	// Use Cases (with optional cache via builder pattern)
-	createUC := useruc.NewCreateUseCase(repo)
-	getUC := useruc.NewGetUseCase(repo).WithCache(redisClient).WithFlight(flightGroup)
-	listUC := useruc.NewListUseCase(repo)
-	updateUC := useruc.NewUpdateUseCase(repo).WithCache(redisClient)
-	deleteUC := useruc.NewDeleteUseCase(repo).WithCache(redisClient)
-
-	// Idempotency Store (optional — uses Redis when enabled)
+	// Idempotency Store (optional — config-dependent, stays in server.go)
 	var idempotencyStore idempotency.Store
 	if cfg.Idempotency.Enabled {
 		if rc := redisClient.UnderlyingClient(); rc != nil {
@@ -222,20 +208,10 @@ func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx
 		}
 	}
 
-	// --- Role Domain (simpler, no cache/singleflight) ---
-	roleRepo := repository.NewRoleRepository(sqlxWriter, sqlxReader)
-	roleCreateUC := roleuc.NewCreateUseCase(roleRepo)
-	roleListUC := roleuc.NewListUseCase(roleRepo)
-	roleDeleteUC := roleuc.NewDeleteUseCase(roleRepo)
-	roleHandler := handler.NewRoleHandler(roleCreateUC, roleListUC, roleDeleteUC)
-
-	// --- Handlers ---
-	userHandler := handler.NewUserHandler(createUC, getUC, listUC, updateUC, deleteUC, businessMetrics)
-
 	return router.Dependencies{
 		HealthChecker:    checker,
-		UserHandler:      userHandler,
-		RoleHandler:      roleHandler,
+		UserHandler:      c.Handlers.User,
+		RoleHandler:      c.Handlers.Role,
 		HTTPMetrics:      httpMetrics,
 		IdempotencyStore: idempotencyStore,
 		Config: router.Config{
@@ -247,10 +223,10 @@ func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx
 	}
 }
 
-func newServer(port string, h http.Handler) *http.Server {
+func newServer(port string, handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:              ":" + port,
-		Handler:           h,
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,

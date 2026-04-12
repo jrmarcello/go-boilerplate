@@ -1,6 +1,6 @@
 # Spec: Bootstrap DI Container
 
-## Status: DRAFT
+## Status: DONE
 
 ## Context
 
@@ -134,7 +134,7 @@ Cada struct aninhada agrupa dependencias de uma camada. A construcao segue ordem
 
 ## Tasks
 
-- [ ] TASK-1: Criar internal/bootstrap/container.go com Container + tipos + New()
+- [x] TASK-1: Criar internal/bootstrap/container.go com Container + tipos + New()
   - Definir structs: Container, Repos, UserUseCases, RoleUseCases, Handlers
   - Implementar `New(writer, reader *sqlx.DB, cacheClient cache.Cache, metrics *infratelemetry.Metrics) *Container`
   - Implementar `buildRepos()`, `buildUseCases()`, `buildHandlers()` privados
@@ -146,7 +146,7 @@ Cada struct aninhada agrupa dependencias de uma camada. A construcao segue ordem
   - files: `internal/bootstrap/container.go`, `internal/bootstrap/container_test.go`
   - tests: TC-U-01, TC-U-02, TC-U-03, TC-U-04, TC-U-05
 
-- [ ] TASK-2: Criar internal/bootstrap/test_helpers.go
+- [x] TASK-2: Criar internal/bootstrap/test_helpers.go
   - `NewForTest(t testing.TB, db *sqlx.DB, cache cache.Cache) *Container` — usa mesmo DB como writer e reader, nil metrics, FlightGroup interno
   - `SetupTestRouter(t testing.TB, db *sqlx.DB, cache cache.Cache) *gin.Engine` — gin.TestMode, rotas de user **E role** registradas (consolida `setupTestRouter()` + `setupRoleTestRouter()` em uma unica funcao), sem auth
   - `SetupTestRouterWithAuth(t testing.TB, db *sqlx.DB, cache cache.Cache, serviceKeys string) *gin.Engine` — idem com auth middleware habilitado
@@ -155,7 +155,7 @@ Cada struct aninhada agrupa dependencias de uma camada. A construcao segue ordem
   - tests: TC-U-06, TC-U-07, TC-U-08
   - depends: TASK-1
 
-- [ ] TASK-3: Refatorar cmd/api/server.go para usar bootstrap.New()
+- [x] TASK-3: Refatorar cmd/api/server.go para usar bootstrap.New()
   - Remover construcao inline de repos, use cases e handlers de `buildDependencies()`
   - Chamar `c := bootstrap.New(sqlxWriter, sqlxReader, redisClient, businessMetrics)` 
   - Extrair handlers para `router.Dependencies`: `c.Handlers.User`, `c.Handlers.Role`
@@ -163,7 +163,7 @@ Cada struct aninhada agrupa dependencias de uma camada. A construcao segue ordem
   - files: `cmd/api/server.go`
   - depends: TASK-1
 
-- [ ] TASK-4: Migrar E2E tests para bootstrap.SetupTestRouter()
+- [x] TASK-4: Migrar E2E tests para bootstrap.SetupTestRouter()
   - Remover `setupTestRouter()` e `setupTestRouterWithAuth()` de `user_test.go` (e onde estao definidas — NAO em setup_test.go)
   - Remover `setupRoleTestRouter()` de `role_test.go` (funcao separada que wires apenas role routes)
   - Substituir todas as chamadas por `bootstrap.SetupTestRouter()` (que registra rotas de user E role)
@@ -201,3 +201,15 @@ File overlap analysis:
 ## Execution Log
 
 <!-- Ralph Loop appends here automatically — do not edit manually -->
+
+### Iteration 1 — TASK-1 (2026-04-12 15:40)
+
+Created `internal/bootstrap/container.go` with Container struct, typed layer structs (Repos, UserUseCases, RoleUseCases, Handlers), and `New()` constructor with phased build (buildRepos -> buildUseCases -> buildHandlers). Created `container_test.go` with 5 tests using go-sqlmock, nil cache and nil metrics. TDD: RED(compilation) -> GREEN(5 passing) -> REFACTOR(clean).
+
+### Iteration 2 — Batch 2: TASK-2, TASK-3 (2026-04-12 15:50)
+
+Executed 2 tasks in parallel via worktree agents. TASK-2: created `internal/bootstrap/test_helpers.go` with `NewForTest()`, `SetupTestRouter()` (registers both user+role routes with CustomRecovery), and `SetupTestRouterWithAuth()` (with ServiceKeyAuth). Uses `router.RegisterUserRoutes`/`RegisterRoleRoutes` for DRY route registration. TASK-3: simplified `cmd/api/server.go` — `buildDependencies()` now calls `bootstrap.New()`, removed inline repo/UC/handler creation. Kept Redis, health checker, and idempotency in server.go.
+
+### Iteration 3 — Batch 3: TASK-4 (2026-04-12 15:47)
+
+Migrated E2E tests to use `bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())` and `bootstrap.SetupTestRouterWithAuth(...)`. Removed `setupTestRouter()`, `setupTestRouterWithAuth()` from `user_test.go` and `setupRoleTestRouter()` from `role_test.go`. Removed unused imports (repository, handler, middleware, useruc, roleuc, gin, httpgin). Both test files now use the consolidated bootstrap helpers that wire user AND role routes.

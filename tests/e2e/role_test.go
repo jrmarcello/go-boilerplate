@@ -8,37 +8,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
+	"github.com/jrmarcello/go-boilerplate/internal/bootstrap"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/jrmarcello/go-boilerplate/internal/infrastructure/db/postgres/repository"
-	"github.com/jrmarcello/go-boilerplate/internal/infrastructure/web/handler"
-	roleuc "github.com/jrmarcello/go-boilerplate/internal/usecases/role"
 )
-
-// setupRoleTestRouter configura o router com rotas de role para testes e2e
-func setupRoleTestRouter() *gin.Engine {
-	gin.SetMode(gin.TestMode)
-
-	db := GetTestDB()
-	repo := repository.NewRoleRepository(db, db)
-
-	createUC := roleuc.NewCreateUseCase(repo)
-	listUC := roleuc.NewListUseCase(repo)
-	deleteUC := roleuc.NewDeleteUseCase(repo)
-
-	h := handler.NewRoleHandler(createUC, listUC, deleteUC)
-
-	r := gin.New()
-	r.Use(gin.Recovery())
-
-	r.POST("/roles", h.Create)
-	r.GET("/roles", h.List)
-	r.DELETE("/roles/:id", h.Delete)
-
-	return r
-}
 
 // cleanupRoles remove todos os roles do banco de teste
 func cleanupRoles() error {
@@ -52,7 +25,7 @@ func cleanupRoles() error {
 
 func TestE2E_CreateRole_Success(t *testing.T) {
 	require.NoError(t, cleanupRoles())
-	router := setupRoleTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	body := `{
 		"name": "admin",
@@ -81,7 +54,7 @@ func TestE2E_CreateRole_Success(t *testing.T) {
 
 func TestE2E_RoleFullCycle(t *testing.T) {
 	require.NoError(t, cleanupRoles())
-	router := setupRoleTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	// 1. Create
 	role := map[string]string{
@@ -141,7 +114,7 @@ func TestE2E_RoleFullCycle(t *testing.T) {
 // =============================================================================
 
 func TestE2E_CreateRole_EmptyName(t *testing.T) {
-	router := setupRoleTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	body := `{
 		"name": "",
@@ -159,7 +132,7 @@ func TestE2E_CreateRole_EmptyName(t *testing.T) {
 
 func TestE2E_CreateRole_DuplicateName(t *testing.T) {
 	require.NoError(t, cleanupRoles())
-	router := setupRoleTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	body := `{
 		"name": "admin",
@@ -183,7 +156,7 @@ func TestE2E_CreateRole_DuplicateName(t *testing.T) {
 }
 
 func TestE2E_DeleteRole_NotFound(t *testing.T) {
-	router := setupRoleTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	// UUID v7 valido mas nao existe
 	req := httptest.NewRequest("DELETE", "/roles/018e4a2c-6b4d-7000-9410-abcdef123456", nil)
@@ -195,7 +168,7 @@ func TestE2E_DeleteRole_NotFound(t *testing.T) {
 }
 
 func TestE2E_DeleteRole_InvalidID(t *testing.T) {
-	router := setupRoleTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	req := httptest.NewRequest("DELETE", "/roles/not-a-uuid", nil)
 	w := httptest.NewRecorder()
@@ -211,7 +184,7 @@ func TestE2E_DeleteRole_InvalidID(t *testing.T) {
 
 func TestE2E_ListRoles_Pagination(t *testing.T) {
 	require.NoError(t, cleanupRoles())
-	router := setupRoleTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	// Create 5 roles with different names
 	for i := 1; i <= 5; i++ {

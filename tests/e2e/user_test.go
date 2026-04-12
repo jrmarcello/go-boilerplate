@@ -8,109 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jrmarcello/go-boilerplate/internal/infrastructure/db/postgres/repository"
-	"github.com/jrmarcello/go-boilerplate/internal/infrastructure/web/handler"
-	"github.com/jrmarcello/go-boilerplate/internal/infrastructure/web/middleware"
-	useruc "github.com/jrmarcello/go-boilerplate/internal/usecases/user"
+	"github.com/jrmarcello/go-boilerplate/internal/bootstrap"
 	"github.com/jrmarcello/go-boilerplate/pkg/httputil"
-	"github.com/jrmarcello/go-boilerplate/pkg/httputil/httpgin"
 )
-
-// setupTestRouter configura o router para testes e2e
-func setupTestRouter() *gin.Engine {
-	gin.SetMode(gin.TestMode)
-
-	db := GetTestDB()
-	cache := GetTestCache()
-	repo := repository.NewUserRepository(db, db)
-
-	// Use Cases (with cache)
-	createUC := useruc.NewCreateUseCase(repo)
-	getUC := useruc.NewGetUseCase(repo).WithCache(cache)
-	listUC := useruc.NewListUseCase(repo)
-	updateUC := useruc.NewUpdateUseCase(repo).WithCache(cache)
-	deleteUC := useruc.NewDeleteUseCase(repo).WithCache(cache)
-
-	h := handler.NewUserHandler(createUC, getUC, listUC, updateUC, deleteUC, nil)
-
-	r := gin.New()
-	r.Use(middleware.CustomRecovery())
-
-	// Public routes
-	r.GET("/health", func(c *gin.Context) {
-		httpgin.SendSuccess(c, http.StatusOK, gin.H{"status": "ok"})
-	})
-
-	r.GET("/ready", func(c *gin.Context) {
-		if pingErr := db.Ping(); pingErr != nil {
-			httpgin.SendError(c, http.StatusServiceUnavailable, "database connection failed")
-			return
-		}
-		httpgin.SendSuccess(c, http.StatusOK, gin.H{"status": "ready"})
-	})
-
-	// Panic test route (only for E2E testing)
-	r.GET("/panic-test", func(_ *gin.Context) {
-		panic("test panic for recovery middleware")
-	})
-
-	// CRUD Routes (without auth for backward compatibility)
-	r.POST("/users", h.Create)
-	r.GET("/users", h.List)
-	r.GET("/users/:id", h.GetByID)
-	r.PUT("/users/:id", h.Update)
-	r.DELETE("/users/:id", h.Delete)
-
-	return r
-}
-
-// setupTestRouterWithAuth configura o router com autenticação para testes
-func setupTestRouterWithAuth() *gin.Engine {
-	gin.SetMode(gin.TestMode)
-
-	db := GetTestDB()
-	cache := GetTestCache()
-	repo := repository.NewUserRepository(db, db)
-
-	createUC := useruc.NewCreateUseCase(repo)
-	getUC := useruc.NewGetUseCase(repo).WithCache(cache)
-	listUC := useruc.NewListUseCase(repo)
-	updateUC := useruc.NewUpdateUseCase(repo).WithCache(cache)
-	deleteUC := useruc.NewDeleteUseCase(repo).WithCache(cache)
-
-	h := handler.NewUserHandler(createUC, getUC, listUC, updateUC, deleteUC, nil)
-
-	r := gin.New()
-	r.Use(middleware.CustomRecovery())
-
-	// Service Key Auth middleware com chaves de teste
-	authConfig := middleware.ServiceKeyConfig{
-		Enabled: true,
-		Keys: map[string]string{
-			"test-service": "sk_test_service_key_12345",
-		},
-	}
-
-	// Public routes
-	r.GET("/health", func(c *gin.Context) {
-		httpgin.SendSuccess(c, http.StatusOK, gin.H{"status": "ok"})
-	})
-
-	// Protected routes
-	protected := r.Group("")
-	protected.Use(middleware.ServiceKeyAuth(authConfig))
-	protected.POST("/users", h.Create)
-	protected.GET("/users", h.List)
-	protected.GET("/users/:id", h.GetByID)
-	protected.PUT("/users/:id", h.Update)
-	protected.DELETE("/users/:id", h.Delete)
-
-	return r
-}
 
 // addAuthHeaders adiciona os headers de autenticação para testes
 func addAuthHeaders(req *http.Request) {
@@ -147,7 +50,7 @@ func extractErrorResponse(t *testing.T, body []byte) httputil.ErrorResponse {
 
 func TestE2E_CreateUser_Success(t *testing.T) {
 	require.NoError(t, CleanupUsers())
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	body := `{
 		"name": "Test User",
@@ -176,7 +79,7 @@ func TestE2E_CreateUser_Success(t *testing.T) {
 
 func TestE2E_UserFullCycle(t *testing.T) {
 	require.NoError(t, CleanupUsers())
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	// 1. Create
 	user := map[string]string{
@@ -251,7 +154,7 @@ func TestE2E_UserFullCycle(t *testing.T) {
 
 // TC-E2E-01: POST /users invalid email returns JSON 400
 func TestE2E_CreateUser_InvalidEmail(t *testing.T) {
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	body := `{
 		"name": "Test User",
@@ -272,7 +175,7 @@ func TestE2E_CreateUser_InvalidEmail(t *testing.T) {
 }
 
 func TestE2E_CreateUser_EmptyRequest(t *testing.T) {
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	body := `{}`
 
@@ -293,7 +196,7 @@ func TestE2E_CreateUser_EmptyRequest(t *testing.T) {
 // TC-E2E-02: POST /users duplicate email returns JSON 409
 func TestE2E_CreateUser_DuplicateEmail(t *testing.T) {
 	require.NoError(t, CleanupUsers())
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	body := `{
 		"name": "First User",
@@ -326,7 +229,7 @@ func TestE2E_CreateUser_DuplicateEmail(t *testing.T) {
 
 // TC-E2E-03: GET /users/:id not found returns JSON 404
 func TestE2E_GetUser_NotFound(t *testing.T) {
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	// UUID v7 válido mas não existe
 	req := httptest.NewRequest("GET", "/users/018e4a2c-6b4d-7000-9410-abcdef123456", nil)
@@ -343,7 +246,7 @@ func TestE2E_GetUser_NotFound(t *testing.T) {
 
 // TC-E2E-04: GET /users/:id invalid UUID returns JSON 400
 func TestE2E_GetUser_InvalidID(t *testing.T) {
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	req := httptest.NewRequest("GET", "/users/invalid-id", nil)
 	w := httptest.NewRecorder()
@@ -358,7 +261,7 @@ func TestE2E_GetUser_InvalidID(t *testing.T) {
 }
 
 func TestE2E_UpdateUser_NotFound(t *testing.T) {
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	update := map[string]string{"name": "Updated Name"}
 	body, _ := json.Marshal(update)
@@ -378,7 +281,7 @@ func TestE2E_UpdateUser_NotFound(t *testing.T) {
 
 func TestE2E_UpdateUser_InvalidEmail(t *testing.T) {
 	require.NoError(t, CleanupUsers())
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	// 1. Create user
 	createBody := `{"name": "Test", "email": "valid@example.com"}`
@@ -411,7 +314,7 @@ func TestE2E_UpdateUser_InvalidEmail(t *testing.T) {
 }
 
 func TestE2E_DeleteUser_NotFound(t *testing.T) {
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	req := httptest.NewRequest("DELETE", "/users/018e4a2c-6b4d-7000-9410-abcdef123456", nil)
 	w := httptest.NewRecorder()
@@ -431,7 +334,7 @@ func TestE2E_DeleteUser_NotFound(t *testing.T) {
 
 // TC-E2E-05: Panic recovery returns JSON 500 (not HTML)
 func TestE2E_PanicRecovery_ReturnsJSON500(t *testing.T) {
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	req := httptest.NewRequest("GET", "/panic-test", nil)
 	w := httptest.NewRecorder()
@@ -455,7 +358,7 @@ func TestE2E_PanicRecovery_ReturnsJSON500(t *testing.T) {
 // =============================================================================
 
 func TestE2E_HealthCheck(t *testing.T) {
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
@@ -469,7 +372,7 @@ func TestE2E_HealthCheck(t *testing.T) {
 }
 
 func TestE2E_ReadinessProbe(t *testing.T) {
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	w := httptest.NewRecorder()
@@ -487,7 +390,7 @@ func TestE2E_ReadinessProbe(t *testing.T) {
 // =============================================================================
 
 func TestE2E_ServiceKeyAuth_Errors(t *testing.T) {
-	router := setupTestRouterWithAuth()
+	router := bootstrap.SetupTestRouterWithAuth(t, GetTestDB(), GetTestCache(), "test-service:sk_test_service_key_12345")
 
 	t.Run("missing auth headers returns 401", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/users/018e4a2c-6b4d-7000-8000-000000000001", nil)
@@ -547,7 +450,7 @@ func TestE2E_ServiceKeyAuth_Errors(t *testing.T) {
 
 func TestE2E_ListUsers_Pagination(t *testing.T) {
 	require.NoError(t, CleanupUsers())
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	// Create 5 users
 	for i := 1; i <= 5; i++ {
@@ -588,7 +491,7 @@ func TestE2E_ListUsers_Pagination(t *testing.T) {
 
 func TestE2E_CacheBehavior(t *testing.T) {
 	require.NoError(t, CleanupUsers())
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	// 1. Create a user
 	user := map[string]string{
@@ -659,7 +562,7 @@ func TestE2E_CacheBehavior(t *testing.T) {
 
 func TestE2E_CreateUser_PerformanceBaseline(t *testing.T) {
 	require.NoError(t, CleanupUsers())
-	router := setupTestRouter()
+	router := bootstrap.SetupTestRouter(t, GetTestDB(), GetTestCache())
 
 	body := `{
 		"name": "Performance Test",
