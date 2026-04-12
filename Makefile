@@ -382,16 +382,16 @@ load-setup: k6-check
 LOAD_URL ?= http://localhost:8080
 
 load-smoke: load-setup ## Smoke test (validacao basica)
-	k6 run --env SCENARIO=smoke --env BASE_URL=$(LOAD_URL) tests/load/scenarios.js 2>&1 | tee tests/load/results/smoke_$(shell date +%Y%m%d_%H%M%S).log
+	k6 run --env SCENARIO=smoke --env BASE_URL=$(LOAD_URL) tests/load/main.js 2>&1 | tee tests/load/results/smoke_$(shell date +%Y%m%d_%H%M%S).log
 
 load-test: load-setup ## Load test (carga progressiva)
-	k6 run --env SCENARIO=load --env BASE_URL=$(LOAD_URL) tests/load/scenarios.js 2>&1 | tee tests/load/results/load_$(shell date +%Y%m%d_%H%M%S).log
+	k6 run --env SCENARIO=load --env BASE_URL=$(LOAD_URL) tests/load/main.js 2>&1 | tee tests/load/results/load_$(shell date +%Y%m%d_%H%M%S).log
 
 load-stress: load-setup ## Stress test (encontrar limites)
-	k6 run --env SCENARIO=stress --env BASE_URL=$(LOAD_URL) tests/load/scenarios.js 2>&1 | tee tests/load/results/stress_$(shell date +%Y%m%d_%H%M%S).log
+	k6 run --env SCENARIO=stress --env BASE_URL=$(LOAD_URL) tests/load/main.js 2>&1 | tee tests/load/results/stress_$(shell date +%Y%m%d_%H%M%S).log
 
 load-spike: load-setup ## Spike test (pico subito)
-	k6 run --env SCENARIO=spike --env BASE_URL=$(LOAD_URL) tests/load/scenarios.js 2>&1 | tee tests/load/results/spike_$(shell date +%Y%m%d_%H%M%S).log
+	k6 run --env SCENARIO=spike --env BASE_URL=$(LOAD_URL) tests/load/main.js 2>&1 | tee tests/load/results/spike_$(shell date +%Y%m%d_%H%M%S).log
 
 load-kind: ## Roda smoke test contra o cluster Kind
 	@$(MAKE) load-smoke LOAD_URL=http://$(DB_NAME).localhost
