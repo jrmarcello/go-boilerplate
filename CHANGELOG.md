@@ -6,6 +6,25 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Commits seguem [Conventional Commits](https://www.conventionalcommits.org/).
 
 ---
+## [0.11.0] - 2026-04-13
+
+### Documentação
+
+- Fix markdown lint warnings (361 -> 0)
+
+### Funcionalidades
+
+- **cli**: Add remove/doctor/add-endpoint/remove-endpoint/wiring commands + fix --no-redis/--no-auth
+- **cli**: Production-grade domain templates with tests and error handling
+- **cli**: Include .claude, .devcontainer, .specs, docs in scaffolded projects
+
+### Manutenção
+
+- Add CLI new commands spec (remove domain, doctor, add/remove endpoint, wiring, bug fixes)
+
+### Refatoração
+
+- Rename project from go-boilerplate to gopherplate
 
 ## [0.10.0] - 2026-04-12
 
@@ -87,7 +106,7 @@ Commits seguem [Conventional Commits](https://www.conventionalcommits.org/).
 - **readme**: Add project intro with quick start and presentation link
 - Move presentation.md to docs/guides/
 - **presentation**: Fix Portuguese accents and punctuation throughout
-- Add presentation guide for gopherplate showcase
+- Add presentation guide for go-boilerplate showcase
 - Add missing guide references, fix env example, document coverage threshold
 - Fix stale lint-full references and cache import paths
 - **claude**: Remove rate limiting reference from middleware list
