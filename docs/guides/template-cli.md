@@ -9,9 +9,14 @@ O **gopherplate CLI** é uma ferramenta de linha de comando que gera novos micro
 - [Instalação](#instalação)
 - [Quick Start](#quick-start)
 - [Comandos](#comandos)
-  - [`gopherplate new`](#boilerplate-new-service-name)
-  - [`gopherplate add domain`](#boilerplate-add-domain-name)
-  - [`gopherplate version`](#boilerplate-version)
+  - [`gopherplate new`](#gopherplate-new-service-name)
+  - [`gopherplate add domain`](#gopherplate-add-domain-name)
+  - [`gopherplate remove domain`](#gopherplate-remove-domain-name)
+  - [`gopherplate add endpoint`](#gopherplate-add-endpoint-domain-name)
+  - [`gopherplate remove endpoint`](#gopherplate-remove-endpoint-domain-name)
+  - [`gopherplate wiring`](#gopherplate-wiring)
+  - [`gopherplate doctor`](#gopherplate-doctor)
+  - [`gopherplate version`](#gopherplate-version)
 - [Flags (modo não-interativo)](#flags-modo-não-interativo)
 - [O que cada opção faz](#o-que-cada-opção-faz)
 - [Customização dos templates](#customização-dos-templates)
@@ -232,23 +237,159 @@ internal/
 
 #### Próximos passos após `add domain`
 
-O CLI imprime instruções de wiring com código copy-pasteable. Em resumo:
+A forma mais rápida e segura é deixar o CLI regenerar o wiring para todos os domínios detectados:
 
-1. **Wiring**: Registre as dependências do novo domínio em `cmd/api/server.go:buildDependencies()`
-2. **Router**: Registre as rotas em `internal/infrastructure/web/router/router.go`
-3. **Migration**: Execute `make migrate-up` para criar a tabela no banco
-4. **Customização**: Edite a entity, value objects e use cases conforme sua regra de negócio
-
-```go
-// cmd/api/server.go — exemplo de wiring manual
-orderRepo := repository.NewOrderRepository(sqlxWriter, sqlxReader)
-orderCreateUC := orderuc.NewCreateUseCase(orderRepo)
-orderGetUC := orderuc.NewGetUseCase(orderRepo)
-orderListUC := orderuc.NewListUseCase(orderRepo)
-orderUpdateUC := orderuc.NewUpdateUseCase(orderRepo)
-orderDeleteUC := orderuc.NewDeleteUseCase(orderRepo)
-orderHandler := handler.NewOrderHandler(orderCreateUC, orderGetUC, orderListUC, orderUpdateUC, orderDeleteUC)
+```bash
+gopherplate wiring   # auto-gera server.go + router.go + container.go + test_helpers.go
+make migrate-up      # cria a tabela no banco
 ```
+
+Se preferir wiring manual, o CLI imprime instruções com código copy-pasteable após `add domain`:
+
+1. Registre as dependências em `cmd/api/server.go:buildDependencies()`
+2. Registre as rotas em `internal/infrastructure/web/router/router.go`
+3. Execute `make migrate-up`
+4. Edite a entity, value objects e use cases conforme sua regra de negócio
+
+---
+
+### `gopherplate remove domain [name]`
+
+Remove um domínio inteiro do projeto (inverso de `add domain`).
+
+```bash
+gopherplate remove domain order          # pede confirmação (default N)
+gopherplate remove domain order --yes    # pula confirmação
+```
+
+#### O que faz
+
+- Lista todos os arquivos a serem deletados (domain/, usecases/, repository, handler, router)
+- Pede confirmação com lista completa — default é **N** (não deletar)
+- Remove com `os.RemoveAll`
+- **Preserva migrations** por padrão (risco de perda de dados) — apenas lista para revisão manual
+- Imprime instruções de cleanup manual (remover wiring residual de server.go/router.go ou rodar `gopherplate wiring`)
+
+#### Validações
+
+- Domínio deve existir em `internal/domain/<name>/`, senão retorna erro
+
+---
+
+### `gopherplate add endpoint [domain] [name]`
+
+Scaffolda um endpoint customizado (não-CRUD) dentro de um domínio existente.
+
+```bash
+gopherplate add endpoint order cancel
+```
+
+#### Gera
+
+- `internal/usecases/order/cancel.go` — use case com `ClassifyError`, `toAppError`, `SpanFromContext`
+- `internal/usecases/order/dto/cancel.go` — Input/Output DTOs
+- `internal/usecases/order/cancel_test.go` — testes unitários com mock + assertions de `*apperror.AppError`
+
+#### Próximos passos
+
+1. Adicionar método handler em `internal/infrastructure/web/handler/<domain>.go`
+2. Adicionar rota em `internal/infrastructure/web/router/<domain>.go`
+3. Rodar `gopherplate wiring` para auto-wiring (ou wiring manual em `cmd/api/server.go`)
+
+#### Validações
+
+- Domínio deve existir
+- Nome do endpoint não pode ser CRUD padrão (`create`, `get`, `update`, `delete`, `list`) — esses já existem por convenção
+- Endpoint não pode já existir
+- Nome deve ser snake_case e começar com letra
+
+---
+
+### `gopherplate remove endpoint [domain] [name]`
+
+Remove um endpoint customizado (inverso de `add endpoint`).
+
+```bash
+gopherplate remove endpoint order cancel          # pede confirmação (default N)
+gopherplate remove endpoint order cancel --yes    # pula confirmação
+```
+
+#### Remove
+
+- `internal/usecases/<domain>/<name>.go`
+- `internal/usecases/<domain>/dto/<name>.go`
+- `internal/usecases/<domain>/<name>_test.go`
+
+#### Proteção CRUD
+
+Bloqueia remoção de `create`/`get`/`update`/`delete`/`list` — para remover esses, use `gopherplate remove domain` (remove o domínio inteiro).
+
+---
+
+### `gopherplate wiring`
+
+Auto-regenera os 4 arquivos de wiring a partir dos domínios detectados em `internal/domain/`.
+
+```bash
+gopherplate wiring          # pede confirmação (default Y)
+gopherplate wiring --yes    # pula confirmação
+```
+
+#### Regenera
+
+- `cmd/api/server.go` — bootstrap.New() com configs
+- `internal/infrastructure/web/router/router.go` — `Register<Domain>Routes()` para cada domínio
+- `internal/bootstrap/container.go` — Repos, UseCases, Handlers structs com campos por domínio
+- `internal/bootstrap/test_helpers.go` — `NewForTest`, `SetupTestRouter`, `SetupTestRouterWithAuth`
+
+#### Detecção inteligente
+
+Inspeciona cada domínio para detectar:
+
+- Quais use cases existem (Create/Get/Update/Delete/List) — alguns domínios podem ter só CRUD parcial (ex: `role` tem só Create/List/Delete)
+- Se o handler aceita `*telemetry.Metrics` — gera o construtor com ou sem o param
+
+#### Quando usar
+
+- Após `add domain` (em vez de wiring manual)
+- Após `add endpoint` para registrar nova rota/handler
+- Após `remove domain` ou `remove endpoint` para limpar wiring órfão
+
+---
+
+### `gopherplate doctor`
+
+Diagnostica o ambiente de desenvolvimento (similar a `flutter doctor`).
+
+```bash
+gopherplate doctor
+```
+
+#### Verifica
+
+- **Tools**: Go, Docker, golangci-lint, swag, goose, air, k6, kind, kubectl
+- **Projeto**: `go.mod` existe (estamos em um projeto Go válido)
+- **Infraestrutura**: containers postgres e redis rodando (via `docker ps`)
+
+#### Output
+
+```text
+gopherplate doctor
+
+  [OK] Go - go version go1.25.9 darwin/amd64
+  [OK] Docker - running
+  [OK] golangci-lint - golangci-lint has version 2.11.4 ...
+  [!!] swag - not installed (run: go install github.com/swaggo/swag/cmd/swag@latest)
+  ...
+
+Project:
+  [OK] go.mod found
+  Docker containers:
+    [OK] postgres running
+    [--] redis not running
+```
+
+Para tools ausentes, exibe instrução de instalação.
 
 ---
 

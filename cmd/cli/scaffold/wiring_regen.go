@@ -1,168 +1,154 @@
 package scaffold
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"text/template"
 )
 
-// TemplateModulePath is the original module path of the template project.
-const TemplateModulePath = "github.com/jrmarcello/go-boilerplate"
-
-// CleanupWiring regenerates server.go and router.go based on the scaffold config,
-// removing references to disabled features. Must run AFTER RemoveDisabledFeatures.
-func CleanupWiring(projectDir string, cfg Config) error {
-	modulePath := detectModulePath(projectDir)
-
-	data := wiringData{
-		ModulePath:   modulePath,
-		DB:           string(cfg.DB),
-		KeepExamples: cfg.KeepExamples,
-		Redis:        cfg.Redis,
-		Idempotency:  cfg.Idempotency,
-		Auth:         cfg.Auth,
-	}
-
-	if genServerErr := generateServerGo(projectDir, data); genServerErr != nil {
-		return fmt.Errorf("generating server.go: %w", genServerErr)
-	}
-
-	if genRouterErr := generateRouterGo(projectDir, data); genRouterErr != nil {
-		return fmt.Errorf("generating router.go: %w", genRouterErr)
-	}
-
-	if genTestHelpersErr := generateTestHelpersGo(projectDir, data); genTestHelpersErr != nil {
-		return fmt.Errorf("generating test_helpers.go: %w", genTestHelpersErr)
-	}
-
-	return nil
+// DomainInfo holds the name variants and capabilities for a detected domain.
+type DomainInfo struct {
+	Name       string // snake_case: "order_item"
+	Pascal     string // PascalCase: "OrderItem"
+	Camel      string // camelCase: "orderItem"
+	Plural     string // plural: "order_items"
+	PluralPath string // plural for URL paths: "order-items" (kebab-case)
+	// Use case capabilities — detected by file presence in internal/usecases/<name>/
+	HasCreate  bool
+	HasGet     bool
+	HasList    bool
+	HasUpdate  bool
+	HasDelete  bool
+	HasMetrics bool // true if handler constructor expects *telemetry.Metrics
 }
 
-type wiringData struct {
-	ModulePath   string
-	DB           string
-	KeepExamples bool
-	Redis        bool
-	Idempotency  bool
-	Auth         bool
-}
-
-func (d wiringData) DBDriverImport() string {
-	switch DBDriver(d.DB) {
-	case DBMySQL:
-		return `_ "github.com/go-sql-driver/mysql"`
-	case DBSQLite:
-		return `_ "modernc.org/sqlite"`
-	case DBOther:
-		return `// TODO: add your database driver import here`
-	default:
-		return `_ "github.com/lib/pq"`
+// NewDomainInfo creates a DomainInfo from a snake_case domain name.
+// Use DetectDomainInfo to populate capability fields from the filesystem.
+func NewDomainInfo(snakeName string) DomainInfo {
+	return DomainInfo{
+		Name:       snakeName,
+		Pascal:     ToPascalCase(snakeName),
+		Camel:      ToCamelCase(snakeName),
+		Plural:     ToPlural(snakeName),
+		PluralPath: ToKebabCase(ToPlural(snakeName)),
+		// Default to full CRUD for newly-scaffolded domains
+		HasCreate: true,
+		HasGet:    true,
+		HasList:   true,
+		HasUpdate: true,
+		HasDelete: true,
 	}
 }
 
-func (d wiringData) DBDriverName() string {
-	switch DBDriver(d.DB) {
-	case DBMySQL:
-		return "mysql"
-	case DBSQLite:
-		return "sqlite"
-	case DBOther:
-		return "postgres" // placeholder
-	default:
-		return "postgres"
-	}
-}
+// DetectDomainInfo inspects projectDir for the given domain and populates
+// capability fields (HasCreate/Get/List/Update/Delete, HasMetrics) based on
+// which files actually exist.
+func DetectDomainInfo(projectDir, snakeName string) DomainInfo {
+	d := NewDomainInfo(snakeName)
 
-func detectModulePath(projectDir string) string {
-	modPath := filepath.Join(projectDir, "go.mod")
-	content, readErr := os.ReadFile(modPath) //nolint:gosec // CLI tool reads user-specified paths
-	if readErr != nil {
-		return TemplateModulePath
-	}
+	ucDir := filepath.Join(projectDir, "internal", "usecases", snakeName)
+	d.HasCreate = fileExists(filepath.Join(ucDir, "create.go"))
+	d.HasGet = fileExists(filepath.Join(ucDir, "get.go"))
+	d.HasList = fileExists(filepath.Join(ucDir, "list.go"))
+	d.HasUpdate = fileExists(filepath.Join(ucDir, "update.go"))
+	d.HasDelete = fileExists(filepath.Join(ucDir, "delete.go"))
 
-	lines := strings.Split(string(content), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "module ") {
-			return strings.TrimPrefix(line, "module ")
+	// Detect whether handler takes *telemetry.Metrics by grepping the constructor signature
+	handlerPath := filepath.Join(projectDir, "internal", "infrastructure", "web", "handler", snakeName+".go")
+	if content, readErr := os.ReadFile(handlerPath); readErr == nil { //nolint:gosec // CLI reads project files
+		if bytes.Contains(content, []byte("*telemetry.Metrics")) || bytes.Contains(content, []byte("*infratelemetry.Metrics")) {
+			d.HasMetrics = true
 		}
 	}
 
-	return TemplateModulePath
+	return d
 }
 
-func generateServerGo(projectDir string, data wiringData) error {
-	tmpl, parseErr := template.New("server.go").Parse(serverGoTemplate)
-	if parseErr != nil {
-		return fmt.Errorf("parsing template: %w", parseErr)
-	}
-
-	outPath := filepath.Join(projectDir, "cmd", "api", "server.go")
-	f, createErr := os.Create(outPath) //nolint:gosec // CLI tool writes to user-specified project directory
-	if createErr != nil {
-		return fmt.Errorf("creating file: %w", createErr)
-	}
-	defer func() { _ = f.Close() }()
-
-	execErr := tmpl.Execute(f, data)
-	if execErr != nil {
-		return fmt.Errorf("executing template: %w", execErr)
-	}
-
-	return nil
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
-func generateRouterGo(projectDir string, data wiringData) error {
-	tmpl, parseErr := template.New("router.go").Parse(routerGoTemplate)
-	if parseErr != nil {
-		return fmt.Errorf("parsing template: %w", parseErr)
-	}
-
-	outPath := filepath.Join(projectDir, "internal", "infrastructure", "web", "router", "router.go")
-	f, createErr := os.Create(outPath)
-	if createErr != nil {
-		return fmt.Errorf("creating file: %w", createErr)
-	}
-	defer func() { _ = f.Close() }()
-
-	execErr := tmpl.Execute(f, data)
-	if execErr != nil {
-		return fmt.Errorf("executing template: %w", execErr)
-	}
-
-	return nil
+// regenData is the template data for N-domain wiring regeneration.
+type regenData struct {
+	ModulePath string
+	Domains    []DomainInfo
 }
 
-func generateTestHelpersGo(projectDir string, data wiringData) error {
-	tmpl, parseErr := template.New("test_helpers.go").Parse(testHelpersGoTemplate)
-	if parseErr != nil {
-		return fmt.Errorf("parsing template: %w", parseErr)
+// RegenerateFromDomains regenerates the 4 wiring files (server.go, router.go,
+// container.go, test_helpers.go) based on the detected domains.
+func RegenerateFromDomains(projectDir, modulePath string, domains []DomainInfo) error {
+	data := regenData{
+		ModulePath: modulePath,
+		Domains:    domains,
 	}
 
-	bootstrapDir := filepath.Join(projectDir, "internal", "bootstrap")
-	if mkdirErr := os.MkdirAll(bootstrapDir, 0o755); mkdirErr != nil {
-		return fmt.Errorf("creating bootstrap dir: %w", mkdirErr)
+	files := []struct {
+		relPath  string
+		template string
+		name     string
+	}{
+		{
+			relPath:  filepath.Join("cmd", "api", "server.go"),
+			template: serverGoNDomainsTemplate,
+			name:     "server.go",
+		},
+		{
+			relPath:  filepath.Join("internal", "infrastructure", "web", "router", "router.go"),
+			template: routerGoNDomainsTemplate,
+			name:     "router.go",
+		},
+		{
+			relPath:  filepath.Join("internal", "bootstrap", "container.go"),
+			template: containerGoNDomainsTemplate,
+			name:     "container.go",
+		},
+		{
+			relPath:  filepath.Join("internal", "bootstrap", "test_helpers.go"),
+			template: testHelpersGoNDomainsTemplate,
+			name:     "test_helpers.go",
+		},
 	}
 
-	outPath := filepath.Join(bootstrapDir, "test_helpers.go")
-	f, createErr := os.Create(outPath) //nolint:gosec // CLI tool writes to user-specified project directory
-	if createErr != nil {
-		return fmt.Errorf("creating file: %w", createErr)
+	funcMap := template.FuncMap{
+		"plural":     ToPlural,
+		"singular":   ToSingular,
+		"pascalCase": ToPascalCase,
+		"camelCase":  ToCamelCase,
+		"snakeCase":  ToSnakeCase,
+		"kebabCase":  ToKebabCase,
+		"lower":      ToLower,
 	}
-	defer func() { _ = f.Close() }()
 
-	execErr := tmpl.Execute(f, data)
-	if execErr != nil {
-		return fmt.Errorf("executing template: %w", execErr)
+	for _, f := range files {
+		tmpl, parseErr := template.New(f.name).Funcs(funcMap).Parse(f.template)
+		if parseErr != nil {
+			return fmt.Errorf("parsing template %s: %w", f.name, parseErr)
+		}
+
+		var buf bytes.Buffer
+		if execErr := tmpl.Execute(&buf, data); execErr != nil {
+			return fmt.Errorf("executing template %s: %w", f.name, execErr)
+		}
+
+		outPath := filepath.Join(projectDir, f.relPath)
+		dirPath := filepath.Dir(outPath)
+		if mkdirErr := os.MkdirAll(dirPath, 0o750); mkdirErr != nil {
+			return fmt.Errorf("creating directory %s: %w", dirPath, mkdirErr)
+		}
+
+		if writeErr := os.WriteFile(outPath, buf.Bytes(), 0o600); writeErr != nil {
+			return fmt.Errorf("writing %s: %w", f.name, writeErr)
+		}
 	}
 
 	return nil
 }
 
 //nolint:lll
-const serverGoTemplate = `package main
+const serverGoNDomainsTemplate = `package main
 
 import (
 	"context"
@@ -175,41 +161,31 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
 	"{{.ModulePath}}/config"
-{{- if .KeepExamples}}
+{{- if gt (len .Domains) 0}}
 	docs "{{.ModulePath}}/docs"
-	"{{.ModulePath}}/internal/infrastructure/db/postgres/repository"
+	"{{.ModulePath}}/internal/bootstrap"
 	infratelemetry "{{.ModulePath}}/internal/infrastructure/telemetry"
-	"{{.ModulePath}}/internal/infrastructure/web/handler"
 {{- end}}
 	"{{.ModulePath}}/internal/infrastructure/web/router"
-{{- if .KeepExamples}}
-	roleuc "{{.ModulePath}}/internal/usecases/role"
-	useruc "{{.ModulePath}}/internal/usecases/user"
-{{- end}}
-{{- if .Redis}}
-	"{{.ModulePath}}/pkg/cache"
 	"{{.ModulePath}}/pkg/cache/redisclient"
-{{- end}}
 	"{{.ModulePath}}/pkg/database"
 	"{{.ModulePath}}/pkg/health"
-{{- if .Idempotency}}
 	"{{.ModulePath}}/pkg/idempotency"
 	"{{.ModulePath}}/pkg/idempotency/redisstore"
-{{- end}}
 	"{{.ModulePath}}/pkg/logutil"
 	pkgtelemetry "{{.ModulePath}}/pkg/telemetry"
 	"{{.ModulePath}}/pkg/telemetry/otelgrpc"
-	"github.com/gin-gonic/gin"
-	"github.com/jmoiron/sqlx"
-	{{.DBDriverImport}}
-{{- if .KeepExamples}}
+	_ "github.com/lib/pq"
+{{- if gt (len .Domains) 0}}
 	"go.opentelemetry.io/otel"
 {{- end}}
 )
 
 // Start initializes the application following the composition pattern:
-// Config → Logger → Telemetry → Database → Dependencies → Router → Server
+// Config -> Logger -> Telemetry -> Database -> Dependencies -> Router -> Server
 func Start(ctx context.Context, cfg *config.Config) error {
 	// 0. Validate config
 	if validateErr := cfg.Validate(); validateErr != nil {
@@ -253,7 +229,7 @@ func Start(ctx context.Context, cfg *config.Config) error {
 
 	// 3. Database (Writer/Reader Cluster)
 	writerCfg := database.Config{
-		Driver:          "{{.DBDriverName}}",
+		Driver:          "postgres",
 		DSN:             cfg.DB.GetWriterDSN(),
 		MaxOpenConns:    cfg.DB.MaxOpenConns,
 		MaxIdleConns:    cfg.DB.MaxIdleConns,
@@ -264,7 +240,7 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	var readerCfg *database.Config
 	if cfg.DB.ReplicaEnabled {
 		readerCfg = &database.Config{
-			Driver:          "{{.DBDriverName}}",
+			Driver:          "postgres",
 			DSN:             cfg.DB.GetReaderDSN(),
 			MaxOpenConns:    cfg.DB.ReplicaMaxOpenConns,
 			MaxIdleConns:    cfg.DB.ReplicaMaxIdleConns,
@@ -277,11 +253,11 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	if clusterErr != nil {
 		return clusterErr
 	}
-	defer cluster.Close()
+	defer func() { _ = cluster.Close() }()
 
 	// Wrap stdlib connections for sqlx-based repositories
-	sqlxWriter := sqlx.NewDb(cluster.Writer(), "{{.DBDriverName}}")
-	sqlxReader := sqlx.NewDb(cluster.Reader(), "{{.DBDriverName}}")
+	sqlxWriter := sqlx.NewDb(cluster.Writer(), "postgres")
+	sqlxReader := sqlx.NewDb(cluster.Reader(), "postgres")
 
 	// SSL mode warning for non-development environments
 	if cfg.DB.SSLMode == "disable" && cfg.Server.Env != "development" {
@@ -298,7 +274,7 @@ func Start(ctx context.Context, cfg *config.Config) error {
 			slog.Warn("Failed to register reader DB pool metrics", "error", regErr)
 		}
 	}
-{{if .KeepExamples}}
+{{if gt (len .Domains) 0}}
 	// 5. Business Metrics (injected into handlers, not global)
 	businessMetrics, metricsErr := infratelemetry.NewMetrics(otel.Meter(cfg.Otel.ServiceName))
 	if metricsErr != nil {
@@ -310,8 +286,8 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	if tp != nil {
 		httpMetrics = tp.HTTPMetrics()
 	}
-	deps := buildDependencies(cluster, sqlxWriter, sqlxReader, cfg, httpMetrics{{if .KeepExamples}}, businessMetrics{{end}})
-{{if .KeepExamples}}
+	deps := buildDependencies(cluster, sqlxWriter, sqlxReader, cfg, httpMetrics{{if gt (len .Domains) 0}}, businessMetrics{{end}})
+{{if gt (len .Domains) 0}}
 	// Swagger Dynamic Config
 	if cfg.Swagger.Host != "" {
 		docs.SwaggerInfo.Host = cfg.Swagger.Host
@@ -341,13 +317,8 @@ func shutdownTelemetry(tp *pkgtelemetry.Provider, logger *slog.Logger) {
 	}
 }
 
-func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx.DB, cfg *config.Config, httpMetrics *pkgtelemetry.HTTPMetrics{{if .KeepExamples}}, businessMetrics *infratelemetry.Metrics{{end}}) router.Dependencies {
-{{- if .KeepExamples}}
-	// Repositories (sqlx wrappers over stdlib *sql.DB connections)
-	repo := repository.NewUserRepository(sqlxWriter, sqlxReader)
-{{- end}}
-{{if .Redis}}
-	// Cache (optional)
+func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx.DB, cfg *config.Config, httpMetrics *pkgtelemetry.HTTPMetrics{{if gt (len .Domains) 0}}, businessMetrics *infratelemetry.Metrics{{end}}) router.Dependencies {
+	// Cache (optional -- config-dependent, stays in server.go)
 	redisClient, cacheErr := redisclient.NewRedisClient(redisclient.RedisConfig{
 		URL:          cfg.Redis.URL,
 		TTL:          cfg.Redis.TTL,
@@ -361,8 +332,8 @@ func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx
 	if cacheErr != nil {
 		slog.Warn("Redis cache disabled", "error", cacheErr)
 	}
-{{end}}
-	// Health Checker
+
+	// Health Checker (cross-cutting, stays in server.go)
 	checker := health.New()
 	checker.Register("database_writer", true, func(ctx context.Context) error {
 		return cluster.Writer().PingContext(ctx)
@@ -372,27 +343,16 @@ func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx
 			return cluster.Reader().PingContext(ctx)
 		})
 	}
-{{- if .Redis}}
 	if redisClient != nil && redisClient.UnderlyingClient() != nil {
 		checker.Register("redis", false, func(ctx context.Context) error {
 			return redisClient.Ping(ctx)
 		})
 	}
-{{- end}}
-{{if .Redis}}
-	// Singleflight protection (prevents cache stampede on concurrent reads)
-	flightGroup := cache.NewFlightGroup()
+{{if gt (len .Domains) 0}}
+	// Bootstrap container (repos, use cases, handlers for all domains)
+	c := bootstrap.New(sqlxWriter, sqlxReader, redisClient, businessMetrics)
 {{end}}
-{{- if .KeepExamples}}
-	// Use Cases (with optional cache via builder pattern)
-	createUC := useruc.NewCreateUseCase(repo)
-	getUC := useruc.NewGetUseCase(repo){{if .Redis}}.WithCache(redisClient).WithFlight(flightGroup){{end}}
-	listUC := useruc.NewListUseCase(repo)
-	updateUC := useruc.NewUpdateUseCase(repo){{if .Redis}}.WithCache(redisClient){{end}}
-	deleteUC := useruc.NewDeleteUseCase(repo){{if .Redis}}.WithCache(redisClient){{end}}
-{{end}}
-{{- if .Idempotency}}
-	// Idempotency Store (optional — uses Redis when enabled)
+	// Idempotency Store (optional -- config-dependent, stays in server.go)
 	var idempotencyStore idempotency.Store
 	if cfg.Idempotency.Enabled {
 		if rc := redisClient.UnderlyingClient(); rc != nil {
@@ -401,48 +361,32 @@ func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx
 			idempotencyStore = redisstore.NewRedisStore(rc, ttl, lockTTL)
 		}
 	}
-{{end}}
-{{- if .KeepExamples}}
-	// --- Role Domain (simpler, no cache/singleflight) ---
-	roleRepo := repository.NewRoleRepository(sqlxWriter, sqlxReader)
-	roleCreateUC := roleuc.NewCreateUseCase(roleRepo)
-	roleListUC := roleuc.NewListUseCase(roleRepo)
-	roleDeleteUC := roleuc.NewDeleteUseCase(roleRepo)
-	roleHandler := handler.NewRoleHandler(roleCreateUC, roleListUC, roleDeleteUC)
 
-	// --- Handlers ---
-	userHandler := handler.NewUserHandler(createUC, getUC, listUC, updateUC, deleteUC, businessMetrics)
-{{end}}
 	return router.Dependencies{
 		HealthChecker: checker,
-{{- if .KeepExamples}}
-		UserHandler:  userHandler,
-		RoleHandler:  roleHandler,
+{{- range .Domains}}
+		{{.Pascal}}Handler: c.Handlers.{{.Pascal}},
 {{- end}}
-		HTTPMetrics: httpMetrics,
-{{- if .Idempotency}}
+		HTTPMetrics:      httpMetrics,
 		IdempotencyStore: idempotencyStore,
-{{- end}}
 		Config: router.Config{
-			ServiceName:    cfg.Otel.ServiceName,
-{{- if .Auth}}
+			ServiceName:        cfg.Otel.ServiceName,
 			ServiceKeysEnabled: cfg.Auth.Enabled,
 			ServiceKeys:        cfg.Auth.ServiceKeys,
-{{- end}}
-			SwaggerEnabled: cfg.Swagger.Enabled,
+			SwaggerEnabled:     cfg.Swagger.Enabled,
 		},
 	}
 }
 
-func newServer(port string, h http.Handler) *http.Server {
+func newServer(port string, handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:              ":" + port,
-		Handler:           h,
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       120 * time.Second,
-		MaxHeaderBytes:    1 << 20, // 1MB — protects against oversized headers
+		MaxHeaderBytes:    1 << 20, // 1MB -- protects against oversized headers
 	}
 }
 
@@ -483,60 +427,53 @@ func runWithGracefulShutdown(srv *http.Server, logger *slog.Logger) error {
 `
 
 //nolint:lll
-const routerGoTemplate = `package router
+const routerGoNDomainsTemplate = `package router
 
 import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-{{- if .KeepExamples}}
+{{- if gt (len .Domains) 0}}
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 {{- end}}
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
-{{- if .KeepExamples}}
+{{- if gt (len .Domains) 0}}
 	"{{.ModulePath}}/internal/infrastructure/web/handler"
 {{- end}}
 	"{{.ModulePath}}/internal/infrastructure/web/middleware"
 	"{{.ModulePath}}/pkg/health"
 	"{{.ModulePath}}/pkg/httputil/httpgin"
-{{- if .Idempotency}}
 	"{{.ModulePath}}/pkg/idempotency"
-{{- end}}
 	"{{.ModulePath}}/pkg/telemetry"
 )
 
-// Config contém configurações do router
+// Config holds router configuration.
 type Config struct {
-	ServiceName string
-{{- if .Auth}}
-	ServiceKeysEnabled bool   // fail-closed em HML/PRD se keys vazio
+	ServiceName        string
+	ServiceKeysEnabled bool   // fail-closed in HML/PRD if keys empty
 	ServiceKeys        string // "service1:key1,service2:key2"
-{{- end}}
-	SwaggerEnabled bool
+	SwaggerEnabled     bool
 }
 
-// Dependencies agrupa todas as dependências necessárias para o router
+// Dependencies groups all dependencies required by the router.
 type Dependencies struct {
 	HealthChecker *health.Checker
-{{- if .KeepExamples}}
-	UserHandler   *handler.UserHandler
-	RoleHandler   *handler.RoleHandler
+{{- range .Domains}}
+	{{.Pascal}}Handler *handler.{{.Pascal}}Handler
 {{- end}}
-	HTTPMetrics *telemetry.HTTPMetrics
-{{- if .Idempotency}}
+	HTTPMetrics      *telemetry.HTTPMetrics
 	IdempotencyStore idempotency.Store
-{{- end}}
-	Config Config
+	Config           Config
 }
 
-// Setup configura e retorna o router Gin com todos os middlewares e rotas
+// Setup configures and returns the Gin engine with all middlewares and routes.
 func Setup(deps Dependencies) *gin.Engine {
 	r := gin.New()
 
-	// Recovery middleware (panic recovery)
-	r.Use(gin.Recovery())
+	// Recovery middleware (panic recovery -- returns JSON 500, not HTML)
+	r.Use(middleware.CustomRecovery())
 
 	// OpenTelemetry (must be before Logger to populate trace_id)
 	r.Use(otelgin.Middleware(deps.Config.ServiceName))
@@ -546,18 +483,18 @@ func Setup(deps Dependencies) *gin.Engine {
 
 	// Custom structured logger
 	r.Use(middleware.Logger())
-{{if .Idempotency}}
-	// Idempotency (optional — only if store is provided)
+
+	// Idempotency (optional -- only if store is provided)
 	if deps.IdempotencyStore != nil {
 		r.Use(middleware.Idempotency(deps.IdempotencyStore))
 	}
-{{end}}
+
 	// Public routes (no auth required)
 	if deps.Config.SwaggerEnabled {
 		registerSwaggerRoutes(r)
 	}
 	registerHealthRoutes(r, deps)
-{{if .Auth}}
+
 	// Protected routes (auth required if SERVICE_KEYS is configured)
 	authConfig := middleware.ServiceKeyConfig{
 		Enabled: deps.Config.ServiceKeysEnabled,
@@ -565,25 +502,16 @@ func Setup(deps Dependencies) *gin.Engine {
 	}
 	protected := r.Group("")
 	protected.Use(middleware.ServiceKeyAuth(authConfig))
-{{- if .KeepExamples}}
-	RegisterUserRoutes(protected, deps.UserHandler)
-	RegisterRoleRoutes(protected, deps.RoleHandler)
-{{- end}}
-{{- else}}
-{{- if .KeepExamples}}
-	// API routes
-	api := r.Group("")
-	RegisterUserRoutes(api, deps.UserHandler)
-	RegisterRoleRoutes(api, deps.RoleHandler)
-{{- end}}
+{{- range .Domains}}
+	Register{{.Pascal}}Routes(protected, deps.{{.Pascal}}Handler)
 {{- end}}
 
 	return r
 }
 
-// registerSwaggerRoutes registra rotas do Swagger
+// registerSwaggerRoutes registers Swagger routes.
 func registerSwaggerRoutes(r *gin.Engine) {
-{{- if .KeepExamples}}
+{{- if gt (len .Domains) 0}}
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 {{- else}}
 	// TODO: uncomment after running swag init
@@ -592,7 +520,7 @@ func registerSwaggerRoutes(r *gin.Engine) {
 {{- end}}
 }
 
-// registerHealthRoutes registra rotas de health check
+// registerHealthRoutes registers health check routes.
 func registerHealthRoutes(r *gin.Engine, deps Dependencies) {
 	// Liveness - always ok (K8s restart if process is dead)
 	r.GET("/health", func(c *gin.Context) {
@@ -624,7 +552,140 @@ func registerHealthRoutes(r *gin.Engine, deps Dependencies) {
 `
 
 //nolint:lll
-const testHelpersGoTemplate = `package bootstrap
+const containerGoNDomainsTemplate = `// Package bootstrap is the composition root for the application.
+// It wires all dependencies (repos, use cases, handlers) into a typed Container.
+// This is the only package allowed to import from all architecture layers.
+package bootstrap
+
+import (
+	"github.com/jmoiron/sqlx"
+
+	"{{.ModulePath}}/internal/infrastructure/db/postgres/repository"
+	infratelemetry "{{.ModulePath}}/internal/infrastructure/telemetry"
+	"{{.ModulePath}}/internal/infrastructure/web/handler"
+{{- range .Domains}}
+	{{.Camel}}uc "{{$.ModulePath}}/internal/usecases/{{.Name}}"
+{{- end}}
+	"{{.ModulePath}}/pkg/cache"
+)
+
+// Container holds all application dependencies grouped by layer.
+type Container struct {
+	Repos    Repos
+{{- range .Domains}}
+	{{.Pascal}}UseCases {{.Pascal}}UseCases
+{{- end}}
+	Handlers Handlers
+}
+
+// Repos groups all repository implementations.
+type Repos struct {
+{{- range .Domains}}
+	{{.Pascal}} *repository.{{.Pascal}}Repository
+{{- end}}
+}
+{{range .Domains}}
+// {{.Pascal}}UseCases groups all {{.Name}} domain use cases.
+type {{.Pascal}}UseCases struct {
+{{- if .HasCreate}}
+	Create *{{.Camel}}uc.CreateUseCase
+{{- end}}
+{{- if .HasGet}}
+	Get    *{{.Camel}}uc.GetUseCase
+{{- end}}
+{{- if .HasList}}
+	List   *{{.Camel}}uc.ListUseCase
+{{- end}}
+{{- if .HasUpdate}}
+	Update *{{.Camel}}uc.UpdateUseCase
+{{- end}}
+{{- if .HasDelete}}
+	Delete *{{.Camel}}uc.DeleteUseCase
+{{- end}}
+}
+{{end}}
+// Handlers groups all HTTP handlers.
+type Handlers struct {
+{{- range .Domains}}
+	{{.Pascal}} *handler.{{.Pascal}}Handler
+{{- end}}
+}
+
+// New creates a fully wired Container. The construction follows a strict phase order:
+// repos -> use cases -> handlers, preventing circular dependencies.
+// metrics may be nil (for tests or contexts without OTel).
+func New(writer, reader *sqlx.DB, cacheClient cache.Cache, metrics *infratelemetry.Metrics) *Container {
+	c := &Container{}
+	c.buildRepos(writer, reader)
+	c.buildUseCases(cacheClient)
+	c.buildHandlers(metrics)
+	return c
+}
+
+func (c *Container) buildRepos(writer, reader *sqlx.DB) {
+	c.Repos = Repos{
+{{- range .Domains}}
+		{{.Pascal}}: repository.New{{.Pascal}}Repository(writer, reader),
+{{- end}}
+	}
+}
+
+func (c *Container) buildUseCases(cacheClient cache.Cache) {
+	flightGroup := cache.NewFlightGroup()
+	_ = flightGroup // used by domains with cache support
+	_ = cacheClient // used by domains with cache support
+{{range .Domains}}
+	c.{{.Pascal}}UseCases = {{.Pascal}}UseCases{
+{{- if .HasCreate}}
+		Create: {{.Camel}}uc.NewCreateUseCase(c.Repos.{{.Pascal}}),
+{{- end}}
+{{- if .HasGet}}
+		Get:    {{.Camel}}uc.NewGetUseCase(c.Repos.{{.Pascal}}),
+{{- end}}
+{{- if .HasList}}
+		List:   {{.Camel}}uc.NewListUseCase(c.Repos.{{.Pascal}}),
+{{- end}}
+{{- if .HasUpdate}}
+		Update: {{.Camel}}uc.NewUpdateUseCase(c.Repos.{{.Pascal}}),
+{{- end}}
+{{- if .HasDelete}}
+		Delete: {{.Camel}}uc.NewDeleteUseCase(c.Repos.{{.Pascal}}),
+{{- end}}
+	}
+{{- end}}
+}
+
+func (c *Container) buildHandlers(metrics *infratelemetry.Metrics) {
+	_ = metrics // used by domains with business metrics
+	c.Handlers = Handlers{
+{{- range .Domains}}
+		{{.Pascal}}: handler.New{{.Pascal}}Handler(
+{{- if .HasCreate}}
+			c.{{.Pascal}}UseCases.Create,
+{{- end}}
+{{- if .HasGet}}
+			c.{{.Pascal}}UseCases.Get,
+{{- end}}
+{{- if .HasList}}
+			c.{{.Pascal}}UseCases.List,
+{{- end}}
+{{- if .HasUpdate}}
+			c.{{.Pascal}}UseCases.Update,
+{{- end}}
+{{- if .HasDelete}}
+			c.{{.Pascal}}UseCases.Delete,
+{{- end}}
+{{- if .HasMetrics}}
+			metrics,
+{{- end}}
+		),
+{{- end}}
+	}
+}
+`
+
+//nolint:lll
+const testHelpersGoNDomainsTemplate = `package bootstrap
 
 import (
 	"net/http"
@@ -634,9 +695,7 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"{{.ModulePath}}/internal/infrastructure/web/middleware"
-{{- if .KeepExamples}}
 	"{{.ModulePath}}/internal/infrastructure/web/router"
-{{- end}}
 	"{{.ModulePath}}/pkg/cache"
 	"{{.ModulePath}}/pkg/httputil/httpgin"
 )
@@ -648,42 +707,33 @@ func NewForTest(t testing.TB, db *sqlx.DB, cacheClient cache.Cache) *Container {
 	return New(db, db, cacheClient, nil)
 }
 
-// SetupTestRouter creates a gin.Engine in test mode with all routes registered,
-// CustomRecovery middleware, health endpoints, and a panic-test route. No auth
-// middleware is applied.
+// SetupTestRouter creates a gin.Engine in test mode with all routes
+// registered, CustomRecovery middleware, health endpoints, and a panic-test
+// route. No auth middleware is applied.
 func SetupTestRouter(t testing.TB, db *sqlx.DB, cacheClient cache.Cache) *gin.Engine {
 	t.Helper()
 
-{{- if .KeepExamples}}
 	c := NewForTest(t, db, cacheClient)
-{{- else}}
-	_ = NewForTest(t, db, cacheClient)
-{{- end}}
 	r := newTestEngine()
 
 	registerTestHealthRoutes(r, db)
 
-{{- if .KeepExamples}}
 	// Register all domain routes without auth
 	group := r.Group("")
-	router.RegisterUserRoutes(group, c.Handlers.User)
-	router.RegisterRoleRoutes(group, c.Handlers.Role)
+{{- range .Domains}}
+	router.Register{{.Pascal}}Routes(group, c.Handlers.{{.Pascal}})
 {{- end}}
 
 	return r
 }
-{{if .Auth}}
+
 // SetupTestRouterWithAuth creates a gin.Engine in test mode with all routes
 // registered behind service key authentication middleware.
 // serviceKeys uses the format "service1:key1,service2:key2".
 func SetupTestRouterWithAuth(t testing.TB, db *sqlx.DB, cacheClient cache.Cache, serviceKeys string) *gin.Engine {
 	t.Helper()
 
-{{- if .KeepExamples}}
 	c := NewForTest(t, db, cacheClient)
-{{- else}}
-	_ = NewForTest(t, db, cacheClient)
-{{- end}}
 	r := newTestEngine()
 
 	registerTestHealthRoutes(r, db)
@@ -695,16 +745,13 @@ func SetupTestRouterWithAuth(t testing.TB, db *sqlx.DB, cacheClient cache.Cache,
 	}
 	protected := r.Group("")
 	protected.Use(middleware.ServiceKeyAuth(authConfig))
-{{- if .KeepExamples}}
-	router.RegisterUserRoutes(protected, c.Handlers.User)
-	router.RegisterRoleRoutes(protected, c.Handlers.Role)
-{{- else}}
-	_ = protected
+{{- range .Domains}}
+	router.Register{{.Pascal}}Routes(protected, c.Handlers.{{.Pascal}})
 {{- end}}
 
 	return r
 }
-{{end}}
+
 // newTestEngine creates a minimal gin.Engine for testing with TestMode and
 // CustomRecovery middleware. It also registers a panic-test route used by
 // E2E recovery middleware tests.
@@ -722,7 +769,7 @@ func newTestEngine() *gin.Engine {
 }
 
 // registerTestHealthRoutes registers simplified health/ready endpoints for tests.
-// Uses health.New() with no checks — always returns healthy (DB connectivity is
+// Uses health.New() with no checks -- always returns healthy (DB connectivity is
 // already validated by the test container setup).
 func registerTestHealthRoutes(r *gin.Engine, db *sqlx.DB) {
 	r.GET("/health", func(c *gin.Context) {

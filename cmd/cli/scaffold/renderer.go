@@ -28,8 +28,26 @@ type TemplateData struct {
 	// ModulePath is the Go module path
 	ModulePath string
 
+	// EndpointNameSnake is the snake_case endpoint name (used only by
+	// endpoint-scaffolding templates, empty for domain scaffolding).
+	EndpointNameSnake string
+
+	// EndpointNamePascal is the PascalCase endpoint name (e.g., "Cancel").
+	EndpointNamePascal string
+
+	// EndpointNameCamel is the camelCase endpoint name (e.g., "cancel").
+	EndpointNameCamel string
+
 	// Config holds the full scaffold configuration
 	Config Config
+}
+
+// WithEndpoint returns a copy of TemplateData populated with endpoint-specific fields.
+func (d TemplateData) WithEndpoint(endpointName string) TemplateData {
+	d.EndpointNameSnake = ToSnakeCase(endpointName)
+	d.EndpointNamePascal = ToPascalCase(endpointName)
+	d.EndpointNameCamel = ToCamelCase(endpointName)
+	return d
 }
 
 // NewTemplateData creates TemplateData from a domain name and config.

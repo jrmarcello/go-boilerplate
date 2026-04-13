@@ -147,7 +147,7 @@ Ver `.env.example` para a lista completa e [ADR-003](docs/adr/003-config-strateg
 
 | Feature | O que faz | Por que importa |
 | ------- | --------- | --------------- |
-| **Template CLI** | `gopherplate new` + `gopherplate add domain` | Scaffold de serviços e domínios em segundos |
+| **Template CLI** | 8 comandos: `new`, `add domain` / `remove domain`, `add endpoint` / `remove endpoint`, `wiring`, `doctor`, `version` | Scaffold de serviços, domínios e endpoints com regeneração automática de wiring e diagnóstico do ambiente |
 | **CRUD completo** | Create, Get, List, Update, Delete | Endpoint funcional de exemplo para copiar |
 | **PostgreSQL** | Writer/Reader split, pool tunado | Escala com read replicas sem mudar código |
 | **Redis Cache** | Cache-aside + singleflight + pool config | Performance com proteção contra cache stampede |

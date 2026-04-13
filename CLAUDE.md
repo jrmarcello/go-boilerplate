@@ -65,7 +65,7 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
   - `idempotency/` - Idempotency Store interface and Redis implementation
 - **`config/`** - Configuration loading (godotenv + env vars)
 - **`cmd/api/`** - Application entrypoint and manual DI wiring in `server.go`
-- **`cmd/cli/`** - Template CLI (`gopherplate`) for scaffolding new services and domains. Contains Cobra commands, scaffold engine, and embedded templates. See `docs/guides/template-cli.md`.
+- **`cmd/cli/`** - Template CLI (`gopherplate`) with 8 commands: `new` (scaffold service), `add domain` / `remove domain` (manage domains), `add endpoint` / `remove endpoint` (manage endpoints with CRUD protection), `doctor` (diagnose tools/Docker/go.mod), `wiring` (auto-regenerate server.go/router.go/container.go from detected domains), `version`. Contains Cobra commands, scaffold engine, and embedded templates. See `docs/guides/template-cli.md`.
 
 ### Key Patterns
 
@@ -167,3 +167,4 @@ Three-layer quality enforcement:
 4. **Post-implementation validation** — enforced automatically by the **Stop hook** (build + fmt + vet + swagger + lint + tests). The hook blocks completion until validation passes. For the full pipeline including E2E, Kind deploy, and smoke tests, run `/validate` explicitly.
 5. **SDD workflow** for complex features: `/spec` → approve → `/ralph-loop` → `/spec-review`. Specs live in `.specs/`. The ralph-loop uses the Stop hook (exit code 2) to iterate task-by-task within the same session. See `docs/guides/sdd-ralph-loop.md`.
 6. **Parallelism** — Three types: (a) **Intra-spec**: `/spec` auto-generates Parallel Batches from task `files:` and `depends:` metadata; ralph-loop launches parallel agents with `isolation: "worktree"` for multi-task batches. (b) **Inter-spec**: independent specs run in separate worktrees. (c) Shared files classified as exclusive, shared-additive (accumulator pattern), or shared-mutative (must serialize).
+7. **Agent worktree cleanup is MANUAL** — when launching `Agent` with `isolation: "worktree"`, the runtime does NOT auto-cleanup worktrees if the agent made changes. After merging files from a worktree, ALWAYS run `git worktree remove <path> --force && git worktree prune`. Orphan worktrees accumulate fast and break IDE Go tooling (each worktree has its own go.mod). The `WorktreeRemove` hook only fires on explicit removal.

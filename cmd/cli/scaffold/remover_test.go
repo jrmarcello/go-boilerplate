@@ -14,6 +14,16 @@ func TestRemoveDisabledFeatures(t *testing.T) {
 		dir := t.TempDir()
 		createFeatureTree(t, dir, FeatureFiles["redis"])
 
+		// Create Go-pure cache files that must survive the Redis removal:
+		// pkg/cache/cache.go (Cache interface) and pkg/cache/singleflight.go (FlightGroup)
+		// have zero Redis dependency and must not be removed.
+		cacheDir := filepath.Join(dir, "pkg", "cache")
+		require.NoError(t, os.MkdirAll(cacheDir, 0o755))
+		cacheFile := filepath.Join(cacheDir, "cache.go")
+		singleflightFile := filepath.Join(cacheDir, "singleflight.go")
+		require.NoError(t, os.WriteFile(cacheFile, []byte("package cache"), 0o644))
+		require.NoError(t, os.WriteFile(singleflightFile, []byte("package cache"), 0o644))
+
 		cfg := DefaultConfig()
 		cfg.Redis = false
 		cfg.Idempotency = false // idempotency requires redis
@@ -26,6 +36,16 @@ func TestRemoveDisabledFeatures(t *testing.T) {
 			_, statErr := os.Stat(abs)
 			assert.True(t, os.IsNotExist(statErr), "expected %s to be removed", rel)
 		}
+
+		// Assert pkg/cache/redisclient/ is removed.
+		_, redisclientErr := os.Stat(filepath.Join(dir, "pkg", "cache", "redisclient"))
+		assert.True(t, os.IsNotExist(redisclientErr), "expected pkg/cache/redisclient to be removed")
+
+		// Assert Go-pure cache files still exist.
+		_, cacheStatErr := os.Stat(cacheFile)
+		assert.NoError(t, cacheStatErr, "expected pkg/cache/cache.go to still exist")
+		_, singleflightStatErr := os.Stat(singleflightFile)
+		assert.NoError(t, singleflightStatErr, "expected pkg/cache/singleflight.go to still exist")
 	})
 
 	t.Run("removes idempotency files when Idempotency is disabled", func(t *testing.T) {

@@ -38,6 +38,11 @@ func TestAddDomainIntegration(t *testing.T) {
 			if entry.IsDir() || filepath.Ext(entry.Name()) != ".tmpl" {
 				continue
 			}
+			// Endpoint-scaffolding templates are rendered by `gopherplate add endpoint`,
+			// not by `gopherplate add domain`, so they are not part of this mapping.
+			if strings.HasPrefix(entry.Name(), "endpoint_") {
+				continue
+			}
 
 			tmplContent, readErr := fs.ReadFile(domaintmpl.Templates, entry.Name())
 			require.NoError(t, readErr, "reading template %s", entry.Name())

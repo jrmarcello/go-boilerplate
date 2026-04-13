@@ -44,7 +44,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	cfg := scaffold.DefaultConfig()
 	reader := bufio.NewReader(os.Stdin)
 	acceptDefaults, _ := cmd.Flags().GetBool("yes")
-	interactive := isInteractive() && !acceptDefaults
+	interactive := IsInteractive() && !acceptDefaults
 
 	// --- Collect configuration from args/flags/prompts ---
 
@@ -105,7 +105,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	if noRedis {
 		cfg.Redis = false
 	} else if interactive && !cmd.Flags().Changed("no-redis") {
-		redisVal, redisErr := promptConfirm(reader, "Incluir cache Redis?", true)
+		redisVal, redisErr := PromptConfirm(reader, "Incluir cache Redis?", true)
 		if redisErr != nil {
 			return redisErr
 		}
@@ -121,7 +121,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	case noIdempotency:
 		cfg.Idempotency = false
 	case interactive && !cmd.Flags().Changed("no-idempotency"):
-		idempVal, idempErr := promptConfirm(reader, "Incluir idempotência?", true)
+		idempVal, idempErr := PromptConfirm(reader, "Incluir idempotência?", true)
 		if idempErr != nil {
 			return idempErr
 		}
@@ -133,7 +133,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	if noAuth {
 		cfg.Auth = false
 	} else if interactive && !cmd.Flags().Changed("no-auth") {
-		authVal, authErr := promptConfirm(reader, "Incluir Service Key Auth?", true)
+		authVal, authErr := PromptConfirm(reader, "Incluir Service Key Auth?", true)
 		if authErr != nil {
 			return authErr
 		}
@@ -150,7 +150,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	case keepExamples:
 		cfg.KeepExamples = true
 	case interactive && !cmd.Flags().Changed("no-examples") && !cmd.Flags().Changed("keep-examples"):
-		exVal, exErr := promptConfirm(reader, "Manter domínios de exemplo (user/role)?", true)
+		exVal, exErr := PromptConfirm(reader, "Manter domínios de exemplo (user/role)?", true)
 		if exErr != nil {
 			return exErr
 		}
@@ -339,47 +339,9 @@ func promptSelect(reader *bufio.Reader, label string, options []string, defaultV
 	return "", fmt.Errorf("invalid option '%s'; choose from: %s", line, strings.Join(options, ", "))
 }
 
-func promptConfirm(reader *bufio.Reader, label string, defaultVal bool) (bool, error) { //nolint:unparam // defaultVal kept for API flexibility
-	defaultHint := "Y/n"
-	if !defaultVal {
-		defaultHint = "y/N"
-	}
-
-	fmt.Printf("  %s [%s]: ", label, defaultHint)
-
-	line, readErr := reader.ReadString('\n')
-	if readErr != nil {
-		return false, fmt.Errorf("reading input: %w", readErr)
-	}
-
-	line = strings.TrimSpace(strings.ToLower(line))
-	if line == "" {
-		return defaultVal, nil
-	}
-
-	switch line {
-	case "y", "yes", "s", "sim":
-		return true, nil
-	case "n", "no", "não", "nao":
-		return false, nil
-	default:
-		return defaultVal, nil
-	}
-}
-
 func boolToYesNo(v bool) string {
 	if v {
 		return "sim"
 	}
 	return "não"
-}
-
-// isInteractive returns true if stdin is a terminal (TTY).
-// When not interactive, prompts are skipped and defaults are used.
-func isInteractive() bool {
-	fi, statErr := os.Stdin.Stat()
-	if statErr != nil {
-		return false
-	}
-	return fi.Mode()&os.ModeCharDevice != 0
 }

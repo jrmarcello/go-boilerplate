@@ -1,0 +1,45 @@
+package {{.DomainNameSnake}}
+
+import (
+	"context"
+	"fmt"
+
+	{{.DomainNameCamel}}domain "{{.ModulePath}}/internal/domain/{{.DomainNameSnake}}"
+	"{{.ModulePath}}/internal/usecases/{{.DomainNameSnake}}/dto"
+	"{{.ModulePath}}/internal/usecases/{{.DomainNameSnake}}/interfaces"
+
+	ucshared "{{.ModulePath}}/internal/usecases/shared"
+	"go.opentelemetry.io/otel/trace"
+)
+
+// {{.EndpointNamePascal}}UseCase implements the custom {{.EndpointNameSnake}} operation for {{.DomainNameSnake}}.
+type {{.EndpointNamePascal}}UseCase struct {
+	Repo interfaces.Repository
+}
+
+// New{{.EndpointNamePascal}}UseCase creates a new instance of {{.EndpointNamePascal}}UseCase.
+func New{{.EndpointNamePascal}}UseCase(repo interfaces.Repository) *{{.EndpointNamePascal}}UseCase {
+	return &{{.EndpointNamePascal}}UseCase{Repo: repo}
+}
+
+// Execute runs the {{.EndpointNameSnake}} operation.
+func (uc *{{.EndpointNamePascal}}UseCase) Execute(ctx context.Context, input dto.{{.EndpointNamePascal}}Input) (*dto.{{.EndpointNamePascal}}Output, error) {
+	span := trace.SpanFromContext(ctx)
+
+	// TODO: Implement {{.EndpointNameSnake}} business logic.
+	// Example:
+	// entity, findErr := uc.Repo.FindByID(ctx, id)
+	// if findErr != nil {
+	//     wrappedErr := fmt.Errorf("{{.EndpointNameSnake}} {{.DomainNameSnake}}: %w", findErr)
+	//     ucshared.ClassifyError(span, findErr, getExpectedErrors, wrappedErr.Error())
+	//     return nil, {{.DomainNameCamel}}ToAppError(findErr)
+	// }
+
+	// Silence unused-import warnings until the user implements the logic.
+	_ = span
+	_ = fmt.Errorf
+	_ = {{.DomainNameCamel}}domain.Err{{.DomainNamePascal}}NotFound
+	_ = ucshared.ClassifyError
+
+	return &dto.{{.EndpointNamePascal}}Output{ID: input.ID}, nil
+}

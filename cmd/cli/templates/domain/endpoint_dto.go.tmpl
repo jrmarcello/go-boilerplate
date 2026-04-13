@@ -1,0 +1,14 @@
+package dto
+
+// {{.EndpointNamePascal}}Input represents the input for the {{.EndpointNameSnake}} operation.
+type {{.EndpointNamePascal}}Input struct {
+	// ID from URL path.
+	ID string `json:"-"`
+	// TODO: Add additional input fields.
+}
+
+// {{.EndpointNamePascal}}Output represents the output for the {{.EndpointNameSnake}} operation.
+type {{.EndpointNamePascal}}Output struct {
+	ID string `json:"id"`
+	// TODO: Add additional output fields.
+}

@@ -9,7 +9,7 @@ import (
 // When a feature is disabled, these paths are removed.
 var FeatureFiles = map[string][]string{
 	"redis": {
-		"pkg/cache",
+		"pkg/cache/redisclient",
 		"pkg/idempotency",
 	},
 	"idempotency": {

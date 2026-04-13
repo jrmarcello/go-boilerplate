@@ -1,0 +1,23 @@
+package {{.DomainNameSnake}}
+
+import (
+	"context"
+	"testing"
+
+	"{{.ModulePath}}/internal/usecases/{{.DomainNameSnake}}/dto"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func Test{{.EndpointNamePascal}}UseCase_Execute_Success(t *testing.T) {
+	repo := &mockRepository{}
+
+	uc := New{{.EndpointNamePascal}}UseCase(repo)
+	input := dto.{{.EndpointNamePascal}}Input{ID: "test-id"}
+
+	output, execErr := uc.Execute(context.Background(), input)
+
+	require.NoError(t, execErr)
+	require.NotNil(t, output)
+	assert.Equal(t, "test-id", output.ID)
+}

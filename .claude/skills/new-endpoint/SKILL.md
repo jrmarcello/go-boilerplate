@@ -8,11 +8,17 @@ user-invocable: true
 
 Scaffolds a new API endpoint following Clean Architecture patterns.
 
-> **Domínio inteiro?** Para criar um domínio completo (entity + usecases + infra + migration), use o CLI:
+> **Domínio inteiro?** Para criar um domínio completo (entity + usecases + infra + migration), use:
 > ```bash
-> go run ./cmd/cli add domain <name>
+> gopherplate add domain <name>
 > ```
-> Este skill é para adicionar endpoints individuais a domínios já existentes.
+>
+> **Endpoint padrão (CRUD-style)?** Use o CLI direto:
+> ```bash
+> gopherplate add endpoint <domain> <name>
+> ```
+>
+> Este skill é uma alternativa para adicionar endpoints com customização guiada por Claude — útil quando o padrão CRUD não cobre o caso ou voce quer ajustes além do template.
 
 ## Example
 

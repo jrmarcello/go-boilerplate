@@ -38,6 +38,7 @@ applies-to: "**/*.go"
 - Constructor injection for required deps (interfaces)
 - Builder methods for optional deps: `.WithCache()`
 - All wiring in `cmd/api/server.go:buildDependencies()`
+- **Tip**: Use `gopherplate wiring` to auto-regenerate `server.go`/`router.go`/`container.go` from detected domains (instead of manual edits)
 
 ## Reusable Packages (pkg/)
 

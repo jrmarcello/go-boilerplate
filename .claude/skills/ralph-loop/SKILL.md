@@ -62,10 +62,19 @@ Read next batch from spec
 2. For each task, launch an Agent call with `isolation: "worktree"` — ALL Agent calls MUST be in a single message (this ensures real parallelism)
 3. Wait for all agents to complete
 4. Collect results — each agent returns its worktree path (if changes were made)
-5. Merge worktrees sequentially into main working directory
-6. Verify: `go build ./...` and `go test ./...` pass after merge
-7. Mark all completed tasks as `[x]` in the spec
-8. Log all tasks in a single Execution Log entry
+5. Merge worktrees sequentially into main working directory (use `cp` from worktree paths)
+6. **Cleanup worktrees MANUALLY** (CRITICAL — the runtime does NOT auto-cleanup Agent worktrees when changes were made):
+
+   ```bash
+   git worktree remove <worktreePath> --force
+   git worktree prune
+   ```
+
+   Run this for EACH worktree immediately after merging its files. Orphan worktrees pile up fast (one per Agent call) and break the VS Code Go extension (it tries to resolve modules in each worktree). The `WorktreeRemove` hook only fires on explicit removal, not on Agent completion.
+
+7. Verify: `go build ./...` and `go test ./...` pass after merge
+8. Mark all completed tasks as `[x]` in the spec
+9. Log all tasks in a single Execution Log entry
 
 ### Agent Prompt Template
 
