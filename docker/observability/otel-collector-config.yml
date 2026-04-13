@@ -50,7 +50,7 @@ exporters:
   # Prometheus metrics (opcional)
   prometheus:
     endpoint: "0.0.0.0:8889"
-    namespace: boilerplate_service
+    namespace: gopherplate_service
 
 extensions:
   health_check:

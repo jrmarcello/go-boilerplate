@@ -1276,7 +1276,7 @@ O gateway é gerado automaticamente a partir de anotações `google.api.http` no
 - Precisa de features específicas do Gin (middleware ecosystem, template rendering)
 - A complexidade de anotações HTTP nos protos não compensa
 
-**Para o boilerplate**: como o Gin já existe e funciona bem para REST, gRPC-Gateway provavelmente não é necessário. A recomendação é manter ambos os stacks separados (Gin para REST, gRPC-Go para gRPC) — mais simples de entender e operar.
+**Para o gopherplate**: como o Gin já existe e funciona bem para REST, gRPC-Gateway provavelmente não é necessário. A recomendação é manter ambos os stacks separados (Gin para REST, gRPC-Go para gRPC) — mais simples de entender e operar.
 
 Se houver interesse futuro, vale pesquisar também o **ConnectRPC** (`connectrpc.com/connect`) — desenvolvido pelo time do buf, suporta gRPC + HTTP/JSON + gRPC-Web com uma única implementação, sem proxy.
 

@@ -865,11 +865,11 @@ tx.Commit()
 ### Porque nao Unit of Work
 
 O UoW (Unit of Work) pattern e mais elegante, mas adiciona uma camada de abstracao
-que **nao existe hoje no boilerplate**. Os use cases atuais trabalham com interfaces
+que **nao existe hoje no template**. Os use cases atuais trabalham com interfaces
 simples (Repository) e builder pattern para deps opcionais.
 
 Introduzir UoW so para o outbox criaria inconsistencia arquitetural. Se no futuro
-o boilerplate migrar para UoW de forma geral, o outbox module pode adicionar um
+o template migrar para UoW de forma geral, o outbox module pode adicionar um
 adapter `uow.go` sem breaking change.
 
 ### Quem gerencia a transacao?
@@ -1110,7 +1110,7 @@ require (
 )
 ```
 
-### 15.2 Wiring no server.go (boilerplate)
+### 15.2 Wiring no server.go (gopherplate)
 
 ```go
 import (

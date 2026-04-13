@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Kibana Dashboard Generator — Go Boilerplate
+Kibana Dashboard Generator — Gopherplate
 
 Generates a kibana dashboard NDJSON file with:
 - 3 Data Views (otel-traces-*, otel-logs-*, otel-metrics-*)
@@ -42,16 +42,16 @@ from datetime import datetime, timezone
 # Configuration
 # ============================================================================
 
-METRICS_DV_ID = "boilerplate-metrics-dataview"
-LOGS_DV_ID = "boilerplate-logs-dataview"
-TRACES_DV_ID = "boilerplate-traces-dataview"
+METRICS_DV_ID = "gopherplate-metrics-dataview"
+LOGS_DV_ID = "gopherplate-logs-dataview"
+TRACES_DV_ID = "gopherplate-traces-dataview"
 
 METRICS_INDEX = os.environ.get("METRICS_INDEX", "otel-metrics-*")
 LOGS_INDEX = os.environ.get("LOGS_INDEX", "otel-logs-*")
 TRACES_INDEX = os.environ.get("TRACES_INDEX", "otel-traces-*")
 
-DASHBOARD_ID = "boilerplate-dashboard"
-DASHBOARD_TITLE = "Go Boilerplate — Observability Dashboard"
+DASHBOARD_ID = "gopherplate-dashboard"
+DASHBOARD_TITLE = "Gopherplate — Observability Dashboard"
 
 NOW = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
@@ -535,7 +535,7 @@ class DashboardBuilder:
                     }),
                     "panelsJSON": "{}",
                 },
-                "description": f"Observability dashboard for {self.service_name} — Go Boilerplate",
+                "description": f"Observability dashboard for {self.service_name} — Gopherplate",
                 "hits": 0,
                 "kibanaSavedObjectMeta": {
                     "searchSourceJSON": json.dumps({
@@ -916,7 +916,7 @@ def build_panels(db):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate Kibana NDJSON dashboard for Go Boilerplate"
+        description="Generate Kibana NDJSON dashboard for Gopherplate"
     )
     parser.add_argument(
         "--service-name",

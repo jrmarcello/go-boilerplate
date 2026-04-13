@@ -16,7 +16,7 @@ Launches a parallel code review with 3 specialized agents auditing the codebase 
 - Layer boundary violations
 - Go idioms and conventions
 - DI patterns and interface design
-- Template quality (as a boilerplate)
+- Template quality (as a starter template)
 
 ### 2. Security Reviewer (security-reviewer agent)
 

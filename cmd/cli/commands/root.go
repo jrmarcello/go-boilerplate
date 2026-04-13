@@ -7,7 +7,7 @@ var version = "dev" // set via ldflags at build time
 var rootCmd = &cobra.Command{
 	Use:   "gopherplate",
 	Short: "Go microservice template scaffolding tool",
-	Long: `Boilerplate CLI scaffolds new Go microservices and domains
+	Long: `Gopherplate CLI scaffolds new Go microservices and domains
 following Clean Architecture patterns.
 
 Commands:

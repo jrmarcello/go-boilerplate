@@ -1,6 +1,6 @@
 # Binários
 /bin/
-/boilerplate
+/gopherplate
 *.exe
 *.exe~
 *.dll

@@ -1,6 +1,6 @@
 package main
 
-// @title           Go Boilerplate API
+// @title           Gopherplate API
 // @version         1.0
 // @description     API para gerenciamento de usuários e roles com Clean Architecture.
 

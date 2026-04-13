@@ -1,8 +1,8 @@
-// Package boilerplate provides the project snapshot and copy logic for the
+// Package gopherplate provides the project snapshot and copy logic for the
 // `gopherplate new` command. Instead of maintaining Go templates for every file,
 // we copy the actual project tree and run post-processing (module rewrite,
 // service name replacement, feature removal, DB driver switch).
-package boilerplate
+package gopherplate
 
 // ExcludePaths lists path prefixes that must never be copied to new projects.
 // Paths ending with "/" are treated as directory prefixes; paths without "/" are

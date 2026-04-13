@@ -91,11 +91,11 @@ fi
 # 6. Check Docker infrastructure
 if command -v docker &>/dev/null; then
   RUNNING=$(docker ps --format '{{.Names}}' 2>/dev/null || true)
-  if ! echo "$RUNNING" | grep -q 'boilerplate-db'; then
-    echo "WARNING: boilerplate-db not running. Run 'make docker-up' in the main project." >&2
+  if ! echo "$RUNNING" | grep -q 'gopherplate-db'; then
+    echo "WARNING: gopherplate-db not running. Run 'make docker-up' in the main project." >&2
   fi
-  if ! echo "$RUNNING" | grep -q 'boilerplate-redis'; then
-    echo "WARNING: boilerplate-redis not running. Run 'make docker-up' in the main project." >&2
+  if ! echo "$RUNNING" | grep -q 'gopherplate-redis'; then
+    echo "WARNING: gopherplate-redis not running. Run 'make docker-up' in the main project." >&2
   fi
 fi
 

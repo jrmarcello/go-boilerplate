@@ -5,7 +5,7 @@ tools: Read, Grep, Glob
 model: sonnet
 memory: project
 ---
-You are a senior Go engineer reviewing code for a Clean Architecture microservice boilerplate.
+You are a senior Go engineer reviewing code for a Clean Architecture microservice template.
 
 ## Review Focus
 

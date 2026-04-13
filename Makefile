@@ -148,17 +148,17 @@ build: ## Compila binarios para bin/
 	@mkdir -p bin
 	go build -o bin/api ./cmd/api
 	go build -o bin/migrate ./cmd/migrate
-	go build -o bin/boilerplate ./cmd/cli
-	@echo "Binaries: bin/api, bin/migrate, bin/boilerplate"
+	go build -o bin/gopherplate ./cmd/cli
+	@echo "Binaries: bin/api, bin/migrate, bin/gopherplate"
 
 build-cli: ## Compila o CLI de scaffold para bin/
 	@mkdir -p bin
-	go build -o bin/boilerplate ./cmd/cli
-	@echo "Binary: bin/boilerplate"
+	go build -o bin/gopherplate ./cmd/cli
+	@echo "Binary: bin/gopherplate"
 
 install-cli: ## Instala o CLI de scaffold no GOBIN
-	go install ./cmd/cli
-	@echo "Installed: $(GOBIN)/boilerplate"
+	go build -o $(GOBIN)/gopherplate ./cmd/cli
+	@echo "Installed: $(GOBIN)/gopherplate"
 
 clean: ## Remove arquivos gerados
 	rm -rf bin/ tests/coverage/ tests/load/results/
@@ -419,7 +419,7 @@ else
 endif
 
 # Git identity from host (passed to container for commits)
-SANDBOX_GIT_EMAIL := $(shell git config user.email 2>/dev/null || echo "dev@boilerplate.local")
+SANDBOX_GIT_EMAIL := $(shell git config user.email 2>/dev/null || echo "dev@gopherplate.local")
 SANDBOX_GIT_NAME  := $(shell git config user.name 2>/dev/null || echo "Developer")
 
 SANDBOX_RUN_ARGS := -it --rm \

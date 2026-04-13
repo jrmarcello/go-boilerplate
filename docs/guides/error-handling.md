@@ -1,6 +1,6 @@
 # Guia de Error Handling
 
-Este guia descreve como o sistema de error handling funciona neste boilerplate e como estende-lo ao adicionar novos erros ou dominios.
+Este guia descreve como o sistema de error handling funciona neste template e como estende-lo ao adicionar novos erros ou dominios.
 
 > **ADR de referencia**: [ADR-009 - Refatoracao do Error Handling](../adr/009-error-handling.md)
 

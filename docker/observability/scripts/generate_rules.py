@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Kibana Alerting Rules Generator — Go Boilerplate
+Kibana Alerting Rules Generator — Gopherplate
 
 Creates 6 basic Kibana alerting rules via the Kibana Alerting API.
 Uses ES|QL queries against OTel metrics data. Stdlib only (no pip deps).
@@ -31,10 +31,10 @@ import urllib.error
 # Configuration
 # --------------------------------------------------------------------------- #
 
-RULE_PREFIX = "BOILERPLATE"
+RULE_PREFIX = "GOPHERPLATE"
 INDEX_PATTERN = "otel-metrics-*"
 TIME_FIELD = "@timestamp"
-TAGS = ["boilerplate", "slo", "auto-generated"]
+TAGS = ["gopherplate", "slo", "auto-generated"]
 
 
 # --------------------------------------------------------------------------- #
@@ -315,7 +315,7 @@ def build_rule_body(rule, connector_id=None):
 
 
 def find_existing_rules(kibana_url):
-    """Find existing auto-generated boilerplate rules. Returns {name: rule_id}."""
+    """Find existing auto-generated gopherplate rules. Returns {name: rule_id}."""
     prefix_marker = "[{prefix}]".format(prefix=RULE_PREFIX)
     existing = {}
     page = 1
@@ -324,7 +324,7 @@ def find_existing_rules(kibana_url):
             kibana_url,
             "GET",
             "/api/alerting/rules/_find?per_page=100&page={p}"
-            "&search_fields=tags&search=boilerplate".format(p=page),
+            "&search_fields=tags&search=gopherplate".format(p=page),
         )
         if status != 200:
             break
@@ -380,7 +380,7 @@ def cmd_apply(kibana_url):
     # Find existing rules to avoid duplicates
     existing = find_existing_rules(kibana_url)
     if existing:
-        print("  Found {count} existing boilerplate rules".format(count=len(existing)))
+        print("  Found {count} existing gopherplate rules".format(count=len(existing)))
 
     created = 0
     updated = 0
@@ -424,14 +424,14 @@ def cmd_apply(kibana_url):
 
 
 def cmd_delete(kibana_url):
-    """Delete all auto-generated boilerplate rules."""
-    print("\n--- Deleting All Boilerplate Rules ---")
+    """Delete all auto-generated gopherplate rules."""
+    print("\n--- Deleting All Gopherplate Rules ---")
     print("  Kibana URL: {url}".format(url=kibana_url))
     print()
 
     existing = find_existing_rules(kibana_url)
     if not existing:
-        print("  No boilerplate rules found.")
+        print("  No gopherplate rules found.")
         return
 
     deleted = 0
@@ -471,7 +471,7 @@ def cmd_delete(kibana_url):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate Kibana alerting rules for go-boilerplate.",
+        description="Generate Kibana alerting rules for gopherplate.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"

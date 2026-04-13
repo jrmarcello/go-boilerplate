@@ -7,7 +7,7 @@ import (
 )
 
 // User é a Entidade principal (Aggregate Root) do domínio.
-// Estrutura simplificada para o boilerplate.
+// Estrutura simplificada para o template.
 type User struct {
 	ID        vo.ID
 	Name      string

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/jrmarcello/gopherplate/cmd/cli/scaffold"
-	boilerplatetmpl "github.com/jrmarcello/gopherplate/cmd/cli/templates/boilerplate"
+	gopherplatetmpl "github.com/jrmarcello/gopherplate/cmd/cli/templates/gopherplate"
 	"github.com/spf13/cobra"
 )
 
@@ -19,9 +19,9 @@ var newCmd = &cobra.Command{
 	Long: `Cria um novo microserviço Go com Clean Architecture a partir do template.
 
 Exemplos:
-  boilerplate new my-service
-  boilerplate new my-service --module github.com/org/my-service --db postgres
-  boilerplate new my-service --module github.com/org/my-service --no-redis --no-auth`,
+  gopherplate new my-service
+  gopherplate new my-service --module github.com/org/my-service --db postgres
+  gopherplate new my-service --module github.com/org/my-service --no-redis --no-auth`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runNew,
 }
@@ -189,7 +189,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 
 	// 3. Copy project
 	fmt.Printf("\nCriando %s...\n\n", cfg.ServiceName)
-	copyErr := boilerplatetmpl.CopyProject(templateDir, outputDir)
+	copyErr := gopherplatetmpl.CopyProject(templateDir, outputDir)
 	if copyErr != nil {
 		return fmt.Errorf("copying project: %w", copyErr)
 	}
@@ -203,7 +203,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 
 	// 5. Replace service name in configs
 	fmt.Println("  Replacing service name...")
-	renameErr := boilerplatetmpl.ReplaceServiceName(outputDir, cfg.ServiceName)
+	renameErr := gopherplatetmpl.ReplaceServiceName(outputDir, cfg.ServiceName)
 	if renameErr != nil {
 		return fmt.Errorf("replacing service name: %w", renameErr)
 	}
@@ -211,7 +211,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	// 6. Switch DB driver if needed
 	if cfg.DB != scaffold.DBPostgres {
 		fmt.Printf("  Switching DB driver to %s...\n", cfg.DB)
-		dbErr := boilerplatetmpl.SwitchDBDriver(outputDir, string(cfg.DB))
+		dbErr := gopherplatetmpl.SwitchDBDriver(outputDir, string(cfg.DB))
 		if dbErr != nil {
 			return fmt.Errorf("switching DB driver: %w", dbErr)
 		}

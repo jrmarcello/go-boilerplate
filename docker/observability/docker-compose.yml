@@ -10,12 +10,12 @@ services:
   # ============================================
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
-    container_name: boilerplate-elasticsearch
+    container_name: gopherplate-elasticsearch
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
-      - cluster.name=boilerplate-cluster
+      - cluster.name=gopherplate-cluster
       # Disable disk watermarks for local dev (prevents shard allocation failures on low disk)
       - cluster.routing.allocation.disk.threshold_enabled=false
     ports:
@@ -41,11 +41,11 @@ services:
   # ============================================
   kibana:
     image: docker.elastic.co/kibana/kibana:8.13.0
-    container_name: boilerplate-kibana
+    container_name: gopherplate-kibana
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - XPACK_SECURITY_ENABLED=false
-      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=boilerplate-kibana-alerts-encrypt-32ch
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=gopherplate-kibana-alerts-encrypt-32ch
     ports:
       - "${KIBANA_PORT:-5601}:5601"
     volumes:
@@ -67,7 +67,7 @@ services:
   # ============================================
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.114.0
-    container_name: boilerplate-otel-collector
+    container_name: gopherplate-otel-collector
     command: [ "--config=/etc/otel-config.yml" ]
     volumes:
       - ./otel-collector-config.yml:/etc/otel-config.yml:ro

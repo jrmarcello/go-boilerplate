@@ -499,7 +499,7 @@ cmd/cli/
 ├── commands/                    # Cobra commands (new, add domain, version)
 ├── scaffold/                    # Engine de scaffold (config, helpers, renderer, rewriter, remover, wiring)
 └── templates/
-    ├── boilerplate/             # Lógica de copy + transform para `gopherplate new`
+    ├── gopherplate/             # Lógica de copy + transform para `gopherplate new`
     │   ├── copy.go              # Copia o projeto excluindo paths irrelevantes
     │   ├── snapshot.go          # Lista de exclusões (ExcludePaths)
     │   ├── servicename.go       # Substituição do nome do serviço em configs
@@ -518,12 +518,12 @@ cmd/cli/
 
 ### Como customizar
 
-1. **Fork** o repositório do boilerplate
+1. **Fork** o repositório do gopherplate
 2. **Edite** os templates em `cmd/cli/templates/`
 3. **Rebuild** o CLI:
 
 ```bash
-go build -o boilerplate ./cmd/cli/
+go build -o gopherplate ./cmd/cli/
 ```
 
 1. **Instale** localmente:
@@ -566,7 +566,7 @@ Atualmente a única estratégia de DI é **Manual** (wiring em `server.go:buildD
 
 ## Troubleshooting
 
-### `command not found: boilerplate`
+### `command not found: gopherplate`
 
 O binário do Go não está no `$PATH`. Verifique:
 

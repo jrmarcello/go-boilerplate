@@ -51,7 +51,7 @@ Code review focused on Clean Architecture, security, and project conventions.
 
 ### Template Quality
 
-- [ ] Code is exemplary for teams cloning this boilerplate
+- [ ] Code is exemplary for teams cloning this template
 - [ ] Patterns are easy to follow
 
 ## Output Format
