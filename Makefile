@@ -171,9 +171,9 @@ changelog: ## Gera sugestão de changelog a partir dos commits (somente visualiz
 	@echo ""
 	@echo "Para criar uma release, use: make release VERSION=x.y.z"
 
-release: ## Cria release: tag + CHANGELOG.md automático (uso: make release VERSION=0.7.0)
+release: ## Cria release + publica no GitHub (uso: make release VERSION=0.13.0)
 	@command -v git-cliff >/dev/null 2>&1 || { echo "git-cliff not found. Install: brew install git-cliff"; exit 1; }
-	@[ -n "$(VERSION)" ] || { echo "Erro: informe a versão. Uso: make release VERSION=0.7.0"; exit 1; }
+	@[ -n "$(VERSION)" ] || { echo "Erro: informe a versão. Uso: make release VERSION=0.13.0"; exit 1; }
 	@[ -z "$$(git status --porcelain)" ] || { echo "Erro: working tree com mudanças não commitadas. Faça commit antes."; exit 1; }
 	@echo "Criando release v$(VERSION)..."
 	@git-cliff --tag "v$(VERSION)" --output CHANGELOG.md
@@ -181,8 +181,13 @@ release: ## Cria release: tag + CHANGELOG.md automático (uso: make release VERS
 	@git commit -m "chore(release): v$(VERSION) [skip ci]"
 	@git tag "v$(VERSION)"
 	@echo ""
-	@echo "Release v$(VERSION) criada. Para publicar:"
-	@echo "  git push origin main --tags"
+	@echo "Commit e tag criados localmente."
+	@read -p "Push para origin/main + tag v$(VERSION) agora? [y/N] " ans; \
+		[ "$$ans" = "y" ] || [ "$$ans" = "Y" ] || { echo "Cancelado. Para publicar depois: git push origin main --follow-tags"; exit 0; }
+	@git push origin main --follow-tags
+	@echo ""
+	@echo "v$(VERSION) publicada. GitHub Actions vai criar a Release em ~30s."
+	@echo "Acompanhe: gh run watch  (ou veja em github.com/<owner>/<repo>/actions)"
 
 # ============================================
 # QUALIDADE DE CÓDIGO

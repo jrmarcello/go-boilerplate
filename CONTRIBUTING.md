@@ -61,9 +61,59 @@ Ao abrir um PR:
 1. Descreva claramente o que foi feito e por que
 2. Garanta que `make lint` e `make test` passam
 3. Se mudou a API, regenere o Swagger: `make swagger`
-4. Se adicionou features, atualize o `CHANGELOG.md` (use `make changelog` como base)
+4. **Nao edite `CHANGELOG.md` manualmente** — ele e gerado automaticamente a partir dos commits durante `make release` (via `git-cliff`). Para ver o changelog previsto a qualquer momento, use `make changelog`.
 
 O pipeline roda automaticamente: lint, vulncheck, unit tests e E2E tests em paralelo.
+
+## Releases
+
+> Esta secao e para mantenedores. Contribuidores externos nao precisam rodar `make release`.
+
+### Quando lancar uma nova versao
+
+Rode `make release` quando houver pelo menos **um commit `feat:` ou `fix:` user-visible** acumulado desde a ultima tag. Commits apenas de `chore`, `docs`, `ci`, `refactor`, `test`, `style` **nao** justificam uma release — isso e ruido pra quem clona o template.
+
+Verifique o que entraria:
+
+```bash
+git log v<ultima-tag>..HEAD --oneline
+```
+
+### Escolhendo a versao (semver pre-1.0)
+
+O projeto esta em `0.x.x`. A regra pratica:
+
+| Situacao desde a ultima tag | Bump | Exemplo |
+| --- | --- | --- |
+| Apenas `fix:` (bug em feature ja lancada) | PATCH | `0.12.0` -> `0.12.1` |
+| Qualquer `feat:` (novo comando, endpoint, env var) | MINOR | `0.12.0` -> `0.13.0` |
+| Breaking change | MINOR + secao "BREAKING CHANGES" | `0.12.0` -> `0.13.0` |
+
+Quem decide MAJOR/MINOR/PATCH e voce no `VERSION=...`. O `git-cliff` so gera o changelog a partir dos commits.
+
+### Fluxo
+
+```bash
+make release VERSION=0.13.0
+```
+
+O Makefile faz, em ordem:
+
+1. Valida working tree limpa
+2. `git-cliff --tag v0.13.0 --output CHANGELOG.md`
+3. `git commit -m "chore(release): v0.13.0 [skip ci]"`
+4. `git tag v0.13.0`
+5. Pergunta `Push para origin/main + tag? [y/N]` — responda `y` para publicar
+6. `git push origin main --follow-tags`
+
+Apos o push, o workflow `.github/workflows/release.yml` dispara automaticamente e publica a **GitHub Release** em `~30s`, com notes geradas pelo `git-cliff` (escopo: so commits desde a tag anterior). Acompanhe com `gh run watch` ou na aba Actions.
+
+### Checklist mental antes de rodar
+
+- [ ] `git log v<ultima-tag>..HEAD --oneline` contem algum `feat:` ou `fix:`?
+- [ ] `make test` e `make lint` passam?
+- [ ] Estou na `main` atualizada (`git pull`)?
+- [ ] Bump correto (`feat` -> MINOR, `fix` -> PATCH)?
 
 ## Testes
 

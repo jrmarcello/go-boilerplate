@@ -76,6 +76,7 @@ make dev               # Servidor local com hot reload
 make run               # Tudo em Docker (infra + migrations + API)
 make run-stop          # Para todos os containers
 make changelog         # Gera sugestão de changelog a partir dos commits
+make release VERSION=x.y.z  # Cria tag, gera CHANGELOG e publica GitHub Release
 
 # Qualidade
 make lint              # golangci-lint + gofmt
