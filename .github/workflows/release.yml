@@ -16,13 +16,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate release notes with git-cliff
-        uses: orhun/git-cliff-action@v3
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
         with:
-          config: cliff.toml
-          args: --latest --strip all
-        env:
-          OUTPUT: RELEASE_NOTES.md
+          tool: git-cliff@2.12.0
+
+      - name: Generate release notes
+        run: git-cliff --latest --strip all --output RELEASE_NOTES.md
 
       - name: Publish GitHub Release
         env:
