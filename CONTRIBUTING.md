@@ -23,7 +23,7 @@ Se quiser implementar a feature, comente na issue antes de comecar para alinhar 
 
 ## Desenvolvimento
 
-Ferramentas necessarias: `Go 1.25`, `Docker`, `Make`.
+Ferramentas necessarias: `Go 1.26`, `Docker`, `Make`.
 
 ```bash
 make setup     # Setup completo (tools + Docker + migrations)

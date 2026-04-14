@@ -18,7 +18,7 @@ func TestAddDomainIntegration(t *testing.T) {
 		projectDir := t.TempDir()
 
 		// Create a minimal Go project structure
-		goModContent := "module github.com/test/my-service\n\ngo 1.25.0\n"
+		goModContent := "module github.com/test/my-service\n\ngo 1.26.0\n"
 		writeErr := os.WriteFile(filepath.Join(projectDir, "go.mod"), []byte(goModContent), 0o644)
 		require.NoError(t, writeErr)
 
@@ -152,7 +152,7 @@ func TestAddDomainIntegration(t *testing.T) {
 	t.Run("scaffolds multi-word domain correctly", func(t *testing.T) {
 		projectDir := t.TempDir()
 
-		goModContent := "module github.com/test/my-service\n\ngo 1.25.0\n"
+		goModContent := "module github.com/test/my-service\n\ngo 1.26.0\n"
 		writeErr := os.WriteFile(filepath.Join(projectDir, "go.mod"), []byte(goModContent), 0o644)
 		require.NoError(t, writeErr)
 

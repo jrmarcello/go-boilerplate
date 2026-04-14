@@ -17,7 +17,7 @@ func setupFakeProject(t *testing.T, domainName string) string { //nolint:unparam
 
 	dir := t.TempDir()
 
-	goMod := "module github.com/test/my-service\n\ngo 1.25.0\n"
+	goMod := "module github.com/test/my-service\n\ngo 1.26.0\n"
 	writeErr := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o600)
 	require.NoError(t, writeErr)
 

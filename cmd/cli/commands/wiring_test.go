@@ -47,7 +47,7 @@ func createFakeDomain(t *testing.T, projectDir, name string) {
 func createFakeProject(t *testing.T, projectDir, modulePath string) {
 	t.Helper()
 
-	goModContent := "module " + modulePath + "\n\ngo 1.25.0\n"
+	goModContent := "module " + modulePath + "\n\ngo 1.26.0\n"
 	writeErr := os.WriteFile(filepath.Join(projectDir, "go.mod"), []byte(goModContent), 0o600)
 	require.NoError(t, writeErr)
 

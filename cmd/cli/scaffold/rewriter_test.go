@@ -36,7 +36,7 @@ func main() {}
 		goMod := filepath.Join(dir, "go.mod")
 		content := `module github.com/jrmarcello/gopherplate
 
-go 1.25.0
+go 1.26.0
 `
 		writeErr := os.WriteFile(goMod, []byte(content), 0o644)
 		require.NoError(t, writeErr)

@@ -29,7 +29,7 @@ func seedEndpointFiles(t *testing.T, root, domain, endpoint string) []string {
 	t.Helper()
 
 	// Create go.mod
-	goModContent := "module github.com/test/my-service\n\ngo 1.25.0\n"
+	goModContent := "module github.com/test/my-service\n\ngo 1.26.0\n"
 	require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte(goModContent), 0o600))
 
 	// Create domain dir (proves domain exists)
@@ -106,7 +106,7 @@ func TestRunRemoveEndpoint_CRUDProtection(t *testing.T) {
 			domain := "order"
 
 			// Seed minimal project
-			goModContent := "module github.com/test/my-service\n\ngo 1.25.0\n"
+			goModContent := "module github.com/test/my-service\n\ngo 1.26.0\n"
 			require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte(goModContent), 0o600))
 			domainDir := filepath.Join(root, "internal", "domain", domain)
 			require.NoError(t, os.MkdirAll(domainDir, 0o750))
@@ -163,7 +163,7 @@ func TestRunRemoveEndpoint_ConfirmationAbort(t *testing.T) {
 func TestRunRemoveEndpoint_DomainNotFound(t *testing.T) {
 	root := t.TempDir()
 
-	goModContent := "module github.com/test/my-service\n\ngo 1.25.0\n"
+	goModContent := "module github.com/test/my-service\n\ngo 1.26.0\n"
 	require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte(goModContent), 0o600))
 
 	prev, cwdErr := os.Getwd()
@@ -179,7 +179,7 @@ func TestRunRemoveEndpoint_DomainNotFound(t *testing.T) {
 func TestRunRemoveEndpoint_EndpointNotFound(t *testing.T) {
 	root := t.TempDir()
 
-	goModContent := "module github.com/test/my-service\n\ngo 1.25.0\n"
+	goModContent := "module github.com/test/my-service\n\ngo 1.26.0\n"
 	require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte(goModContent), 0o600))
 	domainDir := filepath.Join(root, "internal", "domain", "order")
 	require.NoError(t, os.MkdirAll(domainDir, 0o750))
@@ -201,7 +201,7 @@ func TestRunRemoveEndpoint_EndpointNotFound(t *testing.T) {
 func TestRunRemoveEndpoint_MissingFilesGraceful(t *testing.T) {
 	root := t.TempDir()
 
-	goModContent := "module github.com/test/my-service\n\ngo 1.25.0\n"
+	goModContent := "module github.com/test/my-service\n\ngo 1.26.0\n"
 	require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte(goModContent), 0o600))
 	domainDir := filepath.Join(root, "internal", "domain", "order")
 	require.NoError(t, os.MkdirAll(domainDir, 0o750))

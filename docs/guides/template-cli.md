@@ -30,7 +30,7 @@ O **gopherplate CLI** é uma ferramenta de linha de comando que gera novos micro
 
 ### Pré-requisitos
 
-- **Go 1.25+** instalado e configurado
+- **Go 1.26+** instalado e configurado
 - `$GOBIN` (ou `$GOPATH/bin`) presente no `$PATH`
 
 ### Instalando
@@ -376,7 +376,7 @@ gopherplate doctor
 ```text
 gopherplate doctor
 
-  [OK] Go - go version go1.25.9 darwin/amd64
+  [OK] Go - go version go1.26.2 darwin/amd64
   [OK] Docker - running
   [OK] golangci-lint - golangci-lint has version 2.11.4 ...
   [!!] swag - not installed (run: go install github.com/swaggo/swag/cmd/swag@latest)

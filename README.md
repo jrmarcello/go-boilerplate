@@ -1,6 +1,6 @@
 # Gopherplate
 
-[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://go.dev/)
 [![Architecture](https://img.shields.io/badge/Architecture-Clean-blueviolet)](docs/adr/001-clean-architecture.md)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](docker/)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-326CE5?logo=kubernetes)](deploy/)
@@ -410,7 +410,7 @@ make sandbox-status   # Mostra status do container e volumes
 
 ### O que vem instalado no container
 
-- Go 1.25 + todas as dev tools (air, goose, lefthook, golangci-lint, swag, gopls, goimports)
+- Go 1.26 + todas as dev tools (air, goose, lefthook, golangci-lint, swag, gopls, goimports)
 - Node.js 20 + Claude Code
 - Docker-in-Docker (para rodar `docker compose` dentro do container)
 - zsh com Powerline10k
