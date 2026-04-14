@@ -7,6 +7,19 @@
 #   3rd+ attempt → pass (avoid infinite loop)
 set -uo pipefail
 
+# Resolve Go env from the active toolchain (asdf) instead of trusting inherited
+# GOROOT/GOPATH/GOBIN from the parent shell, which can be stale after an asdf
+# version switch mid-session.
+if command -v asdf >/dev/null 2>&1; then
+  GO_BIN="$(asdf which go 2>/dev/null || true)"
+  if [ -n "${GO_BIN:-}" ]; then
+    export GOROOT="$(dirname "$(dirname "$GO_BIN")")"
+    export GOPATH="$(dirname "$GOROOT")/packages"
+    export GOBIN="$(dirname "$GOROOT")/bin"
+    export PATH="$GOBIN:$PATH"
+  fi
+fi
+
 INPUT=$(cat)
 STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false')
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"')
