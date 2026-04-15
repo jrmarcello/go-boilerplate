@@ -37,7 +37,7 @@ func (uc *CreateUseCase) Execute(ctx context.Context, input dto.CreateInput) (*d
 	existingRole, findErr := uc.Repo.FindByName(ctx, input.Name)
 	if findErr != nil && !errors.Is(findErr, roledomain.ErrRoleNotFound) {
 		wrappedErr := fmt.Errorf("creating role: %w", findErr)
-		ucshared.ClassifyError(span, wrappedErr, createExpectedErrors, "creating role")
+		ucshared.ClassifyError(span, findErr, createExpectedErrors, wrappedErr.Error())
 		return nil, roleToAppError(wrappedErr)
 	}
 	if existingRole != nil {
@@ -51,7 +51,7 @@ func (uc *CreateUseCase) Execute(ctx context.Context, input dto.CreateInput) (*d
 	// PASSO 3: Persistir no banco via Repository
 	if createErr := uc.Repo.Create(ctx, r); createErr != nil {
 		wrappedErr := fmt.Errorf("creating role: %w", createErr)
-		ucshared.ClassifyError(span, wrappedErr, createExpectedErrors, "creating role")
+		ucshared.ClassifyError(span, createErr, createExpectedErrors, wrappedErr.Error())
 		return nil, roleToAppError(wrappedErr)
 	}
 

@@ -9,7 +9,6 @@ import (
 	"github.com/jrmarcello/gopherplate/internal/usecases/role/dto"
 	"github.com/jrmarcello/gopherplate/internal/usecases/role/interfaces"
 	ucshared "github.com/jrmarcello/gopherplate/internal/usecases/shared"
-	"github.com/jrmarcello/gopherplate/pkg/apperror"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -36,14 +35,14 @@ func (uc *DeleteUseCase) Execute(ctx context.Context, input dto.DeleteInput) (*d
 	// Validar e converter ID
 	id, parseErr := vo.ParseID(input.ID)
 	if parseErr != nil {
-		ucshared.ClassifyError(span, parseErr, deleteExpectedErrors, "deleting role")
-		return nil, apperror.New(apperror.CodeInvalidRequest, "invalid role ID")
+		ucshared.ClassifyError(span, parseErr, deleteExpectedErrors, "deleting role: invalid ID")
+		return nil, roleToAppError(parseErr)
 	}
 
 	// Deletar role
 	if deleteErr := uc.Repo.Delete(ctx, id); deleteErr != nil {
 		wrappedErr := fmt.Errorf("deleting role: %w", deleteErr)
-		ucshared.ClassifyError(span, deleteErr, deleteExpectedErrors, "deleting role")
+		ucshared.ClassifyError(span, deleteErr, deleteExpectedErrors, wrappedErr.Error())
 		return nil, roleToAppError(wrappedErr)
 	}
 

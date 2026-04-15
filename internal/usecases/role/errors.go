@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	roledomain "github.com/jrmarcello/gopherplate/internal/domain/role"
+	"github.com/jrmarcello/gopherplate/internal/domain/user/vo"
 	"github.com/jrmarcello/gopherplate/pkg/apperror"
 )
 
@@ -11,7 +12,7 @@ import (
 // domain errors (expected) from infra errors (unexpected).
 var (
 	createExpectedErrors = []error{roledomain.ErrDuplicateRoleName}
-	deleteExpectedErrors = []error{roledomain.ErrRoleNotFound}
+	deleteExpectedErrors = []error{vo.ErrInvalidID, roledomain.ErrRoleNotFound}
 	// listExpectedErrors is intentionally nil — list only produces infra errors.
 )
 
@@ -19,6 +20,8 @@ var (
 // Unknown/infra errors are wrapped with CodeInternalError.
 func roleToAppError(err error) *apperror.AppError {
 	switch {
+	case errors.Is(err, vo.ErrInvalidID):
+		return apperror.Wrap(err, apperror.CodeInvalidRequest, "invalid role ID")
 	case errors.Is(err, roledomain.ErrRoleNotFound):
 		return apperror.Wrap(err, apperror.CodeNotFound, "role not found")
 	case errors.Is(err, roledomain.ErrDuplicateRoleName):
