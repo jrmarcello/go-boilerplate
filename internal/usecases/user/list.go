@@ -58,8 +58,12 @@ func (uc *ListUseCase) Execute(ctx context.Context, input dto.ListInput) (*dto.L
 		})
 	}
 
-	// Calculate total pages
-	totalPages := int(math.Ceil(float64(result.Total) / float64(result.Limit)))
+	// Calculate total pages. Guard against Limit==0 (would produce +Inf) and
+	// always report at least one page so clients can render the empty result.
+	totalPages := 1
+	if result.Limit > 0 && result.Total > 0 {
+		totalPages = int(math.Ceil(float64(result.Total) / float64(result.Limit)))
+	}
 
 	return &dto.ListOutput{
 		Data: items,
