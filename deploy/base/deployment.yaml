@@ -63,7 +63,10 @@ spec:
             capabilities:
               drop: ["ALL"]
           ports:
-            - containerPort: 8080
+            - name: http
+              containerPort: 8080
+            - name: grpc
+              containerPort: 50051
           envFrom:
             - configMapRef:
                 name: gopherplate-config

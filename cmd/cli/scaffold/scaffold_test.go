@@ -71,8 +71,8 @@ func TestScaffold_Validate(t *testing.T) {
 		},
 		{
 			name:    "unsupported DI strategy",
-			modify:  func(cfg *Config) { cfg.DI = "fx" },
-			wantErr: `DI strategy "fx" is not yet supported`,
+			modify:  func(cfg *Config) { cfg.DI = "unknown" },
+			wantErr: `DI strategy "unknown" is not yet supported`,
 		},
 		{
 			name: "redis disabled with idempotency also disabled is valid",

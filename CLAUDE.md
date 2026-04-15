@@ -24,6 +24,8 @@ make docker-down    # Stop infrastructure containers
 make migrate-up     # Run database migrations
 make migrate-create NAME=add_something  # Create new migration
 make kind-setup     # Full Kind cluster setup (cluster + db + migrate + deploy)
+make proto          # Generate Go stubs from proto files (buf generate)
+make proto-lint     # Lint proto files (buf lint)
 make help           # See all available make targets
 ```
 
@@ -53,6 +55,9 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
   - `web/handler/` - Gin HTTP handlers, translate domain errors to HTTP responses via `httpgin.SendSuccess`/`httpgin.SendError`
   - `web/router/` - Route registration, middleware wiring
   - `web/middleware/` - Logger, metrics, idempotency, service key auth
+  - `grpc/handler/` - gRPC handlers (UserService, RoleService), translate domain errors to gRPC status codes via `toGRPCStatus()`
+  - `grpc/interceptor/` - Recovery, structured logging, service key auth (constant-time compare)
+  - `grpc/server.go` - gRPC server factory with OTel StatsHandler, interceptor chain, health check, reflection
   - `db/postgres/repository/` - sqlx repository implementations
   - `telemetry/` - Business-specific metrics (user counters)
 - **`pkg/`** - Reusable packages shared across services:
@@ -63,6 +68,7 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
   - `cache/` - Cache interface and Redis implementation
   - `database/` - Driver-agnostic (`database/sql`) connection with Writer/Reader cluster — supports postgres, mysql, sqlite3, etc.
   - `idempotency/` - Idempotency Store interface and Redis implementation
+- **`proto/`** - Protobuf definitions (contract-first API for gRPC). `buf generate` produces Go stubs in `gen/proto/` (gitignored).
 - **`config/`** - Configuration loading (godotenv + env vars)
 - **`cmd/api/`** - Application entrypoint and manual DI wiring in `server.go`
 - **`cmd/cli/`** - Template CLI (`gopherplate`) with 8 commands: `new` (scaffold service), `add domain` / `remove domain` (manage domains), `add endpoint` / `remove endpoint` (manage endpoints with CRUD protection), `doctor` (diagnose tools/Docker/go.mod), `wiring` (auto-regenerate server.go/router.go/container.go from detected domains), `version`. Contains Cobra commands, scaffold engine, and embedded templates. See `docs/guides/template-cli.md`.
@@ -70,12 +76,13 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
 ### Key Patterns
 
 - **Manual DI**: All wiring happens in `cmd/api/server.go:buildDependencies()`. No DI framework. Wires both `user` domain (with cache/singleflight) and `role` domain (simpler, no cache). Use cases accept interfaces via constructor, optional dependencies (cache) via `.WithCache()` builder method.
+- **Dual Server (HTTP + gRPC)**: Optional gRPC server alongside HTTP, controlled by `GRPC_ENABLED` (default false). Both managed by `errgroup` with coordinated graceful shutdown. gRPC handlers reuse the same use cases as HTTP handlers — zero business logic duplication. Proto definitions in `proto/`, stubs generated to `gen/proto/` via `buf generate` (`make proto`).
 - **ID Strategy**: UUID v7 for all entity IDs. See `docs/adr/002-ids.md`.
 - **DB Cluster**: Writer/Reader split via `pkg/database.DBCluster`. Reader is optional, falls back to writer.
 - **API Response Format**: Gin handlers use `httpgin.SendSuccess(c, status, data)` and `httpgin.SendError(c, status, message)`. Core helpers (`httputil.WriteSuccess`/`httputil.WriteError`) work with stdlib `http.ResponseWriter`. Responses wrap in `{"data": ...}` or `{"errors": {"message": ...}}`.
 - **Error Handling**: Domain defines pure errors (`user.ErrNotFound`, etc.). Use cases return `*apperror.AppError` via local `toAppError()`. Handler resolves generically via `errors.As()` + `codeToStatus` map — zero domain imports. Ref: ADR-009, `docs/guides/error-handling.md` (created by spec `error-handling-refactor`).
 - **Span Error Classification**: Use case classifies errors via `shared.ClassifyError()`. Expected errors (validation, not found, conflict) -> `telemetry.WarnSpan` (span stays Ok). Unexpected errors (DB timeout, infra) -> `telemetry.FailSpan` (span marked Error). Handler never touches spans. Ref: ADR-009, `docs/guides/error-handling.md` (created by spec `error-handling-refactor`).
-- **Service Key Auth**: Optional service-to-service authentication via `X-Service-Name` + `X-Service-Key` headers. See `docs/adr/005-service-key-auth.md`.
+- **Service Key Auth**: Optional service-to-service authentication via `X-Service-Name` + `X-Service-Key` headers. Shared between HTTP (middleware) and gRPC (interceptor via metadata). See `docs/adr/005-service-key-auth.md`.
 - **Singleflight**: GetUseCase uses `golang.org/x/sync/singleflight` to prevent cache stampede on concurrent reads for the same entity.
 - **Idempotency**: Redis-backed idempotency via `pkg/idempotency.Store`, wired as optional middleware. Uses SHA-256 fingerprint + lock/unlock pattern.
 

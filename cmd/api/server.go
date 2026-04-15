@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,7 +17,10 @@ import (
 	"github.com/jrmarcello/gopherplate/config"
 	docs "github.com/jrmarcello/gopherplate/docs"
 	"github.com/jrmarcello/gopherplate/internal/bootstrap"
+	appgrpc "github.com/jrmarcello/gopherplate/internal/infrastructure/grpc"
+	"github.com/jrmarcello/gopherplate/internal/infrastructure/grpc/interceptor"
 	infratelemetry "github.com/jrmarcello/gopherplate/internal/infrastructure/telemetry"
+	"github.com/jrmarcello/gopherplate/internal/infrastructure/web/middleware"
 	"github.com/jrmarcello/gopherplate/internal/infrastructure/web/router"
 	"github.com/jrmarcello/gopherplate/pkg/cache/redisclient"
 	"github.com/jrmarcello/gopherplate/pkg/database"
@@ -28,6 +32,8 @@ import (
 	"github.com/jrmarcello/gopherplate/pkg/telemetry/otelgrpc"
 	_ "github.com/lib/pq"
 	"go.opentelemetry.io/otel"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 )
 
 // Start initializes the application following the composition pattern:
@@ -132,7 +138,7 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	if tp != nil {
 		httpMetrics = tp.HTTPMetrics()
 	}
-	deps := buildDependencies(cluster, sqlxWriter, sqlxReader, cfg, httpMetrics, businessMetrics)
+	deps, grpcSrv := buildDependencies(cluster, sqlxWriter, sqlxReader, cfg, httpMetrics, businessMetrics)
 
 	// Swagger Dynamic Config
 	if cfg.Swagger.Host != "" {
@@ -144,11 +150,11 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	// 7. Router
 	r := router.Setup(deps)
 
-	// 8. Server
-	srv := newServer(cfg.Server.Port, r)
+	// 8. HTTP Server
+	httpSrv := newServer(cfg.Server.Port, r)
 
-	// 9. Graceful Shutdown
-	return runWithGracefulShutdown(srv, logger)
+	// 9. Graceful Shutdown (HTTP + optional gRPC via errgroup)
+	return runWithGracefulShutdown(httpSrv, grpcSrv, cfg, logger)
 }
 
 func setupLogger() *slog.Logger {
@@ -163,7 +169,7 @@ func shutdownTelemetry(tp *pkgtelemetry.Provider, logger *slog.Logger) {
 	}
 }
 
-func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx.DB, cfg *config.Config, httpMetrics *pkgtelemetry.HTTPMetrics, businessMetrics *infratelemetry.Metrics) router.Dependencies {
+func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx.DB, cfg *config.Config, httpMetrics *pkgtelemetry.HTTPMetrics, businessMetrics *infratelemetry.Metrics) (router.Dependencies, *grpc.Server) {
 	// Cache (optional -- config-dependent, stays in server.go)
 	redisClient, cacheErr := redisclient.NewRedisClient(redisclient.RedisConfig{
 		URL:          cfg.Redis.URL,
@@ -208,6 +214,18 @@ func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx
 		}
 	}
 
+	// gRPC server (optional -- only if enabled)
+	var grpcSrv *grpc.Server
+	if cfg.GRPC.Enabled {
+		grpcSrv = appgrpc.NewServer(appgrpc.Config{
+			ReflectionEnabled: cfg.GRPC.ReflectionEnabled,
+			AuthConfig: interceptor.AuthConfig{
+				Enabled: cfg.Auth.Enabled,
+				Keys:    middleware.ParseServiceKeys(cfg.Auth.ServiceKeys),
+			},
+		}, c.GRPCHandlers.User, c.GRPCHandlers.Role)
+	}
+
 	return router.Dependencies{
 		HealthChecker:    checker,
 		RoleHandler:      c.Handlers.Role,
@@ -221,7 +239,7 @@ func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx
 			SwaggerEnabled:     cfg.Swagger.Enabled,
 			MaxBodySize:        cfg.Server.MaxBodySize,
 		},
-	}
+	}, grpcSrv
 }
 
 func newServer(port string, handler http.Handler) *http.Server {
@@ -236,37 +254,65 @@ func newServer(port string, handler http.Handler) *http.Server {
 	}
 }
 
-func runWithGracefulShutdown(srv *http.Server, logger *slog.Logger) error {
-	// Error channel to capture server startup failures without os.Exit in goroutine
-	errCh := make(chan error, 1)
-	go func() {
-		logger.Info("Starting server", "port", srv.Addr)
-		if listenErr := srv.ListenAndServe(); listenErr != nil && !errors.Is(listenErr, http.ErrServerClosed) {
-			errCh <- listenErr
-		}
-	}()
-
-	// Wait for interrupt signal or server error
+func runWithGracefulShutdown(httpSrv *http.Server, grpcSrv *grpc.Server, cfg *config.Config, logger *slog.Logger) error {
+	// Signal channel for coordinated shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	select {
-	case listenErr := <-errCh:
-		return listenErr
-	case <-quit:
-		// proceed to graceful shutdown
+	g, ctx := errgroup.WithContext(context.Background())
+
+	// HTTP server
+	g.Go(func() error {
+		logger.Info("Starting HTTP server", "port", httpSrv.Addr)
+		if listenErr := httpSrv.ListenAndServe(); listenErr != nil && !errors.Is(listenErr, http.ErrServerClosed) {
+			return listenErr
+		}
+		return nil
+	})
+
+	// gRPC server (optional)
+	if grpcSrv != nil {
+		g.Go(func() error {
+			addr := ":" + cfg.GRPC.Port
+			lis, listenErr := net.Listen("tcp", addr)
+			if listenErr != nil {
+				return fmt.Errorf("gRPC listen on %s: %w", addr, listenErr)
+			}
+			logger.Info("Starting gRPC server", "port", addr)
+			if serveErr := grpcSrv.Serve(lis); serveErr != nil {
+				return serveErr
+			}
+			return nil
+		})
 	}
 
-	logger.Info("shutting down server...")
+	// Wait for signal or server error
+	g.Go(func() error {
+		select {
+		case <-quit:
+			logger.Info("shutting down servers...")
+		case <-ctx.Done():
+			// One of the servers errored — ctx is canceled by errgroup
+			return nil
+		}
 
-	// Graceful shutdown with timeout
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+		// Graceful shutdown with timeout
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
 
-	if shutdownErr := srv.Shutdown(shutdownCtx); shutdownErr != nil {
-		return shutdownErr
-	}
+		// Shutdown HTTP
+		if shutdownErr := httpSrv.Shutdown(shutdownCtx); shutdownErr != nil {
+			logger.Error("HTTP shutdown error", "error", shutdownErr)
+		}
 
-	logger.Info("server exited properly")
-	return nil
+		// Shutdown gRPC (GracefulStop waits for in-flight RPCs)
+		if grpcSrv != nil {
+			grpcSrv.GracefulStop()
+		}
+
+		logger.Info("servers exited properly")
+		return nil
+	})
+
+	return g.Wait()
 }

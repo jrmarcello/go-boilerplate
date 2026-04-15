@@ -233,6 +233,7 @@ make help          # Ver todos os comandos
 | `docs/guides/cache.md` | Cache com Redis, singleflight e pool config |
 | `docs/guides/kubernetes.md` | Deploy, Kind e operação |
 | `docs/guides/multi-database.md` | Estrategia para múltiplos bancos |
+| `internal/infrastructure/grpc/` | gRPC handlers, interceptors e server factory |
 
 ---
 

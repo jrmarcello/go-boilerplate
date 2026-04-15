@@ -452,9 +452,7 @@ Para agentes de IA, ver [AGENTS.md](AGENTS.md) e [CLAUDE.md](CLAUDE.md).
 O template está em evolução contínua. Próximos passos planejados:
 
 - [ ] Outbox pattern para eventos assíncronos (SQS/SNS)
-- [ ] Suporte a gRPC como alternativa ao REST
 - [ ] Feature flags com LaunchDarkly/Unleash
-- [x] CLI para scaffold automático (`gopherplate new my-service`)
 
 Sugestões são bem-vindas via [Issues](https://github.com/jrmarcello/gopherplate/issues).
 
@@ -494,7 +492,7 @@ Se for muito pro seu caso, colapse as camadas. A Clean Architecture brilha aqui 
 
 O template é intencionalmente **pouco opinativo nas ferramentas**. Usa Gin (HTTP), sqlx (DB), go-redis (cache) — bibliotecas maduras e amplamente adotadas. Não usa ORMs, DI frameworks, ou geradores de código. Quanto menos mágica, mais fácil de entender e debugar.
 
-Mas essa é uma escolha do template como ponto de partida. Você tem **liberdade total para adicionar** qualquer biblioteca ou framework que desejar — GORM para ORM, gRPC para comunicação, etc. A arquitetura em camadas facilita isso: adicione um adapter na infraestrutura e o domínio nem percebe.
+Mas essa é uma escolha do template como ponto de partida. Você tem **liberdade total para adicionar** qualquer biblioteca ou framework que desejar — Uber Fx para DI, GORM para ORM, gRPC para comunicação. A arquitetura em camadas facilita isso: adicione um adapter na infraestrutura e o domínio nem percebe.
 
 ### Posso usar só partes do template?
 

@@ -7,6 +7,22 @@ Commits seguem [Conventional Commits](https://www.conventionalcommits.org/).
 
 ---
 
+## [0.13.0] - 2026-04-15
+
+### Funcionalidades
+
+- **grpc**: Add gRPC server as alternative to REST (dual HTTP + gRPC with errgroup)
+- **grpc**: Proto definitions for User (CRUD) and Role (Create/List/Delete) via buf v2
+- **grpc**: Interceptors: recovery, structured logging, service-key auth (constant-time)
+- **grpc**: OTel instrumentation via StatsHandler + gRPC health check protocol
+- **grpc**: k6 gRPC smoke tests
+
+### Manutenção
+
+- Remove Uber Fx references and guide, keep manual DI only
+- **deps**: Upgrade OTel to v1.43.0, gRPC to v1.80.0
+- **deps**: Add otelgrpc StatsHandler instrumentation
+
 ## [0.12.0] - 2026-04-13
 
 ### Correções

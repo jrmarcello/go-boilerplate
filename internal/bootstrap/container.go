@@ -7,6 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/jrmarcello/gopherplate/internal/infrastructure/db/postgres/repository"
+	grpchandler "github.com/jrmarcello/gopherplate/internal/infrastructure/grpc/handler"
 	infratelemetry "github.com/jrmarcello/gopherplate/internal/infrastructure/telemetry"
 	"github.com/jrmarcello/gopherplate/internal/infrastructure/web/handler"
 	roleuc "github.com/jrmarcello/gopherplate/internal/usecases/role"
@@ -15,7 +16,7 @@ import (
 )
 
 // Container holds all application dependencies grouped by layer.
-// Only Handlers is exported — it is the legitimate external surface.
+// Handlers and GRPCHandlers are exported — they are the legitimate external surface.
 // Intermediate layers (repos, use cases) are unexported so callers cannot
 // reach into the composition root and bypass constructor invariants.
 type Container struct {
@@ -23,6 +24,7 @@ type Container struct {
 	roleUseCases RoleUseCases
 	userUseCases UserUseCases
 	Handlers     Handlers
+	GRPCHandlers GRPCHandlers
 }
 
 // Repos groups all repository implementations.
@@ -53,6 +55,12 @@ type Handlers struct {
 	User *handler.UserHandler
 }
 
+// GRPCHandlers groups all gRPC handlers.
+type GRPCHandlers struct {
+	User *grpchandler.UserHandler
+	Role *grpchandler.RoleHandler
+}
+
 // New creates a fully wired Container. The construction follows a strict phase order:
 // repos -> use cases -> handlers, preventing circular dependencies.
 // metrics may be nil (for tests or contexts without OTel).
@@ -61,6 +69,7 @@ func New(writer, reader *sqlx.DB, cacheClient cache.Cache, metrics *infratelemet
 	c.buildRepos(writer, reader)
 	c.buildUseCases(cacheClient)
 	c.buildHandlers(metrics)
+	c.buildGRPCHandlers(metrics)
 	return c
 }
 
@@ -105,6 +114,24 @@ func (c *Container) buildHandlers(metrics *infratelemetry.Metrics) {
 			c.userUseCases.Update,
 			c.userUseCases.Delete,
 			metrics,
+		),
+	}
+}
+
+func (c *Container) buildGRPCHandlers(metrics *infratelemetry.Metrics) {
+	c.GRPCHandlers = GRPCHandlers{
+		User: grpchandler.NewUserHandler(
+			c.userUseCases.Create,
+			c.userUseCases.Get,
+			c.userUseCases.List,
+			c.userUseCases.Update,
+			c.userUseCases.Delete,
+			metrics,
+		),
+		Role: grpchandler.NewRoleHandler(
+			c.roleUseCases.Create,
+			c.roleUseCases.List,
+			c.roleUseCases.Delete,
 		),
 	}
 }

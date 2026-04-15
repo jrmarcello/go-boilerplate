@@ -46,7 +46,7 @@ type Config struct {
 	// Protocol is the API protocol (http, grpc, both). Currently only "http" is supported.
 	Protocol Protocol
 
-	// DI is the dependency injection strategy (manual, fx). Currently only "manual" is supported.
+	// DI is the dependency injection strategy. Currently only "manual" is supported.
 	DI DIStrategy
 
 	// Redis enables Redis cache support

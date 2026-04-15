@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package appmax.role.v1;
+
+option go_package = "github.com/jrmarcello/gopherplate/gen/proto/appmax/role/v1;rolev1";
+
+message Role {
+  string id = 1;
+  string name = 2;
+  string created_at = 3;
+  string updated_at = 4;
+}

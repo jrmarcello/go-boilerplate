@@ -11,12 +11,19 @@ import (
 
 type Config struct {
 	Server      ServerConfig
+	GRPC        GRPCConfig
 	DB          DBConfig
 	Otel        OtelConfig
 	Redis       RedisConfig
 	Auth        AuthConfig
 	Swagger     SwaggerConfig
 	Idempotency IdempotencyConfig
+}
+
+type GRPCConfig struct {
+	Enabled           bool
+	Port              string
+	ReflectionEnabled bool
 }
 
 type AuthConfig struct {
@@ -150,6 +157,11 @@ func Load() (*Config, error) {
 			Env:         getEnv("APP_ENV", "development"),
 			GinMode:     getEnv("GIN_MODE", ""),
 			MaxBodySize: int64(getEnvInt("HTTP_MAX_BODY_SIZE", 1<<20)), // default 1MB
+		},
+		GRPC: GRPCConfig{
+			Enabled:           getEnvBool("GRPC_ENABLED", false),
+			Port:              getEnv("GRPC_PORT", "50051"),
+			ReflectionEnabled: getEnvBool("GRPC_REFLECTION_ENABLED", true),
 		},
 		DB: DBConfig{
 			Host:     getEnv("DB_HOST", "localhost"),

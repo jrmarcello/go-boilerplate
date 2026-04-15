@@ -36,6 +36,7 @@ ENV_FILE := $(shell test -f .env && echo "--env-file .env" || echo "")
 # Declara todos os targets que não são arquivos
 .PHONY: help setup tools go-tools-check docker-check k6-check kind-check \
         dev run run-stop build build-cli install-cli clean lint security vulncheck swagger \
+        proto proto-lint \
         test test-unit test-e2e test-coverage \
         load-smoke load-test load-stress load-spike load-kind load-clean \
         docker-up docker-down docker-build \
@@ -67,6 +68,9 @@ help: ## Exibe esta mensagem de ajuda
 	@echo ""
 	@echo "\033[1;33m  Code Quality\033[0m"
 	@grep -Eh '^(lint|security|vulncheck|swagger):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+	@echo "\033[1;33m  Proto (gRPC)\033[0m"
+	@grep -Eh '^proto.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "\033[1;33m  Testing\033[0m"
 	@grep -Eh '^(test|test-unit|test-e2e|test-coverage):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -179,18 +183,15 @@ release: ## Cria release + publica no GitHub (uso: make release VERSION=0.13.0)
 	@git-cliff --tag "v$(VERSION)" --output CHANGELOG.md
 	@git add CHANGELOG.md
 	@git commit -m "chore(release): v$(VERSION) [skip ci]"
-	@git tag -a "v$(VERSION)" -m "v$(VERSION)"
+	@git tag "v$(VERSION)"
 	@echo ""
 	@echo "Commit e tag criados localmente."
 	@read -p "Push para origin/main + tag v$(VERSION) agora? [y/N] " ans; \
-		if [ "$$ans" = "y" ] || [ "$$ans" = "Y" ]; then \
-			git push origin main --follow-tags && \
-			echo "" && \
-			echo "v$(VERSION) publicada. GitHub Actions vai criar a Release em ~30s." && \
-			echo "Acompanhe: gh run watch  (ou veja em github.com/<owner>/<repo>/actions)"; \
-		else \
-			echo "Cancelado. Para publicar depois: git push origin main --follow-tags"; \
-		fi
+		[ "$$ans" = "y" ] || [ "$$ans" = "Y" ] || { echo "Cancelado. Para publicar depois: git push origin main --follow-tags"; exit 0; }
+	@git push origin main --follow-tags
+	@echo ""
+	@echo "v$(VERSION) publicada. GitHub Actions vai criar a Release em ~30s."
+	@echo "Acompanhe: gh run watch  (ou veja em github.com/<owner>/<repo>/actions)"
 
 # ============================================
 # QUALIDADE DE CÓDIGO
@@ -210,6 +211,16 @@ swagger: go-tools-check ## Regenera documentacao Swagger
 	@$(GOBIN)/swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal || \
 		swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
 	@echo "Swagger docs generated in docs/"
+
+# ============================================
+# PROTO (gRPC)
+# ============================================
+
+proto: ## Gera stubs Go a partir dos proto files
+	buf generate
+
+proto-lint: ## Lint dos proto files
+	buf lint
 
 # ============================================
 # TESTES

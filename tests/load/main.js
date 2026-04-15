@@ -15,6 +15,12 @@ import {
   listUsers,
 } from './users.js';
 import { smokeRoleCRUD, smokeRoleErrors } from './roles.js';
+import {
+  smokeGRPCUserCRUD,
+  smokeGRPCRoleCRUD,
+  smokeGRPCAuthError,
+  smokeGRPCValidationError,
+} from './grpc_users.js';
 
 // ============================================
 // SCENARIO CONFIGURATION
@@ -138,6 +144,14 @@ export function smokeTest() {
   // Role domain
   smokeRoleCRUD();
   smokeRoleErrors();
+
+  // gRPC domain (only if GRPC_ENABLED)
+  if (__ENV.GRPC_ENABLED === 'true') {
+    smokeGRPCUserCRUD();
+    smokeGRPCRoleCRUD();
+    smokeGRPCAuthError();
+    smokeGRPCValidationError();
+  }
 }
 
 // Load: progressive traffic with read-heavy distribution

@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package appmax.role.v1;
+
+import "appmax/common/v1/pagination.proto";
+import "appmax/role/v1/role.proto";
+
+option go_package = "github.com/jrmarcello/gopherplate/gen/proto/appmax/role/v1;rolev1";
+
+service RoleService {
+  rpc CreateRole(CreateRoleRequest) returns (CreateRoleResponse);
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse);
+  rpc DeleteRole(DeleteRoleRequest) returns (DeleteRoleResponse);
+}
+
+message CreateRoleRequest {
+  string name = 1;
+}
+
+message CreateRoleResponse {
+  string id = 1;
+  string created_at = 2;
+}
+
+message ListRolesRequest {
+  int32 page = 1;
+  int32 limit = 2;
+}
+
+message ListRolesResponse {
+  repeated Role roles = 1;
+  appmax.common.v1.Pagination pagination = 2;
+}
+
+message DeleteRoleRequest {
+  string id = 1;
+}
+
+message DeleteRoleResponse {
+  string id = 1;
+}

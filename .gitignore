@@ -11,6 +11,9 @@
 tests/coverage/
 tests/load/results/
 
+# Generated (proto stubs)
+gen/
+
 # Dependências
 /vendor/
 
