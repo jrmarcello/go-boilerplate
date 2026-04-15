@@ -20,8 +20,8 @@ func NewForTest(t testing.TB, db *sqlx.DB, cacheClient cache.Cache) *Container {
 	return New(db, db, cacheClient, nil)
 }
 
-// SetupTestRouter creates a gin.Engine in test mode with all routes (user and
-// role) registered, CustomRecovery middleware, health endpoints, and a panic-test
+// SetupTestRouter creates a gin.Engine in test mode with all routes
+// registered, CustomRecovery middleware, health endpoints, and a panic-test
 // route. No auth middleware is applied.
 func SetupTestRouter(t testing.TB, db *sqlx.DB, cacheClient cache.Cache) *gin.Engine {
 	t.Helper()
@@ -33,14 +33,14 @@ func SetupTestRouter(t testing.TB, db *sqlx.DB, cacheClient cache.Cache) *gin.En
 
 	// Register all domain routes without auth
 	group := r.Group("")
-	router.RegisterUserRoutes(group, c.Handlers.User)
 	router.RegisterRoleRoutes(group, c.Handlers.Role)
+	router.RegisterUserRoutes(group, c.Handlers.User)
 
 	return r
 }
 
 // SetupTestRouterWithAuth creates a gin.Engine in test mode with all routes
-// (user and role) registered behind service key authentication middleware.
+// registered behind service key authentication middleware.
 // serviceKeys uses the format "service1:key1,service2:key2".
 func SetupTestRouterWithAuth(t testing.TB, db *sqlx.DB, cacheClient cache.Cache, serviceKeys string) *gin.Engine {
 	t.Helper()
@@ -57,8 +57,8 @@ func SetupTestRouterWithAuth(t testing.TB, db *sqlx.DB, cacheClient cache.Cache,
 	}
 	protected := r.Group("")
 	protected.Use(middleware.ServiceKeyAuth(authConfig))
-	router.RegisterUserRoutes(protected, c.Handlers.User)
 	router.RegisterRoleRoutes(protected, c.Handlers.Role)
+	router.RegisterUserRoutes(protected, c.Handlers.User)
 
 	return r
 }
@@ -80,7 +80,7 @@ func newTestEngine() *gin.Engine {
 }
 
 // registerTestHealthRoutes registers simplified health/ready endpoints for tests.
-// Uses health.New() with no checks — always returns healthy (DB connectivity is
+// Uses health.New() with no checks -- always returns healthy (DB connectivity is
 // already validated by the test container setup).
 func registerTestHealthRoutes(r *gin.Engine, db *sqlx.DB) {
 	r.GET("/health", func(c *gin.Context) {

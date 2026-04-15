@@ -15,17 +15,27 @@ import (
 )
 
 // Container holds all application dependencies grouped by layer.
+// Only Handlers is exported — it is the legitimate external surface.
+// Intermediate layers (repos, use cases) are unexported so callers cannot
+// reach into the composition root and bypass constructor invariants.
 type Container struct {
 	repos        Repos
-	userUseCases UserUseCases
 	roleUseCases RoleUseCases
+	userUseCases UserUseCases
 	Handlers     Handlers
 }
 
 // Repos groups all repository implementations.
 type Repos struct {
-	User *repository.UserRepository
 	Role *repository.RoleRepository
+	User *repository.UserRepository
+}
+
+// RoleUseCases groups all role domain use cases.
+type RoleUseCases struct {
+	Create *roleuc.CreateUseCase
+	List   *roleuc.ListUseCase
+	Delete *roleuc.DeleteUseCase
 }
 
 // UserUseCases groups all user domain use cases.
@@ -37,17 +47,10 @@ type UserUseCases struct {
 	Delete *useruc.DeleteUseCase
 }
 
-// RoleUseCases groups all role domain use cases.
-type RoleUseCases struct {
-	Create *roleuc.CreateUseCase
-	List   *roleuc.ListUseCase
-	Delete *roleuc.DeleteUseCase
-}
-
 // Handlers groups all HTTP handlers.
 type Handlers struct {
-	User *handler.UserHandler
 	Role *handler.RoleHandler
+	User *handler.UserHandler
 }
 
 // New creates a fully wired Container. The construction follows a strict phase order:
@@ -63,31 +66,38 @@ func New(writer, reader *sqlx.DB, cacheClient cache.Cache, metrics *infratelemet
 
 func (c *Container) buildRepos(writer, reader *sqlx.DB) {
 	c.repos = Repos{
-		User: repository.NewUserRepository(writer, reader),
 		Role: repository.NewRoleRepository(writer, reader),
+		User: repository.NewUserRepository(writer, reader),
 	}
 }
 
 func (c *Container) buildUseCases(cacheClient cache.Cache) {
 	flightGroup := cache.NewFlightGroup()
-
-	c.userUseCases = UserUseCases{
-		Create: useruc.NewCreateUseCase(c.repos.User),
-		Get:    useruc.NewGetUseCase(c.repos.User).WithCache(cacheClient).WithFlight(flightGroup),
-		List:   useruc.NewListUseCase(c.repos.User),
-		Update: useruc.NewUpdateUseCase(c.repos.User).WithCache(cacheClient),
-		Delete: useruc.NewDeleteUseCase(c.repos.User).WithCache(cacheClient),
-	}
+	_ = flightGroup // used by domains with cache support
+	_ = cacheClient // used by domains with cache support
 
 	c.roleUseCases = RoleUseCases{
 		Create: roleuc.NewCreateUseCase(c.repos.Role),
 		List:   roleuc.NewListUseCase(c.repos.Role),
 		Delete: roleuc.NewDeleteUseCase(c.repos.Role),
 	}
+	c.userUseCases = UserUseCases{
+		Create: useruc.NewCreateUseCase(c.repos.User),
+		Get:    useruc.NewGetUseCase(c.repos.User),
+		List:   useruc.NewListUseCase(c.repos.User),
+		Update: useruc.NewUpdateUseCase(c.repos.User),
+		Delete: useruc.NewDeleteUseCase(c.repos.User),
+	}
 }
 
 func (c *Container) buildHandlers(metrics *infratelemetry.Metrics) {
+	_ = metrics // used by domains with business metrics
 	c.Handlers = Handlers{
+		Role: handler.NewRoleHandler(
+			c.roleUseCases.Create,
+			c.roleUseCases.List,
+			c.roleUseCases.Delete,
+		),
 		User: handler.NewUserHandler(
 			c.userUseCases.Create,
 			c.userUseCases.Get,
@@ -95,11 +105,6 @@ func (c *Container) buildHandlers(metrics *infratelemetry.Metrics) {
 			c.userUseCases.Update,
 			c.userUseCases.Delete,
 			metrics,
-		),
-		Role: handler.NewRoleHandler(
-			c.roleUseCases.Create,
-			c.roleUseCases.List,
-			c.roleUseCases.Delete,
 		),
 	}
 }

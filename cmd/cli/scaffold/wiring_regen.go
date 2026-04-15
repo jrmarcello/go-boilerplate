@@ -374,6 +374,7 @@ func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx
 			ServiceKeysEnabled: cfg.Auth.Enabled,
 			ServiceKeys:        cfg.Auth.ServiceKeys,
 			SwaggerEnabled:     cfg.Swagger.Enabled,
+			MaxBodySize:        cfg.Server.MaxBodySize,
 		},
 	}
 }
@@ -455,6 +456,7 @@ type Config struct {
 	ServiceKeysEnabled bool   // fail-closed in HML/PRD if keys empty
 	ServiceKeys        string // "service1:key1,service2:key2"
 	SwaggerEnabled     bool
+	MaxBodySize        int64 // Max request body in bytes (0 disables the cap)
 }
 
 // Dependencies groups all dependencies required by the router.
@@ -474,6 +476,10 @@ func Setup(deps Dependencies) *gin.Engine {
 
 	// Recovery middleware (panic recovery -- returns JSON 500, not HTML)
 	r.Use(middleware.CustomRecovery())
+
+	// Body size cap (must run before any middleware that reads the body,
+	// e.g. Idempotency and handlers doing ShouldBindJSON).
+	r.Use(middleware.BodyLimit(deps.Config.MaxBodySize))
 
 	// OpenTelemetry (must be before Logger to populate trace_id)
 	r.Use(otelgin.Middleware(deps.Config.ServiceName))
@@ -570,10 +576,13 @@ import (
 )
 
 // Container holds all application dependencies grouped by layer.
+// Only Handlers is exported — it is the legitimate external surface.
+// Intermediate layers (repos, use cases) are unexported so callers cannot
+// reach into the composition root and bypass constructor invariants.
 type Container struct {
-	Repos    Repos
+	repos    Repos
 {{- range .Domains}}
-	{{.Pascal}}UseCases {{.Pascal}}UseCases
+	{{.Camel}}UseCases {{.Pascal}}UseCases
 {{- end}}
 	Handlers Handlers
 }
@@ -623,7 +632,7 @@ func New(writer, reader *sqlx.DB, cacheClient cache.Cache, metrics *infratelemet
 }
 
 func (c *Container) buildRepos(writer, reader *sqlx.DB) {
-	c.Repos = Repos{
+	c.repos = Repos{
 {{- range .Domains}}
 		{{.Pascal}}: repository.New{{.Pascal}}Repository(writer, reader),
 {{- end}}
@@ -635,21 +644,21 @@ func (c *Container) buildUseCases(cacheClient cache.Cache) {
 	_ = flightGroup // used by domains with cache support
 	_ = cacheClient // used by domains with cache support
 {{range .Domains}}
-	c.{{.Pascal}}UseCases = {{.Pascal}}UseCases{
+	c.{{.Camel}}UseCases = {{.Pascal}}UseCases{
 {{- if .HasCreate}}
-		Create: {{.Camel}}uc.NewCreateUseCase(c.Repos.{{.Pascal}}),
+		Create: {{.Camel}}uc.NewCreateUseCase(c.repos.{{.Pascal}}),
 {{- end}}
 {{- if .HasGet}}
-		Get:    {{.Camel}}uc.NewGetUseCase(c.Repos.{{.Pascal}}),
+		Get:    {{.Camel}}uc.NewGetUseCase(c.repos.{{.Pascal}}),
 {{- end}}
 {{- if .HasList}}
-		List:   {{.Camel}}uc.NewListUseCase(c.Repos.{{.Pascal}}),
+		List:   {{.Camel}}uc.NewListUseCase(c.repos.{{.Pascal}}),
 {{- end}}
 {{- if .HasUpdate}}
-		Update: {{.Camel}}uc.NewUpdateUseCase(c.Repos.{{.Pascal}}),
+		Update: {{.Camel}}uc.NewUpdateUseCase(c.repos.{{.Pascal}}),
 {{- end}}
 {{- if .HasDelete}}
-		Delete: {{.Camel}}uc.NewDeleteUseCase(c.Repos.{{.Pascal}}),
+		Delete: {{.Camel}}uc.NewDeleteUseCase(c.repos.{{.Pascal}}),
 {{- end}}
 	}
 {{- end}}
@@ -661,19 +670,19 @@ func (c *Container) buildHandlers(metrics *infratelemetry.Metrics) {
 {{- range .Domains}}
 		{{.Pascal}}: handler.New{{.Pascal}}Handler(
 {{- if .HasCreate}}
-			c.{{.Pascal}}UseCases.Create,
+			c.{{.Camel}}UseCases.Create,
 {{- end}}
 {{- if .HasGet}}
-			c.{{.Pascal}}UseCases.Get,
+			c.{{.Camel}}UseCases.Get,
 {{- end}}
 {{- if .HasList}}
-			c.{{.Pascal}}UseCases.List,
+			c.{{.Camel}}UseCases.List,
 {{- end}}
 {{- if .HasUpdate}}
-			c.{{.Pascal}}UseCases.Update,
+			c.{{.Camel}}UseCases.Update,
 {{- end}}
 {{- if .HasDelete}}
-			c.{{.Pascal}}UseCases.Delete,
+			c.{{.Camel}}UseCases.Delete,
 {{- end}}
 {{- if .HasMetrics}}
 			metrics,

@@ -4,42 +4,41 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
-
 	"github.com/jrmarcello/gopherplate/internal/infrastructure/web/handler"
 	"github.com/jrmarcello/gopherplate/internal/infrastructure/web/middleware"
 	"github.com/jrmarcello/gopherplate/pkg/health"
 	"github.com/jrmarcello/gopherplate/pkg/httputil/httpgin"
 	"github.com/jrmarcello/gopherplate/pkg/idempotency"
 	"github.com/jrmarcello/gopherplate/pkg/telemetry"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
-// Config contém configurações do router
+// Config holds router configuration.
 type Config struct {
 	ServiceName        string
-	ServiceKeysEnabled bool   // fail-closed em HML/PRD se keys vazio
+	ServiceKeysEnabled bool   // fail-closed in HML/PRD if keys empty
 	ServiceKeys        string // "service1:key1,service2:key2"
 	SwaggerEnabled     bool
 	MaxBodySize        int64 // Max request body in bytes (0 disables the cap)
 }
 
-// Dependencies agrupa todas as dependências necessárias para o router
+// Dependencies groups all dependencies required by the router.
 type Dependencies struct {
 	HealthChecker    *health.Checker
-	UserHandler      *handler.UserHandler
 	RoleHandler      *handler.RoleHandler
+	UserHandler      *handler.UserHandler
 	HTTPMetrics      *telemetry.HTTPMetrics
 	IdempotencyStore idempotency.Store
 	Config           Config
 }
 
-// Setup configura e retorna o router Gin com todos os middlewares e rotas
+// Setup configures and returns the Gin engine with all middlewares and routes.
 func Setup(deps Dependencies) *gin.Engine {
 	r := gin.New()
 
-	// Recovery middleware (panic recovery — returns JSON 500, not HTML)
+	// Recovery middleware (panic recovery -- returns JSON 500, not HTML)
 	r.Use(middleware.CustomRecovery())
 
 	// Body size cap (must run before any middleware that reads the body,
@@ -55,7 +54,7 @@ func Setup(deps Dependencies) *gin.Engine {
 	// Custom structured logger
 	r.Use(middleware.Logger())
 
-	// Idempotency (optional — only if store is provided)
+	// Idempotency (optional -- only if store is provided)
 	if deps.IdempotencyStore != nil {
 		r.Use(middleware.Idempotency(deps.IdempotencyStore))
 	}
@@ -73,18 +72,18 @@ func Setup(deps Dependencies) *gin.Engine {
 	}
 	protected := r.Group("")
 	protected.Use(middleware.ServiceKeyAuth(authConfig))
-	RegisterUserRoutes(protected, deps.UserHandler)
 	RegisterRoleRoutes(protected, deps.RoleHandler)
+	RegisterUserRoutes(protected, deps.UserHandler)
 
 	return r
 }
 
-// registerSwaggerRoutes registra rotas do Swagger
+// registerSwaggerRoutes registers Swagger routes.
 func registerSwaggerRoutes(r *gin.Engine) {
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 }
 
-// registerHealthRoutes registra rotas de health check
+// registerHealthRoutes registers health check routes.
 func registerHealthRoutes(r *gin.Engine, deps Dependencies) {
 	// Liveness - always ok (K8s restart if process is dead)
 	r.GET("/health", func(c *gin.Context) {

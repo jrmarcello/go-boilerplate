@@ -31,7 +31,7 @@ import (
 )
 
 // Start initializes the application following the composition pattern:
-// Config → Logger → Telemetry → Database → Dependencies → Router → Server
+// Config -> Logger -> Telemetry -> Database -> Dependencies -> Router -> Server
 func Start(ctx context.Context, cfg *config.Config) error {
 	// 0. Validate config
 	if validateErr := cfg.Validate(); validateErr != nil {
@@ -164,7 +164,7 @@ func shutdownTelemetry(tp *pkgtelemetry.Provider, logger *slog.Logger) {
 }
 
 func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx.DB, cfg *config.Config, httpMetrics *pkgtelemetry.HTTPMetrics, businessMetrics *infratelemetry.Metrics) router.Dependencies {
-	// Cache (optional — config-dependent, stays in server.go)
+	// Cache (optional -- config-dependent, stays in server.go)
 	redisClient, cacheErr := redisclient.NewRedisClient(redisclient.RedisConfig{
 		URL:          cfg.Redis.URL,
 		TTL:          cfg.Redis.TTL,
@@ -198,7 +198,7 @@ func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx
 	// Bootstrap container (repos, use cases, handlers for all domains)
 	c := bootstrap.New(sqlxWriter, sqlxReader, redisClient, businessMetrics)
 
-	// Idempotency Store (optional — config-dependent, stays in server.go)
+	// Idempotency Store (optional -- config-dependent, stays in server.go)
 	var idempotencyStore idempotency.Store
 	if cfg.Idempotency.Enabled {
 		if rc := redisClient.UnderlyingClient(); rc != nil {
@@ -210,8 +210,8 @@ func buildDependencies(cluster *database.DBCluster, sqlxWriter, sqlxReader *sqlx
 
 	return router.Dependencies{
 		HealthChecker:    checker,
-		UserHandler:      c.Handlers.User,
 		RoleHandler:      c.Handlers.Role,
+		UserHandler:      c.Handlers.User,
 		HTTPMetrics:      httpMetrics,
 		IdempotencyStore: idempotencyStore,
 		Config: router.Config{
@@ -232,7 +232,7 @@ func newServer(port string, handler http.Handler) *http.Server {
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       120 * time.Second,
-		MaxHeaderBytes:    1 << 20, // 1MB — protects against oversized headers
+		MaxHeaderBytes:    1 << 20, // 1MB -- protects against oversized headers
 	}
 }
 
