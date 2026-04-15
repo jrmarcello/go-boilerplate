@@ -229,12 +229,6 @@ func (r *UserRepository) List(ctx context.Context, filter userdomain.ListFilter)
 }
 
 func (r *UserRepository) Update(ctx context.Context, e *userdomain.User) error {
-	tx, txErr := r.writer.BeginTxx(ctx, nil)
-	if txErr != nil {
-		return fmt.Errorf("beginning transaction: %w", txErr)
-	}
-	defer func() { _ = tx.Rollback() }()
-
 	query := `
 		UPDATE users SET
 			name = :name,
@@ -245,23 +239,18 @@ func (r *UserRepository) Update(ctx context.Context, e *userdomain.User) error {
 	`
 
 	dbModel := fromDomainUser(e)
-	result, execErr := tx.NamedExecContext(ctx, query, dbModel)
+	result, execErr := r.writer.NamedExecContext(ctx, query, dbModel)
 	if execErr != nil {
-		return execErr
+		return fmt.Errorf("updating user: %w", execErr)
 	}
 
-	rowsAffected, rowsErr := result.RowsAffected()
-	if rowsErr != nil {
-		return rowsErr
+	rowsAffected, affectedErr := result.RowsAffected()
+	if affectedErr != nil {
+		return fmt.Errorf("checking rows affected: %w", affectedErr)
 	}
 
 	if rowsAffected == 0 {
 		return userdomain.ErrUserNotFound
-	}
-
-	commitErr := tx.Commit()
-	if commitErr != nil {
-		return fmt.Errorf("committing transaction: %w", commitErr)
 	}
 
 	return nil
@@ -271,18 +260,18 @@ func (r *UserRepository) Delete(ctx context.Context, id vo.ID) error {
 	query := `
 		UPDATE users SET
 			active = false,
-			updated_at = $1
-		WHERE id = $2 AND active = true
+			updated_at = NOW()
+		WHERE id = $1 AND active = true
 	`
 
-	result, execErr := r.writer.ExecContext(ctx, query, time.Now(), id.String())
+	result, execErr := r.writer.ExecContext(ctx, query, id.String())
 	if execErr != nil {
-		return execErr
+		return fmt.Errorf("deleting user: %w", execErr)
 	}
 
-	rowsAffected, rowsErr := result.RowsAffected()
-	if rowsErr != nil {
-		return rowsErr
+	rowsAffected, affectedErr := result.RowsAffected()
+	if affectedErr != nil {
+		return fmt.Errorf("checking rows affected: %w", affectedErr)
 	}
 
 	if rowsAffected == 0 {

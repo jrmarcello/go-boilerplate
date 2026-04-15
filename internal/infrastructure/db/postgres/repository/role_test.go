@@ -8,10 +8,12 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
-	roledomain "github.com/jrmarcello/gopherplate/internal/domain/role"
-	"github.com/jrmarcello/gopherplate/internal/domain/user/vo"
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	roledomain "github.com/jrmarcello/gopherplate/internal/domain/role"
+	"github.com/jrmarcello/gopherplate/internal/domain/user/vo"
 )
 
 // =============================================================================
@@ -162,6 +164,18 @@ func TestRoleRepository_Create(t *testing.T) {
 
 		assert.Error(t, createErr)
 		assert.ErrorIs(t, createErr, sql.ErrConnDone)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("duplicate name returns ErrDuplicateRoleName", func(t *testing.T) {
+		mock.ExpectExec("INSERT INTO roles").
+			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+			WillReturnError(&pq.Error{Code: "23505"})
+
+		r := buildTestRole()
+		createErr := repo.Create(context.Background(), r)
+
+		assert.ErrorIs(t, createErr, roledomain.ErrDuplicateRoleName)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 }

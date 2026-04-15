@@ -527,11 +527,9 @@ func TestUserRepository_Update(t *testing.T) {
 	repo := NewUserRepository(sqlxDB, sqlxDB)
 
 	t.Run("success", func(t *testing.T) {
-		mock.ExpectBegin()
 		mock.ExpectExec("UPDATE users SET").
 			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnResult(sqlmock.NewResult(0, 1))
-		mock.ExpectCommit()
 
 		e := buildTestUser()
 		updateErr := repo.Update(context.Background(), e)
@@ -541,11 +539,9 @@ func TestUserRepository_Update(t *testing.T) {
 	})
 
 	t.Run("not found - zero rows affected", func(t *testing.T) {
-		mock.ExpectBegin()
 		mock.ExpectExec("UPDATE users SET").
 			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnResult(sqlmock.NewResult(0, 0))
-		mock.ExpectRollback()
 
 		e := buildTestUser()
 		updateErr := repo.Update(context.Background(), e)
@@ -555,43 +551,16 @@ func TestUserRepository_Update(t *testing.T) {
 	})
 
 	t.Run("database error on exec", func(t *testing.T) {
-		mock.ExpectBegin()
 		mock.ExpectExec("UPDATE users SET").
 			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnError(sql.ErrConnDone)
-		mock.ExpectRollback()
 
 		e := buildTestUser()
 		updateErr := repo.Update(context.Background(), e)
 
 		assert.Error(t, updateErr)
 		assert.ErrorIs(t, updateErr, sql.ErrConnDone)
-		assert.NoError(t, mock.ExpectationsWereMet())
-	})
-
-	t.Run("transaction begin error", func(t *testing.T) {
-		mock.ExpectBegin().WillReturnError(sql.ErrConnDone)
-
-		e := buildTestUser()
-		updateErr := repo.Update(context.Background(), e)
-
-		assert.Error(t, updateErr)
-		assert.Contains(t, updateErr.Error(), "beginning transaction")
-		assert.NoError(t, mock.ExpectationsWereMet())
-	})
-
-	t.Run("transaction commit error", func(t *testing.T) {
-		mock.ExpectBegin()
-		mock.ExpectExec("UPDATE users SET").
-			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
-			WillReturnResult(sqlmock.NewResult(0, 1))
-		mock.ExpectCommit().WillReturnError(sql.ErrConnDone)
-
-		e := buildTestUser()
-		updateErr := repo.Update(context.Background(), e)
-
-		assert.Error(t, updateErr)
-		assert.Contains(t, updateErr.Error(), "committing transaction")
+		assert.Contains(t, updateErr.Error(), "updating user")
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 }
@@ -610,7 +579,7 @@ func TestUserRepository_Delete(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		mock.ExpectExec("UPDATE users SET").
-			WithArgs(sqlmock.AnyArg(), testID.String()).
+			WithArgs(testID.String()).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 
 		deleteErr := repo.Delete(context.Background(), testID)
@@ -621,7 +590,7 @@ func TestUserRepository_Delete(t *testing.T) {
 
 	t.Run("not found - zero rows affected", func(t *testing.T) {
 		mock.ExpectExec("UPDATE users SET").
-			WithArgs(sqlmock.AnyArg(), testID.String()).
+			WithArgs(testID.String()).
 			WillReturnResult(sqlmock.NewResult(0, 0))
 
 		deleteErr := repo.Delete(context.Background(), testID)
@@ -632,13 +601,14 @@ func TestUserRepository_Delete(t *testing.T) {
 
 	t.Run("database error", func(t *testing.T) {
 		mock.ExpectExec("UPDATE users SET").
-			WithArgs(sqlmock.AnyArg(), testID.String()).
+			WithArgs(testID.String()).
 			WillReturnError(sql.ErrConnDone)
 
 		deleteErr := repo.Delete(context.Background(), testID)
 
 		assert.Error(t, deleteErr)
 		assert.ErrorIs(t, deleteErr, sql.ErrConnDone)
+		assert.Contains(t, deleteErr.Error(), "deleting user")
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 }

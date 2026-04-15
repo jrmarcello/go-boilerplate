@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
+
 	roledomain "github.com/jrmarcello/gopherplate/internal/domain/role"
 	"github.com/jrmarcello/gopherplate/internal/domain/user/vo"
 )
@@ -73,7 +75,14 @@ func (r *RoleRepository) Create(ctx context.Context, role *roledomain.Role) erro
 
 	dbModel := fromDomainRole(role)
 	_, execErr := r.writer.NamedExecContext(ctx, query, dbModel)
-	return execErr
+	if execErr != nil {
+		var pqErr *pq.Error
+		if errors.As(execErr, &pqErr) && pqErr.Code == "23505" {
+			return roledomain.ErrDuplicateRoleName
+		}
+		return execErr
+	}
+	return nil
 }
 
 func (r *RoleRepository) FindByName(ctx context.Context, name string) (*roledomain.Role, error) {
