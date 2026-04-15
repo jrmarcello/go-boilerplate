@@ -31,7 +31,7 @@ spec:
             - name: POSTGRES_PASSWORD
               value: password
             - name: POSTGRES_DB
-              value: users
+              value: gopherplate
             # Otimizações para alta carga
             - name: POSTGRES_INITDB_ARGS
               value: "--data-checksums"
@@ -67,11 +67,11 @@ spec:
               memory: 2Gi
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "user", "-d", "users"]
+              command: ["pg_isready", "-U", "user", "-d", "gopherplate"]
             initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
             exec:
-              command: ["pg_isready", "-U", "user", "-d", "users"]
+              command: ["pg_isready", "-U", "user", "-d", "gopherplate"]
             initialDelaySeconds: 30
             periodSeconds: 10

@@ -73,6 +73,10 @@ type DBConfig struct {
 }
 
 // GetWriterDSN builds the writer (primary) connection DSN in key=value format.
+//
+// DSN does not set search_path; objects live in the implicit `public` schema.
+// For shared-Postgres deployments, set DB_SEARCH_PATH and append
+// `&search_path=<value>` to the DSN to isolate per service.
 func (c *DBConfig) GetWriterDSN() string {
 	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		c.Host, c.Port, c.User, c.Password, c.Name, c.SSLMode)
@@ -152,7 +156,7 @@ func Load() (*Config, error) {
 			Port:     getEnv("DB_PORT", "5432"),
 			User:     getEnv("DB_USER", "user"),
 			Password: getEnv("DB_PASSWORD", "password"),
-			Name:     getEnv("DB_NAME", "users"),
+			Name:     getEnv("DB_NAME", "gopherplate"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 
 			MaxOpenConns:    getEnvInt("DB_MAX_OPEN_CONNS", 25),
@@ -160,13 +164,15 @@ func Load() (*Config, error) {
 			ConnMaxLifetime: getEnvDuration("DB_CONN_MAX_LIFETIME", 5*time.Minute),
 			ConnMaxIdleTime: getEnvDuration("DB_CONN_MAX_IDLE_TIME", 90*time.Second),
 
-			ReplicaEnabled:         getEnvBool("DB_REPLICA_ENABLED", false),
-			ReplicaHost:            os.Getenv("DB_REPLICA_HOST"),
-			ReplicaPort:            os.Getenv("DB_REPLICA_PORT"),
-			ReplicaUser:            os.Getenv("DB_REPLICA_USER"),
-			ReplicaPassword:        os.Getenv("DB_REPLICA_PASSWORD"),
-			ReplicaName:            os.Getenv("DB_REPLICA_NAME"),
-			ReplicaSSLMode:         os.Getenv("DB_REPLICA_SSLMODE"),
+			ReplicaEnabled:  getEnvBool("DB_REPLICA_ENABLED", false),
+			ReplicaHost:     os.Getenv("DB_REPLICA_HOST"),
+			ReplicaPort:     os.Getenv("DB_REPLICA_PORT"),
+			ReplicaUser:     os.Getenv("DB_REPLICA_USER"),
+			ReplicaPassword: os.Getenv("DB_REPLICA_PASSWORD"),
+			ReplicaName:     os.Getenv("DB_REPLICA_NAME"),
+			ReplicaSSLMode:  os.Getenv("DB_REPLICA_SSLMODE"),
+			// Reader pool defaults are larger than writer because read replicas typically
+			// serve higher-concurrency SELECT workloads. Tune down for small services.
 			ReplicaMaxOpenConns:    getEnvInt("DB_REPLICA_MAX_OPEN_CONNS", 40),
 			ReplicaMaxIdleConns:    getEnvInt("DB_REPLICA_MAX_IDLE_CONNS", 20),
 			ReplicaConnMaxLifetime: getEnvDuration("DB_REPLICA_CONN_MAX_LIFETIME", 5*time.Minute),

@@ -5,7 +5,7 @@
 
 APP_NAME := gopherplate
 IMAGE_NAME := $(APP_NAME)-api
-DB_NAME := entities
+DB_NAME := gopherplate
 
 # ============================================
 # VARIÁVEIS INTERNAS

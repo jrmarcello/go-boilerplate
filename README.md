@@ -125,7 +125,7 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_USER=user
 DB_PASSWORD=password
-DB_NAME=users
+DB_NAME=gopherplate
 
 # Redis
 REDIS_ENABLED=true
