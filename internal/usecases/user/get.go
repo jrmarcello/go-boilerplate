@@ -10,6 +10,7 @@ import (
 	"github.com/jrmarcello/gopherplate/internal/domain/user/vo"
 	"github.com/jrmarcello/gopherplate/internal/usecases/user/dto"
 	"github.com/jrmarcello/gopherplate/internal/usecases/user/interfaces"
+	"github.com/jrmarcello/gopherplate/pkg/apperror"
 	"github.com/jrmarcello/gopherplate/pkg/cache"
 
 	ucshared "github.com/jrmarcello/gopherplate/internal/usecases/shared"
@@ -81,7 +82,11 @@ func (uc *GetUseCase) Execute(ctx context.Context, input dto.GetInput) (*dto.Get
 			ucshared.ClassifyError(span, flightErr, getExpectedErrors, wrappedErr.Error())
 			return nil, userToAppError(flightErr)
 		}
-		e = val.(*userdomain.User)
+		var ok bool
+		e, ok = val.(*userdomain.User)
+		if !ok {
+			return nil, apperror.New(apperror.CodeInternalError, "internal server error")
+		}
 	} else {
 		var findErr error
 		e, findErr = uc.Repo.FindByID(ctx, id)
