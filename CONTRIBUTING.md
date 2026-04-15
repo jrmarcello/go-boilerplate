@@ -100,11 +100,16 @@ make release VERSION=0.13.0
 O Makefile faz, em ordem:
 
 1. Valida working tree limpa
-2. `git-cliff --tag v0.13.0 --output CHANGELOG.md`
-3. `git commit -m "chore(release): v0.13.0 [skip ci]"`
-4. `git tag v0.13.0`
-5. Pergunta `Push para origin/main + tag? [y/N]` — responda `y` para publicar
-6. `git push origin main --follow-tags`
+2. Captura o sha do `HEAD` atual (ultimo commit "real", sem `[skip ci]`) — sera o alvo da tag
+3. `git-cliff --tag v0.13.0 --output CHANGELOG.md`
+4. `git commit -m "chore(release): v0.13.0 [skip ci]"` — commit meta sobre o CHANGELOG
+5. `git tag -a v0.13.0 <sha-capturado-no-passo-2>` — tag annotated apontando para o commit anterior ao chore(release)
+6. Pergunta `Push para origin/main + tag? [y/N]` — responda `y` para publicar
+7. `git push origin main --follow-tags`
+
+**Por que a tag aponta para o commit anterior ao `chore(release)`?**
+
+O `[skip ci]` no commit de release impede o GitHub Actions de rodar qualquer workflow para o push desse commit — inclusive a `release.yml`. Se a tag apontasse para o commit de CHANGELOG (HEAD), o tag push herdaria o `[skip ci]` e a GitHub Release nao seria publicada. Apontando a tag para o commit anterior (que nao tem `[skip ci]`), o tag push dispara o workflow normalmente.
 
 Apos o push, o workflow `.github/workflows/release.yml` dispara automaticamente e publica a **GitHub Release** em `~30s`, com notes geradas pelo `git-cliff` (escopo: so commits desde a tag anterior). Acompanhe com `gh run watch` ou na aba Actions.
 

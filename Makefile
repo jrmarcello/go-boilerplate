@@ -181,11 +181,14 @@ release: ## Cria release + publica no GitHub (uso: make release VERSION=0.13.0)
 	@[ -z "$$(git status --porcelain)" ] || { echo "Erro: working tree com mudanças não commitadas. Faça commit antes."; exit 1; }
 	@echo "Criando release v$(VERSION)..."
 	@git-cliff --tag "v$(VERSION)" --output CHANGELOG.md
-	@git add CHANGELOG.md
-	@git commit -m "chore(release): v$(VERSION) [skip ci]"
-	@git tag -a "v$(VERSION)" -m "v$(VERSION)"
+	@TAG_COMMIT=$$(git rev-parse HEAD) && \
+		git add CHANGELOG.md && \
+		git commit -m "chore(release): v$(VERSION) [skip ci]" && \
+		git tag -a "v$(VERSION)" -m "v$(VERSION)" $$TAG_COMMIT
 	@echo ""
 	@echo "Commit e tag criados localmente."
+	@echo "Tag v$(VERSION) aponta para o commit anterior ao chore(release) (sem [skip ci]),"
+	@echo "para que o tag push dispare release.yml no GitHub Actions."
 	@read -p "Push para origin/main + tag v$(VERSION) agora? [y/N] " ans; \
 		if [ "$$ans" = "y" ] || [ "$$ans" = "Y" ]; then \
 			git push origin main --follow-tags && \
