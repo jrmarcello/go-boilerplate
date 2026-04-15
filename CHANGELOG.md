@@ -6,22 +6,50 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Commits seguem [Conventional Commits](https://www.conventionalcommits.org/).
 
 ---
-
 ## [0.13.0] - 2026-04-15
+
+### CI/CD
+
+- Make govulncheck blocking and pin actions by commit SHA
+- Bump golangci-lint-action to v7 for golangci-lint v2 support
+- **release**: Replace broken git-cliff-action with taiki-e/install-action
+- Auto-publish GitHub Release on tag push
+- Add GitHub Actions workflow adapted from twin pipeline
+
+### Correções
+
+- **make**: Re-apply release target cancel logic and annotated tag
+- **make**: Release cancel prompt actually cancels and use annotated tag
+- **usecases**: Guard pagination total_pages math
+- **middleware/service-key**: Close timing side-channel for unknown service
+- **usecases/user**: Guard singleflight type assertion in GetUseCase
+- **domain/user/vo**: Translate Email.Scan errors to English
+- **handlers**: Drop PII from OTel span attributes
+- **usecases/role**: Align with user domain conventions
+- **middleware**: Return 413 from idempotency on body overflow
 
 ### Funcionalidades
 
-- **grpc**: Add gRPC server as alternative to REST (dual HTTP + gRPC with errgroup)
-- **grpc**: Proto definitions for User (CRUD) and Role (Create/List/Delete) via buf v2
-- **grpc**: Interceptors: recovery, structured logging, service-key auth (constant-time)
-- **grpc**: OTel instrumentation via StatsHandler + gRPC health check protocol
-- **grpc**: k6 gRPC smoke tests
+- **grpc**: Add gRPC server as alternative to REST
+- **db**: Add trigram + unconstrained created_at indexes
+- **middleware**: Enforce HTTP_MAX_BODY_SIZE via BodyLimit
 
 ### Manutenção
 
 - Remove Uber Fx references and guide, keep manual DI only
-- **deps**: Upgrade OTel to v1.43.0, gRPC to v1.80.0
-- **deps**: Add otelgrpc StatsHandler instrumentation
+- **gitignore**: Cover all .env.* variants
+- **config**: Align DB_NAME default and document pool/DSN choices
+- **deps**: Drop redundant docker/docker pin
+- **hooks**: Resolve Go toolchain from asdf in stop-validate
+- **deps**: Bump Go to 1.26.2 and update tool module paths
+- Add a blank line for better readability in CHANGELOG.md
+
+### Refatoração
+
+- **usecases**: Drop decorative DeletedAt from Delete output
+- **cli/wiring**: Align regen template with Findings #1 and #18
+- **bootstrap**: Unexport intermediate Container fields
+- **repository**: Tighten user/role repos per code review
 
 ## [0.12.0] - 2026-04-13
 
@@ -39,6 +67,7 @@ Commits seguem [Conventional Commits](https://www.conventionalcommits.org/).
 
 ### Manutenção
 
+- **release**: V0.12.0 [skip ci]
 - Remove lingering go-boilerplate references after rename to gopherplate
 - Add a blank line for better readability in CHANGELOG.md
 
@@ -150,6 +179,7 @@ Commits seguem [Conventional Commits](https://www.conventionalcommits.org/).
 - **contributing**: Rewrite with issue tracker, dev workflow, and architecture refs
 - Add CHANGELOG.md with full project history
 - **guides**: Add multi-database strategy guide
+- **guides**: Add Uber Fx dependency injection guide
 - Comprehensive documentation update to match current codebase
 - **agents**: Add .agent/ toolkit references to CLAUDE.md and AGENTS.md
 - **readme**: Update with pkg/, new ADRs, commands and features
