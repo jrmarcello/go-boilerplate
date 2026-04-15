@@ -71,10 +71,6 @@ func (h *UserHandler) Create(c *gin.Context) {
 		return
 	}
 
-	span.SetAttributes(
-		attribute.String("user.name", req.Name),
-	)
-
 	res, execErr := h.CreateUC.Execute(ctx, req)
 	if execErr != nil {
 		HandleError(c, execErr)

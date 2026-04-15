@@ -55,10 +55,6 @@ func (h *RoleHandler) Create(c *gin.Context) {
 		return
 	}
 
-	span.SetAttributes(
-		attribute.String("role.name", req.Name),
-	)
-
 	res, execErr := h.CreateUC.Execute(ctx, req)
 	if execErr != nil {
 		HandleError(c, execErr)

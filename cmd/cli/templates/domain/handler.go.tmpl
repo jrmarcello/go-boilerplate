@@ -60,10 +60,6 @@ func (h *{{.DomainNamePascal}}Handler) Create(c *gin.Context) {
 		return
 	}
 
-	span.SetAttributes(
-		attribute.String("{{.DomainNameSnake}}.name", req.Name),
-	)
-
 	res, execErr := h.CreateUC.Execute(ctx, req)
 	if execErr != nil {
 		HandleError(c, execErr)
