@@ -126,6 +126,13 @@ Context7 is installed as a global MCP plugin. It fetches up-to-date documentatio
 
 ## Claude Code Resources
 
+The resources below (skills, subagents, rules, hooks) collectively form this project's **harness**
+— the outer system that guides and validates agent-generated code (Fowler,
+["Harness Engineering for Coding Agents"](https://martinfowler.com/articles/harness-engineering.html)).
+For the full classified inventory of every guide and sensor, see
+[docs/harness.md](docs/harness.md). For the process of adding new controls and the monthly
+coherence check, see [docs/guides/harness-self-steering.md](docs/guides/harness-self-steering.md).
+
 ### Skills (slash commands)
 
 | Skill | Purpose | When to use |

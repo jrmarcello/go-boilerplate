@@ -442,8 +442,21 @@ O projeto inclui 8 ADRs (Architecture Decision Records) em `docs/adr/` explicand
 | [sdd-ralph-loop.md](docs/guides/sdd-ralph-loop.md) | SDD + Ralph Loop — fluxo spec-driven com execução autônoma |
 | [grpc.md](docs/guides/grpc.md) | gRPC como alternativa ao REST (buf, dual server, interceptors) |
 | [recommended-libraries.md](docs/guides/recommended-libraries.md) | Bibliotecas recomendadas (resiliência, crypto, event bus, notificações, sagas) |
+| [harness.md](docs/harness.md) | Mapa do harness do projeto (guides e sensors classificados) |
+| [harness-self-steering.md](docs/guides/harness-self-steering.md) | Processo de evolução do harness: quando abrir gap note, revisão mensal |
 
 Para agentes de IA, ver [AGENTS.md](AGENTS.md) e [CLAUDE.md](CLAUDE.md).
+
+---
+
+## Harness engineering
+
+O projeto adota o modelo de [**harness engineering**](https://martinfowler.com/articles/harness-engineering.html)
+proposto por Martin Fowler: todo o conjunto de guides (feedforward — CLAUDE.md, rules, skills,
+scaffolders) e sensors (feedback — linters, hooks, testes, subagents, CI) que cercam o modelo é
+inventariado e classificado em [docs/harness.md](docs/harness.md). A evolução contínua desse
+harness (quando adicionar um sensor novo, como fazer a revisão mensal de coerência) está
+documentada em [docs/guides/harness-self-steering.md](docs/guides/harness-self-steering.md).
 
 ---
 
