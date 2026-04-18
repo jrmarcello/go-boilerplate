@@ -1,0 +1,109 @@
+name: Perf Regression
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    name: k6 regression gate
+    runs-on: ubuntu-latest
+    # Only run on main pushes or PRs explicitly labeled `perf` — performance is not on the
+    # default PR critical path.
+    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'perf')
+    timeout-minutes: 20
+    env:
+      LOAD_URL: http://localhost:8080
+      # load scenario (~3.5 min) gives statistically stable percentiles.
+      # smoke is 1 iteration — percentiles are unstable and produce false positives.
+      # See docs/guides/perf-regression.md § "Why not smoke".
+      SCENARIO: load
+      PERF_REGRESSION_THRESHOLD: "0.35"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
+            --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+            | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: Check baseline exists
+        run: |
+          BASELINE="tests/load/baselines/${SCENARIO}.json"
+          if [ ! -f "$BASELINE" ]; then
+            echo "::warning::Baseline $BASELINE not committed yet. Run 'make load-baseline SCENARIO=${SCENARIO}' locally and commit the result."
+            echo "BASELINE_MISSING=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Start infrastructure (Postgres + Redis)
+        if: env.BASELINE_MISSING != 'true'
+        run: make docker-up
+
+      - name: Run migrations
+        if: env.BASELINE_MISSING != 'true'
+        run: make migrate-up
+
+      - name: Generate Swagger (required for build)
+        if: env.BASELINE_MISSING != 'true'
+        run: |
+          go install github.com/swaggo/swag/cmd/swag@v1.16.6
+          swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
+
+      - name: Start API
+        if: env.BASELINE_MISSING != 'true'
+        run: |
+          go build -o bin/api ./cmd/api
+          ./bin/api &
+          echo $! > /tmp/api.pid
+
+      - name: Wait for API health
+        if: env.BASELINE_MISSING != 'true'
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/health >/dev/null; then
+              echo "API up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API never became healthy"
+          exit 1
+
+      - name: Run regression gate
+        if: env.BASELINE_MISSING != 'true'
+        run: make load-regression SCENARIO=${SCENARIO}
+
+      - name: Stop API
+        if: always() && env.BASELINE_MISSING != 'true'
+        run: |
+          if [ -f /tmp/api.pid ]; then
+            kill "$(cat /tmp/api.pid)" || true
+          fi
+
+      - name: Upload summary artifact
+        if: always() && env.BASELINE_MISSING != 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: perf-summary-${{ github.run_id }}
+          path: tests/load/results/
+          retention-days: 14

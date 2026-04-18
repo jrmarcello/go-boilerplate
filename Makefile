@@ -39,6 +39,7 @@ ENV_FILE := $(shell test -f .env && echo "--env-file .env" || echo "")
         proto proto-lint \
         test test-unit test-e2e test-coverage \
         load-smoke load-test load-stress load-spike load-kind load-clean \
+        load-baseline load-regression \
         docker-up docker-down docker-build \
         observability-up observability-down observability-logs \
         kind-up kind-down kind-deploy kind-logs kind-status kind-migrate kind-setup \
@@ -424,6 +425,22 @@ load-clean: ## Limpa dados de testes de carga
 	@echo "Limpando dados de load test..."
 	@docker exec $$(docker ps --format '{{.Names}}' | grep -E 'db|postgres' | head -1) psql -U user -d $(DB_NAME) -c "DELETE FROM entities WHERE name LIKE 'Load Test%';"
 	@echo "Dados de load test removidos"
+
+# Perf regression gate (spec: k6-regression-gate)
+SCENARIO              ?= smoke
+PERF_BASELINE_DIR     := tests/load/baselines
+PERF_BASELINE_FILE    := $(PERF_BASELINE_DIR)/$(SCENARIO).json
+PERF_SUMMARY_FILE     := tests/load/results/$(SCENARIO)_summary.json
+
+load-baseline: load-setup ## Regenera o baseline de performance (uso: make load-baseline SCENARIO=smoke)
+	@mkdir -p $(PERF_BASELINE_DIR)
+	k6 run --summary-export=$(PERF_BASELINE_FILE) --env SCENARIO=$(SCENARIO) --env BASE_URL=$(LOAD_URL) tests/load/main.js
+	@echo "Baseline atualizado: $(PERF_BASELINE_FILE)"
+
+load-regression: load-setup ## Roda cenario e falha se p95 degradar (uso: make load-regression SCENARIO=smoke)
+	@test -f $(PERF_BASELINE_FILE) || { echo "Baseline ausente: $(PERF_BASELINE_FILE). Rode 'make load-baseline SCENARIO=$(SCENARIO)' uma vez para gerar."; exit 1; }
+	k6 run --summary-export=$(PERF_SUMMARY_FILE) --env SCENARIO=$(SCENARIO) --env BASE_URL=$(LOAD_URL) tests/load/main.js
+	go run ./tests/load/cmd/perfcompare --baseline $(PERF_BASELINE_FILE) --summary $(PERF_SUMMARY_FILE)
 
 # ============================================
 # SANDBOX (Claude Code DevContainer)

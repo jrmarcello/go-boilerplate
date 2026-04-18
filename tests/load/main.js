@@ -92,6 +92,10 @@ selectedScenario[SCENARIO] = allScenarios[SCENARIO];
 export const options = {
   scenarios: selectedScenario,
 
+  // Ensure p(99) is emitted in --summary-export (k6 default stops at p(95)).
+  // perfcompare gates on both p(95) and p(99); see docs/guides/perf-regression.md.
+  summaryTrendStats: ['min', 'med', 'avg', 'max', 'p(90)', 'p(95)', 'p(99)'],
+
   thresholds: {
     // Smoke: assertion-based — any failure = test failure
     errors: [SCENARIO === 'smoke' ? 'rate==0' : 'rate<0.01'],

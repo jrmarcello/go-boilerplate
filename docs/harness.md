@@ -158,6 +158,7 @@ Config: [.golangci.yml](../.golangci.yml)
 | `ci.yml::vulncheck` | sensor | C | behavior | CI | `govulncheck -show verbose ./...` |
 | `ci.yml::unit-tests` | sensor | C | behavior | CI | `go test -race -coverprofile=...`, **60% coverage threshold** |
 | `ci.yml::e2e-tests` | sensor | C | behavior | CI | `go test ./tests/e2e/... -count=1` via TestContainers |
+| `perf-regression.yml::regression` | sensor | C | arch-fitness | CI | k6 run + `perfcompare` vs. `tests/load/baselines/<scenario>.json` (p95 15%, p99 30%) |
 | `release.yml` | guide | C | meta | CI | release pipeline |
 
 Files: [.github/workflows/ci.yml](../.github/workflows/ci.yml),
@@ -211,7 +212,7 @@ the sensor or guide. Links may be broken until the corresponding spec ships.
 
 | Gap | Category | Spec |
 | --- | --- | --- |
-| No performance regression gate: `/load-test` runs but never fails on degradation. | arch-fitness | [.specs/k6-regression-gate.md](../.specs/k6-regression-gate.md) |
+| ~~No performance regression gate: `/load-test` runs but never fails on degradation.~~ **Resolved by spec k6-regression-gate** (DONE) — see `perf-regression.yml` job above and [guides/perf-regression.md](guides/perf-regression.md). | arch-fitness | [.specs/k6-regression-gate.md](../.specs/k6-regression-gate.md) |
 | Coverage measures execution, not verification (no mutation testing). | maint | [.specs/maintainability-harness.md](../.specs/maintainability-harness.md) |
 | `unused` catches unreferenced; no detection of unreachable-but-referenced code. | maint | [.specs/maintainability-harness.md](../.specs/maintainability-harness.md) |
 | Coverage threshold is global 60%, not a delta on changed lines. | maint | [.specs/maintainability-harness.md](../.specs/maintainability-harness.md) |

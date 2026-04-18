@@ -1,6 +1,8 @@
 # Binários
 /bin/
 /gopherplate
+/perfcompare
+/tests/load/cmd/perfcompare/perfcompare
 *.exe
 *.exe~
 *.dll
