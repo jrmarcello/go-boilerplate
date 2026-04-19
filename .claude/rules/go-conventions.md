@@ -12,11 +12,9 @@ applies-to: "**/*.go"
 - Use cases return `*apperror.AppError` via a local `toAppError()` function that maps domain errors to structured application errors
 - `apperror.Wrap(err, code, message)` preserves the error chain — `errors.Is()` works through `Unwrap()`
 - Handler resolves errors generically via `errors.As(err, &appErr)` + `codeToStatus` map — zero domain imports in the handler layer
-- Ref: `docs/guides/error-handling.md`, ADR-009 (created by spec `error-handling-refactor` — references valid after its execution)
+- Ref: [docs/guides/error-handling.md](../../docs/guides/error-handling.md), [ADR-009](../../docs/adr/009-error-handling.md)
 
 ## Span Error Classification (OTel)
-
-> Note: The files referenced below (`pkg/telemetry/span.go`, `internal/usecases/shared/classify.go`, `docs/guides/error-handling.md`, ADR-009) are created by the spec `error-handling-refactor` — references will be valid after its execution.
 
 - **Use case decides span status** — not the handler, not the infrastructure layer
 - `telemetry.FailSpan(span, err, msg)` for **unexpected** errors (DB timeout, connection reset, 5xx) — marks span as Error and records the error event

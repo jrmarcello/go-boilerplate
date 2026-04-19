@@ -27,6 +27,17 @@ make kind-setup     # Full Kind cluster setup (cluster + db + migrate + deploy)
 make proto          # Generate Go stubs from proto files (buf generate)
 make proto-lint     # Lint proto files (buf lint)
 make help           # See all available make targets
+
+# Harness sensors (see docs/harness.md)
+make deadcode       # Detect unreachable funcs in cmd/(api|migrate) + internal/
+make mutation       # Mutation testing via gremlins (internal/usecases/)
+make coverage-delta # Coverage delta on changed lines vs main (diff-cover, 70% threshold)
+make semgrep        # Run custom organizational rules (.semgrep/)
+make semgrep-test   # Validate semgrep rules against fixtures
+make buf-breaking   # Detect breaking changes in proto/ vs main
+make golden-update  # Regenerate golden fixtures in tests/e2e/testdata/
+make load-baseline SCENARIO=load    # Regenerate k6 perf baseline
+make load-regression SCENARIO=load  # Fail if p95 degrades > 35% vs baseline
 ```
 
 Run a single test file or function:
@@ -80,8 +91,8 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
 - **ID Strategy**: UUID v7 for all entity IDs. See `docs/adr/002-ids.md`.
 - **DB Cluster**: Writer/Reader split via `pkg/database.DBCluster`. Reader is optional, falls back to writer.
 - **API Response Format**: Gin handlers use `httpgin.SendSuccess(c, status, data)` and `httpgin.SendError(c, status, message)`. Core helpers (`httputil.WriteSuccess`/`httputil.WriteError`) work with stdlib `http.ResponseWriter`. Responses wrap in `{"data": ...}` or `{"errors": {"message": ...}}`.
-- **Error Handling**: Domain defines pure errors (`user.ErrNotFound`, etc.). Use cases return `*apperror.AppError` via local `toAppError()`. Handler resolves generically via `errors.As()` + `codeToStatus` map — zero domain imports. Ref: ADR-009, `docs/guides/error-handling.md` (created by spec `error-handling-refactor`).
-- **Span Error Classification**: Use case classifies errors via `shared.ClassifyError()`. Expected errors (validation, not found, conflict) -> `telemetry.WarnSpan` (span stays Ok). Unexpected errors (DB timeout, infra) -> `telemetry.FailSpan` (span marked Error). Handler never touches spans. Ref: ADR-009, `docs/guides/error-handling.md` (created by spec `error-handling-refactor`).
+- **Error Handling**: Domain defines pure errors (`user.ErrNotFound`, etc.). Use cases return `*apperror.AppError` via local `toAppError()`. Handler resolves generically via `errors.As()` + `codeToStatus` map — zero domain imports. Ref: ADR-009, `docs/guides/error-handling.md`.
+- **Span Error Classification**: Use case classifies errors via `shared.ClassifyError()`. Expected errors (validation, not found, conflict) -> `telemetry.WarnSpan` (span stays Ok). Unexpected errors (DB timeout, infra) -> `telemetry.FailSpan` (span marked Error). Handler never touches spans. Ref: ADR-009, `docs/guides/error-handling.md`.
 - **Service Key Auth**: Optional service-to-service authentication via `X-Service-Name` + `X-Service-Key` headers. Shared between HTTP (middleware) and gRPC (interceptor via metadata). See `docs/adr/005-service-key-auth.md`.
 - **Singleflight**: GetUseCase uses `golang.org/x/sync/singleflight` to prevent cache stampede on concurrent reads for the same entity.
 - **Idempotency**: Redis-backed idempotency via `pkg/idempotency.Store`, wired as optional middleware. Uses SHA-256 fingerprint + lock/unlock pattern.
@@ -94,7 +105,7 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
 - **Migrations**: Goose SQL files in `internal/infrastructure/db/postgres/migration/`
 - **Tests**: Unit tests use hand-written mocks (`mocks_test.go` per package). E2E tests use TestContainers (Postgres + Redis).
 - **Import rule**: Never import `infrastructure` from `domain` or `usecases`. Never import `usecases` from `domain`.
-- **Error handling guide**: See `docs/guides/error-handling.md` for the practical guide on adding new errors, mapping patterns, and span classification (created by spec `error-handling-refactor`).
+- **Error handling guide**: See `docs/guides/error-handling.md` for the practical guide on adding new errors, mapping patterns, and span classification.
 
 ## CI Pipeline (GitHub Actions)
 
@@ -129,9 +140,18 @@ Context7 is installed as a global MCP plugin. It fetches up-to-date documentatio
 The resources below (skills, subagents, rules, hooks) collectively form this project's **harness**
 — the outer system that guides and validates agent-generated code (Fowler,
 ["Harness Engineering for Coding Agents"](https://martinfowler.com/articles/harness-engineering.html)).
-For the full classified inventory of every guide and sensor, see
-[docs/harness.md](docs/harness.md). For the process of adding new controls and the monthly
-coherence check, see [docs/guides/harness-self-steering.md](docs/guides/harness-self-steering.md).
+[docs/harness.md](docs/harness.md) is the **canonical inventory** of every guide and sensor
+(this file and README.md summarize; harness.md is authoritative when they diverge). For the
+process of evolving the harness, see
+[docs/guides/harness-self-steering.md](docs/guides/harness-self-steering.md).
+
+Per-sensor deep-dive guides live in `docs/guides/`:
+
+- [perf-regression.md](docs/guides/perf-regression.md) — k6 baseline + p95/p99 gate
+- [mutation-testing.md](docs/guides/mutation-testing.md) — gremlins nightly report
+- [golden-fixtures.md](docs/guides/golden-fixtures.md) — approved-fixtures for responses
+- [semgrep-rules.md](docs/guides/semgrep-rules.md) — organizational-pattern rules
+- [error-handling.md](docs/guides/error-handling.md) — ADR-009 practical guide
 
 ### Skills (slash commands)
 

@@ -169,6 +169,8 @@ Config: [.golangci.yml](../.golangci.yml)
 | `release.yml` | guide | C | meta | CI | release pipeline |
 
 Files: [.github/workflows/ci.yml](../.github/workflows/ci.yml),
+[.github/workflows/perf-regression.yml](../.github/workflows/perf-regression.yml),
+[.github/workflows/mutation-nightly.yml](../.github/workflows/mutation-nightly.yml),
 [.github/workflows/release.yml](../.github/workflows/release.yml)
 
 ### MCP servers
@@ -237,3 +239,7 @@ For the process of identifying new gaps and evolving the harness, see
 - Martin Fowler, ["Harness Engineering for Coding Agents"](https://martinfowler.com/articles/harness-engineering.html)
 - [ADR-009: Error handling](adr/009-error-handling.md) — example of how guide + sensor reinforce
   each other (ADR + linter + rule + review skill).
+- [README.md § Harness engineering](../README.md#harness-engineering) — project-level intro and
+  how this inventory fits into the overall documentation.
+- [CLAUDE.md § Claude Code Resources](../CLAUDE.md#claude-code-resources) — AI-agent-facing
+  summary of the same harness, with per-sensor deep-dive links.

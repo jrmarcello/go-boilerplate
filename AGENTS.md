@@ -13,7 +13,7 @@ Este projeto segue **Clean Architecture** e princípios **SOLID**. Consulte os A
 | **Clean Architecture** | Separação em camadas com dependências apontando para dentro | `docs/adr/001-clean-architecture.md` |
 | **Dependency Inversion** | Use Cases definem interfaces; Infrastructure implementa | `docs/adr/001-clean-architecture.md` |
 | **Single Responsibility** | Cada arquivo/struct tem uma única responsabilidade | - |
-| **Error Handling** | Erros de domínio são puros; tradução ocorre no handler | `docs/adr/004-error-handling.md` |
+| **Error Handling** | Erros de domínio são puros; tradução ocorre no handler | `docs/adr/009-error-handling.md` |
 
 ### Estrutura de Camadas
 
@@ -219,20 +219,32 @@ make help          # Ver todos os comandos
 | `docs/adr/001-clean-architecture.md` | Estrutura de camadas e DI |
 | `docs/adr/002-ids.md` | Estrategia de IDs (UUID v7) |
 | `docs/adr/003-config-strategy.md` | godotenv + .env + K8s |
-| `docs/adr/004-error-handling.md` | Tratamento de erros em camadas |
+| `docs/adr/009-error-handling.md` | Tratamento de erros em camadas |
 | `docs/adr/005-service-key-auth.md` | Autenticação via Service Key |
 | `docs/adr/006-migration-strategy.md` | ArgoCD PreSync + binário separado |
 | `docs/adr/007-pkg-reusable-packages.md` | Pacotes reutilizáveis em pkg/ |
 | `docs/adr/008-api-response-format.md` | Formato padronizado de resposta HTTP |
+| `docs/adr/009-error-handling.md` | Tratamento de erros (supersedes ADR-004) |
 
 ### Guias
 
 | Arquivo | Sobre |
 | ------- | ----- |
+| `docs/harness.md` | Mapa do harness do projeto (guides + sensors classificados) |
 | `docs/guides/architecture.md` | Diagramas e visão geral |
 | `docs/guides/cache.md` | Cache com Redis, singleflight e pool config |
+| `docs/guides/error-handling.md` | Guia prático de erros (ADR-009) |
 | `docs/guides/kubernetes.md` | Deploy, Kind e operação |
 | `docs/guides/multi-database.md` | Estrategia para múltiplos bancos |
+| `docs/guides/grpc.md` | gRPC (buf, dual server, interceptors) |
+| `docs/guides/template-cli.md` | CLI de scaffold (gopherplate) |
+| `docs/guides/sdd-ralph-loop.md` | SDD + Ralph Loop |
+| `docs/guides/harness-self-steering.md` | Processo de evolução do harness |
+| `docs/guides/perf-regression.md` | Gate de regressão de performance (k6) |
+| `docs/guides/mutation-testing.md` | Mutation testing (gremlins) |
+| `docs/guides/golden-fixtures.md` | Approved-fixtures para respostas |
+| `docs/guides/semgrep-rules.md` | Regras Semgrep organizacionais |
+| `docs/guides/recommended-libraries.md` | Bibliotecas recomendadas |
 | `internal/infrastructure/grpc/` | gRPC handlers, interceptors e server factory |
 
 ---

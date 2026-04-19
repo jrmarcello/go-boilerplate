@@ -82,6 +82,13 @@ make release VERSION=x.y.z  # Cria tag, gera CHANGELOG e publica GitHub Release
 make lint              # golangci-lint + gofmt
 make vulncheck         # Varredura de vulnerabilidades (govulncheck)
 make swagger           # Regenera documentação Swagger
+make deadcode          # Detecta funções inalcançáveis (cmd/api + cmd/migrate + internal/)
+make mutation          # Mutation testing (gremlins) sobre internal/usecases/
+make coverage-delta    # Coverage delta nas linhas alteradas vs. main (diff-cover)
+make semgrep           # Regras organizacionais (handlers, use cases)
+make semgrep-test      # Valida regras semgrep contra fixtures
+make buf-breaking      # Detecta breaking changes em proto/ vs. main
+make golden-update     # Regenera golden fixtures dos testes E2E
 
 # Testes
 make test              # Todos (unit + E2E)
@@ -97,9 +104,11 @@ make observability-setup # Dashboard + alertas no Kibana
 make kind-setup        # Kubernetes local completo
 
 # Load Tests
-make load-smoke        # Validação básica (5 VUs)
+make load-smoke        # Validação básica (1 VU/1 iter — functional smoke)
 make load-test         # Carga progressiva (até 50 VUs)
 make load-stress       # Encontrar limites (até 200 VUs)
+make load-baseline SCENARIO=load    # Regenera baseline de performance
+make load-regression SCENARIO=load  # Falha se p95 degradar > 35%
 
 # Template CLI
 make build-cli         # Compila CLI para bin/gopherplate
@@ -375,11 +384,12 @@ A spec é agnóstica de arquitetura — funciona tanto com camadas separadas qua
 
 #### Agentes Especializados
 
-3 agentes com memória persistente, usados pelos skills de review e debug:
+4 agentes com memória persistente, usados pelos skills de review e debug:
 
 - **code-reviewer** — Compliance de arquitetura, idiomas Go, padrões do template
 - **security-reviewer** — OWASP Top 10, injeção, auth, dados sensíveis
 - **db-analyst** — Schema, performance de queries, migrations, pool
+- **test-reviewer** — Qualidade de testes (mutation-survivor, error-path coverage, mocking discipline, test smells, TDD compliance)
 
 Para mais detalhes sobre a configuração de IA, ver [CLAUDE.md](CLAUDE.md).
 
@@ -458,9 +468,10 @@ Para agentes de IA, ver [AGENTS.md](AGENTS.md) e [CLAUDE.md](CLAUDE.md).
 O projeto adota o modelo de [**harness engineering**](https://martinfowler.com/articles/harness-engineering.html)
 proposto por Martin Fowler: todo o conjunto de guides (feedforward — CLAUDE.md, rules, skills,
 scaffolders) e sensors (feedback — linters, hooks, testes, subagents, CI) que cercam o modelo é
-inventariado e classificado em [docs/harness.md](docs/harness.md). A evolução contínua desse
-harness (quando adicionar um sensor novo, como fazer a revisão mensal de coerência) está
-documentada em [docs/guides/harness-self-steering.md](docs/guides/harness-self-steering.md).
+inventariado e classificado em [docs/harness.md](docs/harness.md) — **fonte única da verdade**
+quando este README ou o CLAUDE.md divergirem do inventário. A evolução contínua desse harness
+(quando adicionar um sensor novo, como fazer a revisão mensal de coerência) está documentada em
+[docs/guides/harness-self-steering.md](docs/guides/harness-self-steering.md).
 
 ---
 
