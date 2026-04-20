@@ -37,6 +37,20 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Setup buf
+        uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
+
+      - name: Install protoc-gen plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+      - name: Generate proto stubs
+        run: buf generate
+
+      - name: Install goose
+        run: go install github.com/pressly/goose/v3/cmd/goose@latest
+
       - name: Install k6
         run: |
           sudo gpg -k
