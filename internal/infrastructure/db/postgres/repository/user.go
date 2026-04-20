@@ -11,6 +11,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	userdomain "github.com/jrmarcello/gopherplate/internal/domain/user"
 	"github.com/jrmarcello/gopherplate/internal/domain/user/vo"
+	"github.com/jrmarcello/gopherplate/pkg/telemetry"
 	"github.com/lib/pq"
 )
 
@@ -73,6 +74,9 @@ func NewUserRepository(writer, reader *sqlx.DB) *UserRepository {
 }
 
 func (r *UserRepository) Create(ctx context.Context, e *userdomain.User) error {
+	ctx, span := telemetry.StartDBSpan(ctx, "insert", "users")
+	defer span.End()
+
 	query := `
 		INSERT INTO users (
 			id, name, email, active, created_at, updated_at
@@ -94,6 +98,9 @@ func (r *UserRepository) Create(ctx context.Context, e *userdomain.User) error {
 }
 
 func (r *UserRepository) FindByID(ctx context.Context, id vo.ID) (*userdomain.User, error) {
+	ctx, span := telemetry.StartDBSpan(ctx, "select", "users_by_id")
+	defer span.End()
+
 	query := `
 		SELECT id, name, email, active, created_at, updated_at
 		FROM users
@@ -113,6 +120,9 @@ func (r *UserRepository) FindByID(ctx context.Context, id vo.ID) (*userdomain.Us
 }
 
 func (r *UserRepository) FindByEmail(ctx context.Context, email vo.Email) (*userdomain.User, error) {
+	ctx, span := telemetry.StartDBSpan(ctx, "select", "users_by_email")
+	defer span.End()
+
 	query := `
 		SELECT id, name, email, active, created_at, updated_at
 		FROM users
@@ -132,6 +142,9 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email vo.Email) (*user
 }
 
 func (r *UserRepository) List(ctx context.Context, filter userdomain.ListFilter) (*userdomain.ListResult, error) {
+	ctx, span := telemetry.StartDBSpan(ctx, "select", "users")
+	defer span.End()
+
 	filter.Normalize()
 
 	// Build dynamic query with filters
@@ -229,6 +242,9 @@ func (r *UserRepository) List(ctx context.Context, filter userdomain.ListFilter)
 }
 
 func (r *UserRepository) Update(ctx context.Context, e *userdomain.User) error {
+	ctx, span := telemetry.StartDBSpan(ctx, "update", "users")
+	defer span.End()
+
 	query := `
 		UPDATE users SET
 			name = :name,
@@ -257,6 +273,13 @@ func (r *UserRepository) Update(ctx context.Context, e *userdomain.User) error {
 }
 
 func (r *UserRepository) Delete(ctx context.Context, id vo.ID) error {
+	// NOTE: soft delete is implemented as an UPDATE (sets active=false), so the
+	// span is named `db.update.users` — NOT `db.delete.users`. The wire-level
+	// operation reflects what the database actually executes; a "delete" span
+	// here would mislead trace consumers into expecting a row removal.
+	ctx, span := telemetry.StartDBSpan(ctx, "update", "users")
+	defer span.End()
+
 	query := `
 		UPDATE users SET
 			active = false,

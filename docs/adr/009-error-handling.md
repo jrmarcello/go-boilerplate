@@ -208,6 +208,19 @@ func HandleError(c *gin.Context, span trace.Span, err error) {
 
 ---
 
+## Refinamentos
+
+A spec [otel-strategy-alignment](../../.specs/otel-strategy-alignment.md) refinou os contratos descritos acima com base nas diretrizes internas de OpenTelemetry (Assis). As decisoes desta ADR continuam validas — a spec apenas enriquece a observabilidade sobre a mesma estrutura de camadas:
+
+- **`FailSpan` enriquecido**: alem de `SetStatus(Error)` + `RecordError`, agora anexa o atributo `error.type=<fmt.Sprintf("%T", err)>` e captura a stack trace via `trace.WithStackTrace(true)`.
+- **`ClassifyError` com keys semanticas**: passou a receber `[]ucshared.ExpectedError{Err, AttrKey, AttrValue}`. Em vez de uma key generica `expected_error`, cada sentinela e classificada com uma key especifica — `AttrKeyAppResult` (ex: `not_found`, `duplicate_email`) ou `AttrKeyAppValidationError` — declaradas em [`internal/usecases/shared/attrkeys.go`](../../internal/usecases/shared/attrkeys.go).
+- **Convencao de nomes de span**: HTTP segue `http.<verb>.<resource>` (via helper `HTTPSpanName` + middleware `SpanRename`); DB segue `db.<op>.<table>` (via `StartDBSpan`). Soft-delete (`UserRepository.Delete`) e `db.update.users`, nao `db.delete.users`.
+- **Span events substituem `slog` no fluxo de negocio**: `cache.hit/miss/set/set_failed/invalidated/invalidate_failed`, `singleflight.shared`, `idempotency.*` sao emitidos via `telemetry.RecordEvent`. `slog` segue permitido apenas em quatro categorias (startup/shutdown, panic, access log, infra-unreachable fail-open).
+
+Para o guia pratico, veja [`docs/guides/observability.md`](../guides/observability.md).
+
+---
+
 ## Referencias
 
 - **ADR-004**: Error Handling Layered Translation (predecessor, agora superseded)
@@ -216,3 +229,5 @@ func HandleError(c *gin.Context, span trace.Span, err error) {
 - `pkg/telemetry/span.go`: Helpers `FailSpan()` e `WarnSpan()`
 - `internal/usecases/shared/classify.go`: `ClassifyError()` compartilhado
 - `docs/guides/error-handling.md`: Guia pratico de error handling
+- `docs/guides/observability.md`: Convencao de nomes de span, catalogo de eventos, postura logs-vs-traces
+- `.specs/otel-strategy-alignment.md`: Spec do refinamento

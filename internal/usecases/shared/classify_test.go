@@ -15,6 +15,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Local sentinel errors used by ClassifyError tests. We intentionally do NOT
+// import user/role domain packages here — the shared classifier must work
+// against arbitrary sentinels with only the stdlib `errors` package.
+var (
+	errFoo      = errors.New("foo")
+	errBar      = errors.New("bar")
+	errInfraOOM = errors.New("connection refused")
+)
+
 // newTestSpan creates a real, recording span backed by an in-memory exporter.
 // Callers must call span.End() and tp.ForceFlush() before inspecting the
 // exporter's finished spans.
@@ -27,58 +36,67 @@ func newTestSpan(exp *tracetest.InMemoryExporter) (sdktrace.ReadWriteSpan, *sdkt
 }
 
 func TestClassifyError(t *testing.T) {
-	errNotFound := errors.New("not found")
-	errDuplicate := errors.New("duplicate entry")
-	errInternal := errors.New("connection refused")
-
 	tests := []struct {
 		name           string
 		err            error
-		expectedErrors []error
+		expected       []ExpectedError
 		contextMsg     string
 		wantStatus     codes.Code
-		wantAttrKey    string // WarnSpan sets attribute, not event
+		wantAttrKey    string
 		wantAttrValue  string
 		wantNoSpanCall bool
 	}{
 		{
-			name:           "TC-U-04: routes expected error to WarnSpan",
-			err:            errNotFound,
-			expectedErrors: []error{errNotFound, errDuplicate},
-			contextMsg:     "getting user",
-			wantStatus:     codes.Unset,
-			wantAttrKey:    "expected.error",
-			wantAttrValue:  errNotFound.Error(),
+			name: "TC-UC-04: matched ExpectedError with explicit AttrValue applies semantic attribute",
+			err:  errFoo,
+			expected: []ExpectedError{
+				{Err: errFoo, AttrKey: AttrKeyAppResult, AttrValue: "not_found"},
+			},
+			contextMsg:    "getting foo",
+			wantStatus:    codes.Unset,
+			wantAttrKey:   AttrKeyAppResult,
+			wantAttrValue: "not_found",
 		},
 		{
-			name:           "TC-U-05: routes unexpected error to FailSpan",
-			err:            errInternal,
-			expectedErrors: []error{errNotFound, errDuplicate},
-			contextMsg:     "getting user",
-			wantStatus:     codes.Error,
+			name: "TC-UC-05: matched ExpectedError with empty AttrValue falls back to err.Error()",
+			err:  errFoo,
+			expected: []ExpectedError{
+				{Err: errFoo, AttrKey: AttrKeyAppValidationError},
+			},
+			contextMsg:    "validating foo",
+			wantStatus:    codes.Unset,
+			wantAttrKey:   AttrKeyAppValidationError,
+			wantAttrValue: errFoo.Error(),
 		},
 		{
-			name:           "TC-U-06: wrapped expected error still matches via errors.Is",
-			err:            fmt.Errorf("repo: %w", errNotFound),
-			expectedErrors: []error{errNotFound},
-			contextMsg:     "getting user",
-			wantStatus:     codes.Unset,
-			wantAttrKey:    "expected.error",
-			wantAttrValue:  fmt.Errorf("repo: %w", errNotFound).Error(),
+			name: "TC-UC-06: unmatched error routes to FailSpan (status=Error, description=context msg)",
+			err:  errInfraOOM,
+			expected: []ExpectedError{
+				{Err: errFoo, AttrKey: AttrKeyAppResult, AttrValue: "not_found"},
+			},
+			contextMsg: "fetching widget",
+			wantStatus: codes.Error,
 		},
 		{
-			name:           "TC-U-07: empty expectedErrors treats all as unexpected",
-			err:            errNotFound,
-			expectedErrors: []error{},
-			contextMsg:     "getting user",
-			wantStatus:     codes.Error,
-		},
-		{
-			name:           "TC-U-08: nil error is no-op",
-			err:            nil,
-			expectedErrors: []error{errNotFound},
-			contextMsg:     "getting user",
+			name: "TC-UC-07: nil error is a no-op",
+			err:  nil,
+			expected: []ExpectedError{
+				{Err: errFoo, AttrKey: AttrKeyAppResult, AttrValue: "not_found"},
+			},
+			contextMsg:     "noop",
 			wantNoSpanCall: true,
+		},
+		{
+			name: "TC-UC-08: wrapped expected error still matches via errors.Is",
+			err:  fmt.Errorf("repo: %w", errFoo),
+			expected: []ExpectedError{
+				{Err: errBar, AttrKey: AttrKeyAppResult, AttrValue: "duplicate"},
+				{Err: errFoo, AttrKey: AttrKeyAppResult, AttrValue: "not_found"},
+			},
+			contextMsg:    "loading foo",
+			wantStatus:    codes.Unset,
+			wantAttrKey:   AttrKeyAppResult,
+			wantAttrValue: "not_found",
 		},
 	}
 
@@ -87,7 +105,7 @@ func TestClassifyError(t *testing.T) {
 			exp := tracetest.NewInMemoryExporter()
 			span, tp := newTestSpan(exp)
 
-			ClassifyError(span, tt.err, tt.expectedErrors, tt.contextMsg)
+			ClassifyError(span, tt.err, tt.expected, tt.contextMsg)
 
 			span.End()
 			flushErr := tp.ForceFlush(context.Background())
@@ -99,29 +117,35 @@ func TestClassifyError(t *testing.T) {
 			stub := finished[0]
 
 			if tt.wantNoSpanCall {
-				assert.Equal(t, codes.Unset, stub.Status.Code, "nil error should leave span status unset")
-				assert.Empty(t, stub.Events, "nil error should not add events")
+				assert.Equal(t, codes.Unset, stub.Status.Code, "nil error must leave span status Unset")
+				assert.Empty(t, stub.Events, "nil error must not record any events")
+				assert.Empty(t, stub.Attributes, "nil error must not set any attributes")
 				return
 			}
 
 			assert.Equal(t, tt.wantStatus, stub.Status.Code)
 
-			// WarnSpan uses SetAttributes (not events) — check attributes
 			if tt.wantAttrKey != "" {
 				wantAttr := attribute.String(tt.wantAttrKey, tt.wantAttrValue)
-				assert.Contains(t, stub.Attributes, wantAttr, "expected attribute %s=%s", tt.wantAttrKey, tt.wantAttrValue)
+				assert.Contains(t, stub.Attributes, wantAttr,
+					"expected attribute %s=%s on span", tt.wantAttrKey, tt.wantAttrValue)
 			}
 
 			if tt.wantStatus == codes.Error {
-				assert.Equal(t, tt.contextMsg, stub.Status.Description)
-				// FailSpan should have recorded the error as an exception event
+				assert.Equal(t, tt.contextMsg, stub.Status.Description,
+					"FailSpan must set status description to contextMsg")
+				// FailSpan calls RecordError, which produces an "exception" event.
+				// Note: the richer error.type attribute is added by TASK-1 (FailSpan
+				// enrichment) and validated by TC-UC-32 in TASK-3 — not asserted here
+				// since TASK-1 may not be merged into this worktree's base yet.
 				foundException := false
 				for _, ev := range stub.Events {
 					if ev.Name == "exception" {
 						foundException = true
 					}
 				}
-				assert.True(t, foundException, "expected RecordError to produce an 'exception' event")
+				assert.True(t, foundException,
+					"FailSpan must record the error as an 'exception' event")
 			}
 		})
 	}

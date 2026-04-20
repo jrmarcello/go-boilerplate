@@ -1,0 +1,46 @@
+# Observability posture — enforces REQ-4 of .specs/otel-strategy-alignment.md
+# (logs vs. traces). Use cases and business-flow middleware must emit span
+# attributes/events via pkg/telemetry rather than `slog`/`logutil.Log*`.
+# Four categories remain allowed and are out of scope below:
+#   - cmd/api/**                      (startup / shutdown)
+#   - middleware/recovery.go          (panic recovery)
+#   - middleware/logger.go            (HTTP access log)
+#   - fail-open infra-unreachable branches in middleware/idempotency.go,
+#     each annotated with `// nosemgrep: gopherplate-usecase-no-slog-in-flow`.
+#
+# See docs/guides/observability.md for the policy.
+#
+# Run locally:   make semgrep
+# Validate:      make semgrep-test
+
+rules:
+  - id: gopherplate-usecase-no-slog-in-flow
+    languages: [go]
+    severity: WARNING
+    message: >-
+      Business-flow observability belongs in span attributes/events
+      (telemetry.RecordEvent / shared.ClassifyError), not logs. `slog.*` and
+      `logutil.Log*` are allowed only in startup/shutdown (cmd/api/**), panic
+      recovery (middleware/recovery.go), the HTTP access log (middleware/logger.go),
+      and fail-open infra-unreachable branches of middleware/idempotency.go
+      (annotate those lines with `// nosemgrep: gopherplate-usecase-no-slog-in-flow`).
+      See docs/guides/observability.md and ADR-009.
+    paths:
+      include:
+        - "**/internal/usecases/**"
+        - "**/internal/infrastructure/web/middleware/idempotency.go"
+      exclude:
+        - "**/*_test.go"
+        - "**/internal/usecases/shared/**"
+        - "**/internal/usecases/*/interfaces/**"
+        - "**/internal/usecases/*/dto/**"
+    patterns:
+      - pattern-either:
+          - pattern: slog.Debug(...)
+          - pattern: slog.Info(...)
+          - pattern: slog.Warn(...)
+          - pattern: slog.Error(...)
+          - pattern: logutil.LogDebug(...)
+          - pattern: logutil.LogInfo(...)
+          - pattern: logutil.LogWarn(...)
+          - pattern: logutil.LogError(...)

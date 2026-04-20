@@ -3,6 +3,8 @@
 Este guia descreve como o sistema de error handling funciona neste template e como estende-lo ao adicionar novos erros ou dominios.
 
 > **ADR de referencia**: [ADR-009 - Refatoracao do Error Handling](../adr/009-error-handling.md)
+>
+> **See also**: [observability.md](observability.md) — convencao de nomes de span (`http.<verb>.<resource>`, `db.<op>.<table>`), catalogo de eventos e postura logs-vs-traces.
 
 ---
 
@@ -54,16 +56,18 @@ Cada use case possui 3 elementos de error handling:
 
 ### 1. `expectedErrors` — Lista de erros esperados
 
-Define quais erros sao "normais" (validacao, not found, conflito) vs "inesperados" (timeout, connection reset).
+Define quais erros sao "normais" (validacao, not found, conflito) vs "inesperados" (timeout, connection reset). Cada entrada e um `ucshared.ExpectedError{Err, AttrKey, AttrValue}` — o `AttrKey` vem das constantes compartilhadas em [`internal/usecases/shared/attrkeys.go`](../../internal/usecases/shared/attrkeys.go) e `AttrValue` e opcional (quando vazio, `ClassifyError` usa `err.Error()`).
 
 ```go
-var createExpectedErrors = []error{
-    vo.ErrInvalidEmail,
-    vo.ErrInvalidID,
+var createExpectedErrors = []ucshared.ExpectedError{
+    {Err: vo.ErrInvalidEmail,           AttrKey: ucshared.AttrKeyAppValidationError},
+    {Err: userdomain.ErrDuplicateEmail, AttrKey: ucshared.AttrKeyAppResult, AttrValue: "duplicate_email"},
 }
 ```
 
-**Proposito**: Alimenta `ClassifyError()` para decidir se o span recebe Warning (esperado) ou Error (inesperado).
+**Proposito**: Alimenta `ClassifyError()` para decidir se o span recebe um atributo semantico (esperado, span fica Ok) ou e marcado como Error (inesperado). O par `AttrKey/AttrValue` descreve o erro no vocabulario da observabilidade (ex: `app.result=duplicate_email`), em vez da mensagem crua.
+
+Veja [observability.md](observability.md) para a lista completa de keys em uso e para a convencao de nomes/eventos que complementa essa classificacao.
 
 ### 2. `toAppError()` — Conversao dominio -> aplicacao
 
@@ -133,23 +137,25 @@ var codeToStatus = map[string]int{
 
 | Tipo de erro | Funcao | Efeito no span | Exemplo |
 | ------------ | ------ | --------------- | ------- |
-| **Esperado** | `telemetry.WarnSpan(span, key, value)` | Atributo semantico, span OK | `ErrInvalidEmail`, `ErrNotFound` |
-| **Inesperado** | `telemetry.FailSpan(span, err, msg)` | Span marcado como Error + evento de erro | DB timeout, connection reset |
+| **Esperado** | `telemetry.WarnSpan(span, key, value)` (via `ClassifyError`) | Atributo semantico (`app.result=not_found`, `app.validation_error=<msg>`), span OK | `ErrInvalidEmail`, `ErrUserNotFound`, `ErrDuplicateEmail` |
+| **Inesperado** | `telemetry.FailSpan(span, err, msg)` | Span marcado como Error + atributo `error.type` + stack trace | DB timeout, connection reset |
+
+As keys (`app.result`, `app.validation_error`) vem das constantes compartilhadas `ucshared.AttrKeyAppResult` e `ucshared.AttrKeyAppValidationError` ([internal/usecases/shared/attrkeys.go](../../internal/usecases/shared/attrkeys.go)) — nenhum pacote de dominio define string literal para o mesmo conceito.
 
 ```go
-// pkg/telemetry/span.go
-
-func FailSpan(span trace.Span, err error, msg string) {
-    span.SetStatus(codes.Error, msg)
-    span.RecordError(err)
+// Use case: declara ExpectedError com AttrKey compartilhado
+var getExpectedErrors = []ucshared.ExpectedError{
+    {Err: vo.ErrInvalidID,             AttrKey: ucshared.AttrKeyAppValidationError},
+    {Err: userdomain.ErrUserNotFound,  AttrKey: ucshared.AttrKeyAppResult, AttrValue: "not_found"},
 }
 
-func WarnSpan(span trace.Span, key, value string) {
-    span.SetAttributes(attribute.String(key, value))
-}
+// Dentro do Execute: uma chamada unifica tudo
+shared.ClassifyError(span, findErr, getExpectedErrors, "GetUseCase")
+// - match: WarnSpan(span, "app.result", "not_found") --> span Ok
+// - no match: FailSpan(span, err, "GetUseCase") --> span Error + error.type + stack trace
 ```
 
-**Regra**: O handler NUNCA chama `span.SetStatus()` nem `span.RecordError()`. Essa responsabilidade e exclusiva do use case.
+**Regra**: O handler NUNCA chama `span.SetStatus()` nem `span.RecordError()`. Essa responsabilidade e exclusiva do use case. Para a lista completa de atributos e eventos emitidos hoje, veja [observability.md](observability.md).
 
 ---
 
@@ -175,9 +181,9 @@ Ao criar um novo erro de dominio (ex: `ErrEmailAlreadyExists`), siga estes passo
 - [ ] **3. Adicionar na lista `expectedErrors` (se for um erro de negocio esperado)**
 
   ```go
-  var createExpectedErrors = []error{
-      vo.ErrInvalidEmail,
-      userdomain.ErrEmailAlreadyExists, // novo
+  var createExpectedErrors = []ucshared.ExpectedError{
+      {Err: vo.ErrInvalidEmail,                AttrKey: ucshared.AttrKeyAppValidationError},
+      {Err: userdomain.ErrEmailAlreadyExists,  AttrKey: ucshared.AttrKeyAppResult, AttrValue: "duplicate_email"}, // novo
   }
   ```
 
@@ -257,9 +263,9 @@ import (
 )
 
 // Erros esperados para classificacao de span
-var getExpectedErrors = []error{
-    vo.ErrInvalidID,
-    userdomain.ErrUserNotFound,
+var getExpectedErrors = []ucshared.ExpectedError{
+    {Err: vo.ErrInvalidID,            AttrKey: ucshared.AttrKeyAppValidationError},
+    {Err: userdomain.ErrUserNotFound, AttrKey: ucshared.AttrKeyAppResult, AttrValue: "not_found"},
 }
 
 // toAppError converte erros de dominio em AppError

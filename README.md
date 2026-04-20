@@ -7,9 +7,9 @@
 
 **Padronização e Developer Experience como padrão.** Template production-ready para microsserviços Go — de zero a produção em minutos, não semanas.
 
-Rode `gopherplate new my-service` e tenha um serviço configurado em segundos — com prompts interativos para escolher banco de dados, cache, autenticação e mais. O template vem com dois domínios de exemplo: `user` (CRUD completo com cache, singleflight, idempotência) e `role` (multi-domain DI). Use `gopherplate add domain` para criar novos domínios seguindo Clean Architecture automaticamente. A infraestrutura já está pronta: PostgreSQL com Writer/Reader split, Redis cache com singleflight, OpenTelemetry, idempotência, autenticação service-to-service, 291+ testes unitários e 22 E2E (75%+ de cobertura), CI/CD com notificações Slack, Kubernetes com Kustomize, e observabilidade completa com dashboard e alertas.
+Rode `gopherplate new my-service` e tenha um serviço configurado em segundos — com prompts interativos para escolher banco de dados, cache, autenticação, flavor (`base` ou `crud`) e mais. O template vem com dois domínios de exemplo: `user` (CRUD completo com cache, singleflight, idempotência) e `role` (multi-domain DI). Use `gopherplate add domain` para criar novos domínios seguindo Clean Architecture automaticamente. A infraestrutura já está pronta: PostgreSQL com Writer/Reader split, Redis cache com singleflight, servidor gRPC dual-stack opcional, OpenTelemetry com convenção de span naming Appmax (`http.<verb>.<resource>`, `db.<op>.<table>`) e catálogo de events de cache/idempotência, idempotência, autenticação service-to-service, 491 testes unitários e 41 E2E (75%+ de cobertura), CI/CD com notificações Slack, Kubernetes com Kustomize, e observabilidade completa com dashboard e alertas.
 
-DX pensado para produtividade: 40+ comandos make com verificação automática de pré-requisitos, hot reload, Lefthook com 3 camadas de verificação de qualidade (pre-commit, commit-msg, pre-push), e integração nativa com Claude Code — 14 skills (incluindo SDD + Ralph Loop para execução autônoma), 7 hooks de qualidade, 3 agentes especializados com memória persistente e 4 rules auto-aplicadas que atuam como um code reviewer contínuo enquanto você desenvolve.
+DX pensado para produtividade: 40+ comandos make com verificação automática de pré-requisitos, hot reload, Lefthook com 3 camadas de verificação de qualidade (pre-commit, commit-msg, pre-push), e integração nativa com Claude Code — 14 skills (incluindo SDD + Ralph Loop para execução autônoma), 7 hooks de qualidade, 4 agentes especializados com memória persistente e 5 rules auto-aplicadas que atuam como um code reviewer contínuo enquanto você desenvolve.
 
 O template é **pouco opinativo e fortemente extensível**: serve como base para vários tipos de projeto, e o desenvolvedor tem liberdade total para adicionar as bibliotecas e frameworks que desejar.
 
@@ -25,6 +25,7 @@ O template é **pouco opinativo e fortemente extensível**: serve como base para
 go install github.com/jrmarcello/gopherplate/cmd/cli@latest
 gopherplate new my-service
 # Prompts interativos guiam a configuração: banco, cache, auth, etc.
+# Use --flavor crud (default) para HTTP+gRPC CRUD, ou --flavor base para o mínimo.
 cd my-service
 ```
 
@@ -163,8 +164,9 @@ Ver `.env.example` para a lista completa e [ADR-003](docs/adr/003-config-strateg
 | **Redis Cache** | Cache-aside + singleflight + pool config | Performance com proteção contra cache stampede |
 | **Idempotência** | Redis-backed, SHA-256 fingerprint, fail-open | Requests duplicados não causam efeitos colaterais |
 | **UUID v7** | IDs ordenados por tempo, tipo nativo no Postgres | Performance de índice + unicidade global |
-| **OpenTelemetry** | Traces + metrics + logs integrados | Observabilidade completa desde o dia 1 |
-| **Service Key Auth** | Autenticação entre serviços via headers | Segurança entre microsserviços |
+| **gRPC dual-server** | Servidor opcional ao lado do HTTP, mesmas use cases (`GRPC_ENABLED=true`), interceptors de auth/log/recovery | Comunicação interna eficiente sem duplicar lógica de negócio |
+| **OpenTelemetry** | Traces + metrics + logs integrados, convenção de span naming Appmax (`http.<verb>.<resource>`, `db.<op>.<table>`), span events para cache/singleflight/idempotência, classificação semântica de erros (`app.result`, `app.validation_error`) | Observabilidade completa desde o dia 1, alinhada à posture do tech lead — posture logs-vs-traces enforçada por semgrep em CI |
+| **Service Key Auth** | Autenticação entre serviços via headers (HTTP + gRPC metadata) | Segurança entre microsserviços |
 | **Logging estruturado** | Contexto propagado + mascaramento de dados pessoais (email, CPF, telefone) | Logs rastreáveis e em conformidade com LGPD — dados sensíveis nunca aparecem em plaintext no ELK/Kibana |
 | **Health checks** | `/health` + `/ready` com verificação de dependências | Kubernetes liveness/readiness probes prontos |
 
@@ -197,7 +199,7 @@ curl -X GET http://localhost:8080/users \
 
 | Feature | O que faz | Quando roda |
 | ------- | --------- | ----------- |
-| **291+ testes unitários + 22 E2E** | Unit + sqlmock + E2E com TestContainers | `make test` |
+| **491 testes unitários + 41 E2E** | Unit + sqlmock + E2E com TestContainers | `make test` |
 | **75%+ de cobertura** | Domain, usecases, middleware, pkg — tudo coberto (10 pacotes com 100%) | CI exige 60% mínimo |
 | **golangci-lint** | 50+ linters incluindo gosec | Pre-commit + CI |
 | **govulncheck** | Varredura de vulnerabilidades em dependências | Pre-push + CI |
@@ -224,7 +226,7 @@ curl -X GET http://localhost:8080/users \
 | CI/CD | 1 semana | Já configurado (GitHub Actions) |
 | Kubernetes | 1-2 semanas | `make kind-setup` (5 min) |
 | Observabilidade | "a gente vê depois" | `make observability-setup` (1 min) |
-| Testes | "a gente escreve depois" | 313 testes de exemplo |
+| Testes | "a gente escreve depois" | 532 testes de exemplo |
 | **Padronização** | **Serviços diferentes** | **Mesmo DX e padrão de qualidade em todos** |
 
 ---
@@ -332,7 +334,7 @@ Estes pacotes podem ser importados por **qualquer serviço Go** — não só que
 
 ### Claude Code Integrado
 
-O template inclui integração nativa com [Claude Code](https://claude.ai/code) — **14 skills**, **7 hooks**, **3 agentes especializados** e **4 rules auto-aplicadas** que funcionam como um code reviewer contínuo enquanto você desenvolve.
+O template inclui integração nativa com [Claude Code](https://claude.ai/code) — **14 skills**, **7 hooks**, **4 agentes especializados** e **5 rules auto-aplicadas** que funcionam como um code reviewer contínuo enquanto você desenvolve.
 
 #### Skills (slash commands)
 
@@ -384,7 +386,7 @@ A spec é agnóstica de arquitetura — funciona tanto com camadas separadas qua
 
 #### Agentes Especializados
 
-4 agentes com memória persistente, usados pelos skills de review e debug:
+4 agentes com memória persistente, usados pelos skills de review e debug e também por solicitação:
 
 - **code-reviewer** — Compliance de arquitetura, idiomas Go, padrões do template
 - **security-reviewer** — OWASP Top 10, injeção, auth, dados sensíveis
@@ -440,13 +442,15 @@ Isso garante que o Claude Code com `--dangerously-skip-permissions` não consiga
 
 ## Documentação
 
-O projeto inclui 8 ADRs (Architecture Decision Records) em `docs/adr/` explicando o **porquê** de cada decisão técnica, e guias práticos em `docs/guides/`:
+O projeto inclui 9 ADRs (Architecture Decision Records) em `docs/adr/` explicando o **porquê** de cada decisão técnica, e guias práticos em `docs/guides/`:
 
 | Guia | Sobre |
 | ---- | ----- |
 | [template-cli.md](docs/guides/template-cli.md) | Template CLI — scaffold de serviços e domínios |
 | [architecture.md](docs/guides/architecture.md) | Diagramas e visão geral |
 | [cache.md](docs/guides/cache.md) | Cache com Redis, singleflight e pool config |
+| [error-handling.md](docs/guides/error-handling.md) | Error handling em 3 camadas (domain → use case → handler), `apperror`, `ExpectedError` |
+| [observability.md](docs/guides/observability.md) | OTel posture — span naming `http.<verb>.<resource>` e `db.<op>.<table>`, catálogo de events, política logs-vs-traces enforçada por semgrep |
 | [kubernetes.md](docs/guides/kubernetes.md) | Deploy, Kind e operação |
 | [multi-database.md](docs/guides/multi-database.md) | Estratégia para serviços com múltiplos bancos |
 | [sdd-ralph-loop.md](docs/guides/sdd-ralph-loop.md) | SDD + Ralph Loop — fluxo spec-driven com execução autônoma |
@@ -457,7 +461,7 @@ O projeto inclui 8 ADRs (Architecture Decision Records) em `docs/adr/` explicand
 | [perf-regression.md](docs/guides/perf-regression.md) | Gate de regressão de performance via k6 baseline |
 | [mutation-testing.md](docs/guides/mutation-testing.md) | Mutation testing (gremlins): testa seus testes |
 | [golden-fixtures.md](docs/guides/golden-fixtures.md) | Approved-fixtures (golden) para travar shape de resposta |
-| [semgrep-rules.md](docs/guides/semgrep-rules.md) | Regras Semgrep organizacionais (handlers, use cases) |
+| [semgrep-rules.md](docs/guides/semgrep-rules.md) | Regras Semgrep organizacionais (handlers, use cases, observability posture) |
 | [cli-flavors.md](docs/guides/cli-flavors.md) | Flavors do `gopherplate new` — como funcionam, como adicionar |
 
 Para agentes de IA, ver [AGENTS.md](AGENTS.md) e [CLAUDE.md](CLAUDE.md).

@@ -445,3 +445,100 @@ func TestRoleRepository_Delete(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 }
+
+// =============================================================================
+// Span-naming assertions for TC-UC-66..69
+// =============================================================================
+
+// TC-UC-66
+func TestRoleRepository_Create_OpensChildSpan(t *testing.T) {
+	exporter := installRepoTracerProvider(t)
+
+	db, mock, mockErr := sqlmock.New()
+	require.NoError(t, mockErr)
+	defer func() { _ = db.Close() }()
+	sqlxDB := sqlx.NewDb(db, "postgres")
+	repo := NewRoleRepository(sqlxDB, sqlxDB)
+
+	mock.ExpectExec("INSERT INTO roles").
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	createErr := repo.Create(context.Background(), buildTestRole())
+	require.NoError(t, createErr)
+
+	assertSpanRecorded(t, exporter, "db.insert.roles")
+}
+
+// TC-UC-67
+func TestRoleRepository_FindByName_OpensChildSpan(t *testing.T) {
+	exporter := installRepoTracerProvider(t)
+
+	db, mock, mockErr := sqlmock.New()
+	require.NoError(t, mockErr)
+	defer func() { _ = db.Close() }()
+	sqlxDB := sqlx.NewDb(db, "postgres")
+	repo := NewRoleRepository(sqlxDB, sqlxDB)
+
+	now := time.Now().Truncate(time.Microsecond)
+	testID := vo.NewID()
+	rows := sqlmock.NewRows([]string{"id", "name", "description", "created_at", "updated_at"}).
+		AddRow(testID.String(), "admin", "Administrador do sistema", now, now)
+	mock.ExpectQuery("SELECT .+ FROM roles WHERE name").
+		WithArgs("admin").
+		WillReturnRows(rows)
+
+	_, findErr := repo.FindByName(context.Background(), "admin")
+	require.NoError(t, findErr)
+
+	assertSpanRecorded(t, exporter, "db.select.roles_by_name")
+}
+
+// TC-UC-68
+func TestRoleRepository_List_OpensChildSpan(t *testing.T) {
+	exporter := installRepoTracerProvider(t)
+
+	db, mock, mockErr := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, mockErr)
+	defer func() { _ = db.Close() }()
+	sqlxDB := sqlx.NewDb(db, "postgres")
+	repo := NewRoleRepository(sqlxDB, sqlxDB)
+
+	now := time.Now().Truncate(time.Microsecond)
+	testID := vo.NewID()
+
+	mock.ExpectBegin()
+	countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
+	mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM roles").WillReturnRows(countRows)
+	dataRows := sqlmock.NewRows([]string{"id", "name", "description", "created_at", "updated_at"}).
+		AddRow(testID.String(), "admin", "Administrador do sistema", now, now)
+	mock.ExpectQuery("SELECT .+ FROM roles").WillReturnRows(dataRows)
+	mock.ExpectCommit()
+
+	_, listErr := repo.List(context.Background(), roledomain.ListFilter{Page: 1, Limit: 20})
+	require.NoError(t, listErr)
+
+	assertSpanRecorded(t, exporter, "db.select.roles")
+	assert.Len(t, exporter.GetSpans(), 1, "List must open exactly one span (COUNT + SELECT share it)")
+}
+
+// TC-UC-69: hard DELETE — span is db.delete.roles (NOT db.update.roles).
+func TestRoleRepository_Delete_OpensDeleteSpan_HardDelete(t *testing.T) {
+	exporter := installRepoTracerProvider(t)
+
+	db, mock, mockErr := sqlmock.New()
+	require.NoError(t, mockErr)
+	defer func() { _ = db.Close() }()
+	sqlxDB := sqlx.NewDb(db, "postgres")
+	repo := NewRoleRepository(sqlxDB, sqlxDB)
+
+	testID := vo.NewID()
+	mock.ExpectExec("DELETE FROM roles").
+		WithArgs(testID.String()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	deleteErr := repo.Delete(context.Background(), testID)
+	require.NoError(t, deleteErr)
+
+	assertSpanRecorded(t, exporter, "db.delete.roles")
+}

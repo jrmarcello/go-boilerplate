@@ -75,7 +75,7 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
   - `apperror/` - Structured application errors (AppError with code, message, HTTP status)
   - `httputil/` - Standardized API response helpers: core `WriteSuccess`/`WriteError` (stdlib `http.ResponseWriter`) + Gin wrappers in `httputil/httpgin/` (`SendSuccess`, `SendError`)
   - `logutil/` - Structured logging with context propagation, fanout handler, PII masking
-  - `telemetry/` - OpenTelemetry setup (traces + HTTP metrics + DB pool metrics)
+  - `telemetry/` - OpenTelemetry setup (traces + HTTP metrics + DB pool metrics). Includes `naming.go` (`HTTPSpanName`, `DBSpanName`, `StartDBSpan` — `http.<verb>.<resource>` + `db.<op>.<table>` convention), `events.go` (`RecordEvent` helper for span events), and `span.go` with enriched `FailSpan` (adds `error.type` attribute + stack trace via `trace.WithStackTrace(true)`). See [docs/guides/observability.md](docs/guides/observability.md).
   - `cache/` - Cache interface and Redis implementation
   - `database/` - Driver-agnostic (`database/sql`) connection with Writer/Reader cluster — supports postgres, mysql, sqlite3, etc.
   - `idempotency/` - Idempotency Store interface and Redis implementation
@@ -92,7 +92,7 @@ swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
 - **DB Cluster**: Writer/Reader split via `pkg/database.DBCluster`. Reader is optional, falls back to writer.
 - **API Response Format**: Gin handlers use `httpgin.SendSuccess(c, status, data)` and `httpgin.SendError(c, status, message)`. Core helpers (`httputil.WriteSuccess`/`httputil.WriteError`) work with stdlib `http.ResponseWriter`. Responses wrap in `{"data": ...}` or `{"errors": {"message": ...}}`.
 - **Error Handling**: Domain defines pure errors (`user.ErrNotFound`, etc.). Use cases return `*apperror.AppError` via local `toAppError()`. Handler resolves generically via `errors.As()` + `codeToStatus` map — zero domain imports. Ref: ADR-009, `docs/guides/error-handling.md`.
-- **Span Error Classification**: Use case classifies errors via `shared.ClassifyError()`. Expected errors (validation, not found, conflict) -> `telemetry.WarnSpan` (span stays Ok). Unexpected errors (DB timeout, infra) -> `telemetry.FailSpan` (span marked Error). Handler never touches spans. Ref: ADR-009, `docs/guides/error-handling.md`.
+- **Span Error Classification**: Use case classifies errors via `shared.ClassifyError()` with `[]ucshared.ExpectedError{Err, AttrKey, AttrValue}`. Expected errors (validation, not found, conflict) -> `telemetry.WarnSpan` with a semantic key from `shared.AttrKey*` constants (`app.result`, `app.validation_error`) — span stays Ok. Unexpected errors (DB timeout, infra) -> `telemetry.FailSpan` (span marked Error, `error.type` attribute + stack trace recorded). Handler never touches spans. Ref: ADR-009, `docs/guides/error-handling.md`, `docs/guides/observability.md`.
 - **Service Key Auth**: Optional service-to-service authentication via `X-Service-Name` + `X-Service-Key` headers. Shared between HTTP (middleware) and gRPC (interceptor via metadata). See `docs/adr/005-service-key-auth.md`.
 - **Singleflight**: GetUseCase uses `golang.org/x/sync/singleflight` to prevent cache stampede on concurrent reads for the same entity.
 - **Idempotency**: Redis-backed idempotency via `pkg/idempotency.Store`, wired as optional middleware. Uses SHA-256 fingerprint + lock/unlock pattern.
@@ -152,6 +152,7 @@ Per-sensor deep-dive guides live in `docs/guides/`:
 - [golden-fixtures.md](docs/guides/golden-fixtures.md) — approved-fixtures for responses
 - [semgrep-rules.md](docs/guides/semgrep-rules.md) — organizational-pattern rules
 - [error-handling.md](docs/guides/error-handling.md) — ADR-009 practical guide
+- [observability.md](docs/guides/observability.md) — span naming, event catalog, logs-vs-traces posture
 
 ### Skills (slash commands)
 

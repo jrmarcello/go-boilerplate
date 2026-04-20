@@ -12,7 +12,35 @@ import (
 	"github.com/jrmarcello/gopherplate/pkg/apperror"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.opentelemetry.io/otel/codes"
 )
+
+// TC-UC-36: list with infra failure -> FailSpan path: status=Error.
+// list has no expected errors, so any repo error must classify as failure.
+func TestListUseCase_Execute_RepositoryError_SpanFail(t *testing.T) {
+	mockRepo := new(MockRepository)
+	mockRepo.On("List", mock.Anything, mock.AnythingOfType("user.ListFilter")).
+		Return(nil, errors.New("connection refused"))
+
+	uc := NewListUseCase(mockRepo)
+	input := dto.ListInput{Page: 1, Limit: 20}
+
+	ctx, finalize := newRecordingSpanContext(t)
+
+	output, executeErr := uc.Execute(ctx, input)
+
+	assert.Error(t, executeErr)
+	assert.Nil(t, output)
+
+	var appErr *apperror.AppError
+	assert.True(t, errors.As(executeErr, &appErr), "expected *apperror.AppError")
+	assert.Equal(t, apperror.CodeInternalError, appErr.Code)
+	mockRepo.AssertExpectations(t)
+
+	stub := finalize()
+	assert.Equal(t, codes.Error, stub.Status.Code,
+		"unexpected infra error must mark span Error")
+}
 
 func TestListUseCase_Execute_Success(t *testing.T) {
 	// Arrange

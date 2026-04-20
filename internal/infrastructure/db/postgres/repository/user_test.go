@@ -13,7 +13,52 @@ import (
 	"github.com/jrmarcello/gopherplate/internal/domain/user/vo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
+
+// installRepoTracerProvider installs an in-memory exporter as the global
+// tracer provider for the duration of the test, restoring the previous
+// provider via t.Cleanup so cross-test pollution cannot occur.
+func installRepoTracerProvider(t *testing.T) *tracetest.InMemoryExporter {
+	t.Helper()
+
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+
+	prev := otel.GetTracerProvider()
+	otel.SetTracerProvider(tp)
+	t.Cleanup(func() {
+		otel.SetTracerProvider(prev)
+		_ = tp.Shutdown(context.Background())
+	})
+	return exporter
+}
+
+// assertSpanRecorded fails the test if no finished span with the expected name
+// is found in the exporter. Returns the matched span for further assertions.
+func assertSpanRecorded(t *testing.T, exporter *tracetest.InMemoryExporter, expectedName string) sdktrace.ReadOnlySpan {
+	t.Helper()
+
+	spans := exporter.GetSpans().Snapshots()
+	for _, s := range spans {
+		if s.Name() == expectedName {
+			return s
+		}
+	}
+	t.Fatalf("expected span %q not recorded; got: %v", expectedName, spanNames(spans))
+	return nil
+}
+
+func spanNames(spans []sdktrace.ReadOnlySpan) []string {
+	names := make([]string, 0, len(spans))
+	for _, s := range spans {
+		names = append(names, s.Name())
+	}
+	return names
+}
 
 // =============================================================================
 // Unit Tests for internal conversions (não precisam de banco)
@@ -611,4 +656,181 @@ func TestUserRepository_Delete(t *testing.T) {
 		assert.Contains(t, deleteErr.Error(), "deleting user")
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
+}
+
+// =============================================================================
+// Span-naming assertions for TC-UC-60..70
+// =============================================================================
+
+// TC-UC-60
+func TestUserRepository_Create_OpensChildSpan(t *testing.T) {
+	exporter := installRepoTracerProvider(t)
+
+	db, mock, mockErr := sqlmock.New()
+	require.NoError(t, mockErr)
+	defer func() { _ = db.Close() }()
+	sqlxDB := sqlx.NewDb(db, "postgres")
+	repo := NewUserRepository(sqlxDB, sqlxDB)
+
+	mock.ExpectExec("INSERT INTO users").
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	createErr := repo.Create(context.Background(), buildTestUser())
+	require.NoError(t, createErr)
+
+	assertSpanRecorded(t, exporter, "db.insert.users")
+}
+
+// TC-UC-61
+func TestUserRepository_FindByID_OpensChildSpan(t *testing.T) {
+	exporter := installRepoTracerProvider(t)
+
+	db, mock, mockErr := sqlmock.New()
+	require.NoError(t, mockErr)
+	defer func() { _ = db.Close() }()
+	sqlxDB := sqlx.NewDb(db, "postgres")
+	repo := NewUserRepository(sqlxDB, sqlxDB)
+
+	now := time.Now().Truncate(time.Microsecond)
+	testID := vo.NewID()
+	rows := sqlmock.NewRows([]string{"id", "name", "email", "active", "created_at", "updated_at"}).
+		AddRow(testID.String(), "Test User", "test@example.com", true, now, now)
+	mock.ExpectQuery("SELECT .+ FROM users WHERE id").
+		WithArgs(testID.String()).
+		WillReturnRows(rows)
+
+	_, findErr := repo.FindByID(context.Background(), testID)
+	require.NoError(t, findErr)
+
+	assertSpanRecorded(t, exporter, "db.select.users_by_id")
+}
+
+// TC-UC-62
+func TestUserRepository_FindByEmail_OpensChildSpan(t *testing.T) {
+	exporter := installRepoTracerProvider(t)
+
+	db, mock, mockErr := sqlmock.New()
+	require.NoError(t, mockErr)
+	defer func() { _ = db.Close() }()
+	sqlxDB := sqlx.NewDb(db, "postgres")
+	repo := NewUserRepository(sqlxDB, sqlxDB)
+
+	now := time.Now().Truncate(time.Microsecond)
+	testID := vo.NewID()
+	testEmail, _ := vo.NewEmail("test@example.com")
+	rows := sqlmock.NewRows([]string{"id", "name", "email", "active", "created_at", "updated_at"}).
+		AddRow(testID.String(), "Test User", "test@example.com", true, now, now)
+	mock.ExpectQuery("SELECT .+ FROM users WHERE email").
+		WithArgs(testEmail.String()).
+		WillReturnRows(rows)
+
+	_, findErr := repo.FindByEmail(context.Background(), testEmail)
+	require.NoError(t, findErr)
+
+	assertSpanRecorded(t, exporter, "db.select.users_by_email")
+}
+
+// TC-UC-63: List opens a single parent span; COUNT and SELECT both happen inside it.
+func TestUserRepository_List_OpensSingleChildSpan(t *testing.T) {
+	exporter := installRepoTracerProvider(t)
+
+	db, mock, mockErr := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, mockErr)
+	defer func() { _ = db.Close() }()
+	sqlxDB := sqlx.NewDb(db, "postgres")
+	repo := NewUserRepository(sqlxDB, sqlxDB)
+
+	now := time.Now().Truncate(time.Microsecond)
+	testID := vo.NewID()
+
+	mock.ExpectBegin()
+	countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
+	mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM users").WillReturnRows(countRows)
+	dataRows := sqlmock.NewRows([]string{"id", "name", "email", "active", "created_at", "updated_at"}).
+		AddRow(testID.String(), "Test User", "test@example.com", true, now, now)
+	mock.ExpectQuery("SELECT .+ FROM users").WillReturnRows(dataRows)
+	mock.ExpectCommit()
+
+	_, listErr := repo.List(context.Background(), userdomain.ListFilter{Page: 1, Limit: 20})
+	require.NoError(t, listErr)
+
+	span := assertSpanRecorded(t, exporter, "db.select.users")
+	assert.NotNil(t, span)
+
+	// Single parent span: ensure the recorder saw exactly one span overall.
+	assert.Len(t, exporter.GetSpans(), 1, "List must open exactly one span (COUNT + SELECT share it)")
+}
+
+// TC-UC-64
+func TestUserRepository_Update_OpensChildSpan(t *testing.T) {
+	exporter := installRepoTracerProvider(t)
+
+	db, mock, mockErr := sqlmock.New()
+	require.NoError(t, mockErr)
+	defer func() { _ = db.Close() }()
+	sqlxDB := sqlx.NewDb(db, "postgres")
+	repo := NewUserRepository(sqlxDB, sqlxDB)
+
+	mock.ExpectExec("UPDATE users SET").
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	updateErr := repo.Update(context.Background(), buildTestUser())
+	require.NoError(t, updateErr)
+
+	assertSpanRecorded(t, exporter, "db.update.users")
+}
+
+// TC-UC-65: Delete is a soft-delete via UPDATE — span is db.update.users (NOT db.delete.users).
+// The wire-level operation reflects what actually executes against Postgres;
+// a "delete" span name would mislead trace consumers into expecting a row removal.
+func TestUserRepository_Delete_OpensUpdateSpan_SoftDeleteGotcha(t *testing.T) {
+	exporter := installRepoTracerProvider(t)
+
+	db, mock, mockErr := sqlmock.New()
+	require.NoError(t, mockErr)
+	defer func() { _ = db.Close() }()
+	sqlxDB := sqlx.NewDb(db, "postgres")
+	repo := NewUserRepository(sqlxDB, sqlxDB)
+
+	testID := vo.NewID()
+	mock.ExpectExec("UPDATE users SET").
+		WithArgs(testID.String()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	deleteErr := repo.Delete(context.Background(), testID)
+	require.NoError(t, deleteErr)
+
+	// Soft-delete is implemented as `UPDATE users SET active=false WHERE id=$1 AND active=true`.
+	// The span name reflects the SQL verb (UPDATE), not the domain intent (delete).
+	assertSpanRecorded(t, exporter, "db.update.users")
+}
+
+// TC-UC-70: sql.ErrNoRows must NOT cause infra to mark the span as failed.
+// ADR-009: the use case decides span status; infrastructure only opens/ends the span.
+func TestUserRepository_FindByID_NotFound_SpanStatusUntouched(t *testing.T) {
+	exporter := installRepoTracerProvider(t)
+
+	db, mock, mockErr := sqlmock.New()
+	require.NoError(t, mockErr)
+	defer func() { _ = db.Close() }()
+	sqlxDB := sqlx.NewDb(db, "postgres")
+	repo := NewUserRepository(sqlxDB, sqlxDB)
+
+	testID := vo.NewID()
+	mock.ExpectQuery("SELECT .+ FROM users WHERE id").
+		WithArgs(testID.String()).
+		WillReturnError(sql.ErrNoRows)
+
+	_, findErr := repo.FindByID(context.Background(), testID)
+	assert.ErrorIs(t, findErr, userdomain.ErrUserNotFound)
+
+	span := assertSpanRecorded(t, exporter, "db.select.users_by_id")
+	require.NotNil(t, span)
+
+	// Status must remain Unset — infra MUST NOT call FailSpan.
+	assert.Equal(t, codes.Unset, span.Status().Code,
+		"infrastructure must NOT mark the span as failed; ADR-009 leaves classification to the use case")
+	assert.Empty(t, span.Events(), "infra MUST NOT record an exception event")
 }

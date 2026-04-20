@@ -8,11 +8,13 @@ import (
 
 	userdomain "github.com/jrmarcello/gopherplate/internal/domain/user"
 	"github.com/jrmarcello/gopherplate/internal/domain/user/vo"
+	ucshared "github.com/jrmarcello/gopherplate/internal/usecases/shared"
 	"github.com/jrmarcello/gopherplate/internal/usecases/user/dto"
 	"github.com/jrmarcello/gopherplate/pkg/apperror"
 	"github.com/jrmarcello/gopherplate/pkg/cache"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.opentelemetry.io/otel/codes"
 )
 
 func TestGetUseCase_Execute_Success(t *testing.T) {
@@ -47,6 +49,8 @@ func TestGetUseCase_Execute_Success(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
+// TC-UC-33: non-existent ID -> AppError(CodeNotFound); span attribute
+// app.result=not_found; status=Unset (warn path).
 func TestGetUseCase_Execute_NotFound(t *testing.T) {
 	// Arrange
 	mockRepo := new(MockRepository)
@@ -56,8 +60,10 @@ func TestGetUseCase_Execute_NotFound(t *testing.T) {
 	uc := NewGetUseCase(mockRepo)
 	input := dto.GetInput{ID: "018e4a2c-6b4d-7000-9410-abcdef123456"}
 
+	ctx, finalize := newRecordingSpanContext(t)
+
 	// Act
-	output, executeErr := uc.Execute(context.Background(), input)
+	output, executeErr := uc.Execute(ctx, input)
 
 	// Assert
 	assert.Error(t, executeErr)
@@ -68,6 +74,13 @@ func TestGetUseCase_Execute_NotFound(t *testing.T) {
 	assert.Equal(t, apperror.CodeNotFound, appErr.Code)
 	assert.Equal(t, "user not found", appErr.Message)
 	mockRepo.AssertExpectations(t)
+
+	stub := finalize()
+	assert.Equal(t, codes.Unset, stub.Status.Code,
+		"not-found must classify as warn (status Unset)")
+	assert.True(t, hasAttr(stub, ucshared.AttrKeyAppResult, "not_found"),
+		"expected attribute %s=not_found on span; got attrs=%v",
+		ucshared.AttrKeyAppResult, stub.Attributes)
 }
 
 func TestGetUseCase_Execute_InvalidID(t *testing.T) {

@@ -8,11 +8,40 @@ import (
 
 	userdomain "github.com/jrmarcello/gopherplate/internal/domain/user"
 	"github.com/jrmarcello/gopherplate/internal/domain/user/vo"
+	ucshared "github.com/jrmarcello/gopherplate/internal/usecases/shared"
 	"github.com/jrmarcello/gopherplate/internal/usecases/user/dto"
 	"github.com/jrmarcello/gopherplate/pkg/apperror"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.opentelemetry.io/otel/codes"
 )
+
+// TC-UC-34: invalid ID -> AppError(CodeInvalidRequest); span attribute
+// app.validation_error=<msg>; status=Unset (warn path).
+func TestUpdateUseCase_Execute_InvalidID_SpanWarn(t *testing.T) {
+	mockRepo := new(MockRepository)
+	uc := NewUpdateUseCase(mockRepo)
+	newName := "Updated Name"
+	input := dto.UpdateInput{ID: "invalid-id", Name: &newName}
+
+	ctx, finalize := newRecordingSpanContext(t)
+
+	output, executeErr := uc.Execute(ctx, input)
+
+	assert.Error(t, executeErr)
+	assert.Nil(t, output)
+
+	var appErr *apperror.AppError
+	assert.True(t, errors.As(executeErr, &appErr), "expected *apperror.AppError")
+	assert.Equal(t, apperror.CodeInvalidRequest, appErr.Code)
+	mockRepo.AssertNotCalled(t, "FindByID")
+
+	stub := finalize()
+	assert.Equal(t, codes.Unset, stub.Status.Code,
+		"invalid-id must classify as warn (status Unset)")
+	assert.NotEmpty(t, attrValue(stub, ucshared.AttrKeyAppValidationError),
+		"expected attribute %q on span", ucshared.AttrKeyAppValidationError)
+}
 
 func TestUpdateUseCase_Execute_Success(t *testing.T) {
 	// Arrange

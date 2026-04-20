@@ -48,6 +48,12 @@ func Setup(deps Dependencies) *gin.Engine {
 	// OpenTelemetry (must be before Logger to populate trace_id)
 	r.Use(otelgin.Middleware(deps.Config.ServiceName))
 
+	// Rename the otelgin-created root span to Assis convention
+	// (http.<verb>.<resource>, snake_case) — must run AFTER otelgin so the
+	// span exists, and renames post-c.Next() so c.FullPath() is populated.
+	// See docs/guides/observability.md.
+	r.Use(middleware.SpanRename())
+
 	// HTTP Metrics (count, duration, Apdex)
 	r.Use(middleware.Metrics(deps.HTTPMetrics))
 

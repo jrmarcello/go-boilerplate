@@ -5,16 +5,34 @@ import (
 
 	userdomain "github.com/jrmarcello/gopherplate/internal/domain/user"
 	"github.com/jrmarcello/gopherplate/internal/domain/user/vo"
+	ucshared "github.com/jrmarcello/gopherplate/internal/usecases/shared"
 	"github.com/jrmarcello/gopherplate/pkg/apperror"
 )
 
-// expectedErrors per use case — used by ClassifyError to distinguish
-// domain/validation errors (expected) from infrastructure errors (unexpected).
+// expectedErrors per use case — used by ucshared.ClassifyError to record
+// semantic span attributes for expected outcomes (validation, not-found,
+// conflict). Anything outside these slices is routed to FailSpan as an
+// unexpected infra failure. AttrKey values come from the shared
+// AttrKey* constants in internal/usecases/shared/attrkeys.go to keep the
+// trace vocabulary consistent across domains.
 var (
-	createExpectedErrors = []error{vo.ErrInvalidEmail, userdomain.ErrDuplicateEmail}
-	getExpectedErrors    = []error{vo.ErrInvalidID, userdomain.ErrUserNotFound}
-	updateExpectedErrors = []error{vo.ErrInvalidID, vo.ErrInvalidEmail, userdomain.ErrUserNotFound}
-	deleteExpectedErrors = []error{vo.ErrInvalidID, userdomain.ErrUserNotFound}
+	createExpectedErrors = []ucshared.ExpectedError{
+		{Err: vo.ErrInvalidEmail, AttrKey: ucshared.AttrKeyAppValidationError},
+		{Err: userdomain.ErrDuplicateEmail, AttrKey: ucshared.AttrKeyAppResult, AttrValue: "duplicate_email"},
+	}
+	getExpectedErrors = []ucshared.ExpectedError{
+		{Err: vo.ErrInvalidID, AttrKey: ucshared.AttrKeyAppValidationError},
+		{Err: userdomain.ErrUserNotFound, AttrKey: ucshared.AttrKeyAppResult, AttrValue: "not_found"},
+	}
+	updateExpectedErrors = []ucshared.ExpectedError{
+		{Err: vo.ErrInvalidID, AttrKey: ucshared.AttrKeyAppValidationError},
+		{Err: vo.ErrInvalidEmail, AttrKey: ucshared.AttrKeyAppValidationError},
+		{Err: userdomain.ErrUserNotFound, AttrKey: ucshared.AttrKeyAppResult, AttrValue: "not_found"},
+	}
+	deleteExpectedErrors = []ucshared.ExpectedError{
+		{Err: vo.ErrInvalidID, AttrKey: ucshared.AttrKeyAppValidationError},
+		{Err: userdomain.ErrUserNotFound, AttrKey: ucshared.AttrKeyAppResult, AttrValue: "not_found"},
+	}
 	// list has no expected errors — only infra errors are possible.
 )
 

@@ -276,11 +276,17 @@ buf-breaking: ## Checa se as mudancas atuais em proto/ sao breaking vs. main
 
 semgrep: ## Roda regras semgrep customizadas do projeto (.semgrep/)
 	@which semgrep >/dev/null 2>&1 || { echo "semgrep nao encontrado. Instale com: pip install semgrep  (ou: brew install semgrep)"; exit 1; }
-	semgrep --config .semgrep/ --error ./internal/...
+	semgrep --config .semgrep/ --error ./internal/
 
-semgrep-test: ## Valida as regras semgrep contra as fixtures em .semgrep/testdata/
+semgrep-test: ## Valida as regras semgrep contra as fixtures em .semgrep/ (pareadas por nome: foo.yml + foo.go)
 	@which semgrep >/dev/null 2>&1 || { echo "semgrep nao encontrado. Instale com: pip install semgrep  (ou: brew install semgrep)"; exit 1; }
-	semgrep --test .semgrep/
+	@for rule in .semgrep/*.yml; do \
+		fixture=".semgrep/$$(basename $$rule .yml).go"; \
+		if [ -f "$$fixture" ]; then \
+			echo "semgrep --test --config $$rule $$fixture"; \
+			semgrep --test --config "$$rule" "$$fixture" || exit 1; \
+		fi \
+	done
 
 golden-update: ## Regenera todos os golden files (use apos mudanca intencional de response)
 	go test ./tests/e2e/... -update -count=1

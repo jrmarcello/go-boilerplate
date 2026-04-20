@@ -12,6 +12,7 @@ import (
 
 	roledomain "github.com/jrmarcello/gopherplate/internal/domain/role"
 	"github.com/jrmarcello/gopherplate/internal/domain/user/vo"
+	"github.com/jrmarcello/gopherplate/pkg/telemetry"
 )
 
 // roleDB é o modelo de banco de dados (Data Model) para Role.
@@ -65,6 +66,9 @@ func NewRoleRepository(writer, reader *sqlx.DB) *RoleRepository {
 }
 
 func (r *RoleRepository) Create(ctx context.Context, role *roledomain.Role) error {
+	ctx, span := telemetry.StartDBSpan(ctx, "insert", "roles")
+	defer span.End()
+
 	query := `
 		INSERT INTO roles (
 			id, name, description, created_at, updated_at
@@ -86,6 +90,9 @@ func (r *RoleRepository) Create(ctx context.Context, role *roledomain.Role) erro
 }
 
 func (r *RoleRepository) FindByName(ctx context.Context, name string) (*roledomain.Role, error) {
+	ctx, span := telemetry.StartDBSpan(ctx, "select", "roles_by_name")
+	defer span.End()
+
 	query := `
 		SELECT id, name, description, created_at, updated_at
 		FROM roles
@@ -105,6 +112,9 @@ func (r *RoleRepository) FindByName(ctx context.Context, name string) (*roledoma
 }
 
 func (r *RoleRepository) List(ctx context.Context, filter roledomain.ListFilter) (*roledomain.ListResult, error) {
+	ctx, span := telemetry.StartDBSpan(ctx, "select", "roles")
+	defer span.End()
+
 	filter.Normalize()
 
 	// Build dynamic query with filters
@@ -190,6 +200,9 @@ func (r *RoleRepository) List(ctx context.Context, filter roledomain.ListFilter)
 }
 
 func (r *RoleRepository) Delete(ctx context.Context, id vo.ID) error {
+	ctx, span := telemetry.StartDBSpan(ctx, "delete", "roles")
+	defer span.End()
+
 	query := `
 		DELETE FROM roles
 		WHERE id = $1

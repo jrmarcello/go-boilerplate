@@ -7,11 +7,43 @@ import (
 
 	userdomain "github.com/jrmarcello/gopherplate/internal/domain/user"
 	"github.com/jrmarcello/gopherplate/internal/domain/user/vo"
+	ucshared "github.com/jrmarcello/gopherplate/internal/usecases/shared"
 	"github.com/jrmarcello/gopherplate/internal/usecases/user/dto"
 	"github.com/jrmarcello/gopherplate/pkg/apperror"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.opentelemetry.io/otel/codes"
 )
+
+// TC-UC-35: delete with not found -> AppError(CodeNotFound); span attribute
+// app.result=not_found; status=Unset (warn path).
+func TestDeleteUseCase_Execute_NotFound_SpanWarn(t *testing.T) {
+	mockRepo := new(MockRepository)
+	mockRepo.On("Delete", mock.Anything, mock.AnythingOfType("vo.ID")).
+		Return(userdomain.ErrUserNotFound)
+
+	uc := NewDeleteUseCase(mockRepo)
+	input := dto.DeleteInput{ID: "018e4a2c-6b4d-7000-9410-abcdef123456"}
+
+	ctx, finalize := newRecordingSpanContext(t)
+
+	output, executeErr := uc.Execute(ctx, input)
+
+	assert.Error(t, executeErr)
+	assert.Nil(t, output)
+
+	var appErr *apperror.AppError
+	assert.True(t, errors.As(executeErr, &appErr), "expected *apperror.AppError")
+	assert.Equal(t, apperror.CodeNotFound, appErr.Code)
+	mockRepo.AssertExpectations(t)
+
+	stub := finalize()
+	assert.Equal(t, codes.Unset, stub.Status.Code,
+		"not-found must classify as warn (status Unset)")
+	assert.True(t, hasAttr(stub, ucshared.AttrKeyAppResult, "not_found"),
+		"expected attribute %s=not_found on span; got attrs=%v",
+		ucshared.AttrKeyAppResult, stub.Attributes)
+}
 
 func TestDeleteUseCase_Execute_Success(t *testing.T) {
 	// Arrange

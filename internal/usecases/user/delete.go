@@ -3,13 +3,14 @@ package user
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	"github.com/jrmarcello/gopherplate/internal/domain/user/vo"
 	"github.com/jrmarcello/gopherplate/internal/usecases/user/dto"
 	"github.com/jrmarcello/gopherplate/internal/usecases/user/interfaces"
+	"github.com/jrmarcello/gopherplate/pkg/telemetry"
 
 	ucshared "github.com/jrmarcello/gopherplate/internal/usecases/shared"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -58,8 +59,12 @@ func (uc *DeleteUseCase) Execute(ctx context.Context, input dto.DeleteInput) (*d
 	// 3. Invalidar cache
 	if uc.Cache != nil {
 		cacheKey := "user:" + input.ID
+		cacheKeyAttr := attribute.String("cache.key", cacheKey)
 		if deleteCacheErr := uc.Cache.Delete(ctx, cacheKey); deleteCacheErr != nil {
-			slog.Warn("failed to invalidate cache", "key", cacheKey, "error", deleteCacheErr)
+			telemetry.RecordEvent(span, "cache.invalidate_failed", cacheKeyAttr,
+				attribute.String("error.message", deleteCacheErr.Error()))
+		} else {
+			telemetry.RecordEvent(span, "cache.invalidated", cacheKeyAttr)
 		}
 	}
 

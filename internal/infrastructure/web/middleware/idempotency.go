@@ -12,6 +12,9 @@ import (
 	"github.com/jrmarcello/gopherplate/pkg/httputil"
 	"github.com/jrmarcello/gopherplate/pkg/idempotency"
 	"github.com/jrmarcello/gopherplate/pkg/logutil"
+	"github.com/jrmarcello/gopherplate/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -66,11 +69,18 @@ func Idempotency(store idempotency.Store) gin.HandlerFunc {
 		fullKey := buildIdempotencyKey(serviceName, key)
 
 		ctx := c.Request.Context()
+		span := trace.SpanFromContext(ctx)
+		keyAttr := attribute.String("idempotency.key", key)
 
 		// 5. Attempt to acquire lock
 		acquired, lockErr := store.Lock(ctx, fullKey, fingerprint)
 		if lockErr != nil {
-			// Redis unavailable -> fail-open
+			// Redis unavailable -> fail-open; emit event for trace correlation
+			// AND keep the log for operator visibility per REQ-4 (observability.md
+			// permits logutil on infra-unreachable branches).
+			telemetry.RecordEvent(span, "idempotency.store_unavailable", keyAttr)
+			// fail-open infra-unreachable branch; span event already emitted for correlation
+			// nosemgrep: gopherplate-usecase-no-slog-in-flow
 			logutil.LogWarn(ctx, "idempotency store unavailable, proceeding without",
 				"error", lockErr.Error(), "idempotency_key", key)
 			c.Next()
@@ -81,7 +91,8 @@ func Idempotency(store idempotency.Store) gin.HandlerFunc {
 			// Key already exists: check state
 			entry, getErr := store.Get(ctx, fullKey)
 			if getErr != nil {
-				// Error fetching -> fail-open
+				// fail-open infra-unreachable branch; log retained for operator visibility
+				// nosemgrep: gopherplate-usecase-no-slog-in-flow
 				logutil.LogWarn(ctx, "idempotency store get failed, proceeding without",
 					"error", getErr.Error(), "idempotency_key", key)
 				c.Next()
@@ -96,6 +107,7 @@ func Idempotency(store idempotency.Store) gin.HandlerFunc {
 
 			if entry.Status == idempotency.StatusProcessing {
 				// Previous request still in progress -> 409 Conflict
+				telemetry.RecordEvent(span, "idempotency.locked", keyAttr)
 				c.AbortWithStatusJSON(http.StatusConflict, httputil.ErrorResponse{
 					Errors: httputil.ErrorDetail{Message: "A request with this Idempotency-Key is already being processed"},
 				})
@@ -104,8 +116,7 @@ func Idempotency(store idempotency.Store) gin.HandlerFunc {
 
 			// COMPLETED -> verify fingerprint before replay
 			if entry.Fingerprint != "" && fingerprint != entry.Fingerprint {
-				logutil.LogWarn(ctx, "idempotency key reused with different body",
-					"idempotency_key", key)
+				telemetry.RecordEvent(span, "idempotency.fingerprint_mismatch", keyAttr)
 				c.AbortWithStatusJSON(http.StatusUnprocessableEntity, httputil.ErrorResponse{
 					Errors: httputil.ErrorDetail{Message: "Idempotency-Key already used with a different request body"},
 				})
@@ -113,14 +124,15 @@ func Idempotency(store idempotency.Store) gin.HandlerFunc {
 			}
 
 			// Replay stored response
-			logutil.LogInfo(ctx, "idempotency replay",
-				"idempotency_key", key, "status_code", entry.StatusCode)
+			telemetry.RecordEvent(span, "idempotency.replayed", keyAttr,
+				attribute.Int("idempotency.status_code", entry.StatusCode))
 			c.Data(entry.StatusCode, "application/json; charset=utf-8", entry.Body)
 			c.Abort()
 			return
 		}
 
 		// 6. First request with this key — capture response
+		telemetry.RecordEvent(span, "idempotency.key_acquired", keyAttr)
 		rw := &idempotencyResponseWriter{
 			ResponseWriter: c.Writer,
 			body:           &bytes.Buffer{},
@@ -139,15 +151,24 @@ func Idempotency(store idempotency.Store) gin.HandlerFunc {
 				Fingerprint: fingerprint,
 			})
 			if completeErr != nil {
+				// fail-open infra-unreachable branch; log retained for operator visibility
+				// nosemgrep: gopherplate-usecase-no-slog-in-flow
 				logutil.LogWarn(ctx, "failed to store idempotency response",
 					"error", completeErr.Error(), "idempotency_key", key)
+			} else {
+				telemetry.RecordEvent(span, "idempotency.stored", keyAttr,
+					attribute.Int("idempotency.status_code", statusCode))
 			}
 		} else {
 			// 5xx error -> unlock to allow retry
 			unlockErr := store.Unlock(ctx, fullKey)
 			if unlockErr != nil {
+				// fail-open infra-unreachable branch; log retained for operator visibility
+				// nosemgrep: gopherplate-usecase-no-slog-in-flow
 				logutil.LogWarn(ctx, "failed to unlock idempotency key",
 					"error", unlockErr.Error(), "idempotency_key", key)
+			} else {
+				telemetry.RecordEvent(span, "idempotency.released", keyAttr)
 			}
 		}
 	}

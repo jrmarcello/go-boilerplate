@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
 	userdomain "github.com/jrmarcello/gopherplate/internal/domain/user"
@@ -12,8 +11,10 @@ import (
 	"github.com/jrmarcello/gopherplate/internal/usecases/user/interfaces"
 	"github.com/jrmarcello/gopherplate/pkg/apperror"
 	"github.com/jrmarcello/gopherplate/pkg/cache"
+	"github.com/jrmarcello/gopherplate/pkg/telemetry"
 
 	ucshared "github.com/jrmarcello/gopherplate/internal/usecases/shared"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -60,23 +61,28 @@ func (uc *GetUseCase) Execute(ctx context.Context, input dto.GetInput) (*dto.Get
 	}
 
 	cacheKey := "user:" + input.ID
+	cacheKeyAttr := attribute.String("cache.key", cacheKey)
 
 	// 1. Tentar cache primeiro
 	if uc.Cache != nil {
 		var cached dto.GetOutput
 		if cacheErr := uc.Cache.Get(ctx, cacheKey, &cached); cacheErr == nil {
-			slog.Debug("cache hit", "key", cacheKey)
+			telemetry.RecordEvent(span, "cache.hit", cacheKeyAttr)
 			return &cached, nil
 		}
+		telemetry.RecordEvent(span, "cache.miss", cacheKeyAttr)
 	}
 
 	// 2. Buscar no repositório (cache miss — with singleflight if configured)
 	var e *userdomain.User
 
 	if uc.Flight != nil {
-		val, flightErr, _ := uc.Flight.Do(input.ID, func() (any, error) {
+		val, flightErr, shared := uc.Flight.Do(input.ID, func() (any, error) {
 			return uc.Repo.FindByID(ctx, id)
 		})
+		if shared {
+			telemetry.RecordEvent(span, "singleflight.shared", cacheKeyAttr)
+		}
 		if flightErr != nil {
 			wrappedErr := fmt.Errorf("getting user: %w", flightErr)
 			ucshared.ClassifyError(span, flightErr, getExpectedErrors, wrappedErr.Error())
@@ -110,7 +116,10 @@ func (uc *GetUseCase) Execute(ctx context.Context, input dto.GetInput) (*dto.Get
 	// 4. Armazenar no cache
 	if uc.Cache != nil {
 		if setCacheErr := uc.Cache.Set(ctx, cacheKey, output); setCacheErr != nil {
-			slog.Warn("failed to cache user", "key", cacheKey, "error", setCacheErr)
+			telemetry.RecordEvent(span, "cache.set_failed", cacheKeyAttr,
+				attribute.String("error.message", setCacheErr.Error()))
+		} else {
+			telemetry.RecordEvent(span, "cache.set", cacheKeyAttr)
 		}
 	}
 
