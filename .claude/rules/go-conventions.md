@@ -3,6 +3,21 @@ applies-to: "**/*.go"
 ---
 # Go Code Conventions
 
+This file documents **project-specific** conventions (Clean Architecture layout,
+apperror, span classification, DI, `gopherplate wiring`). Language-level idioms
+(naming, zero values, method sets, concurrency, error wrapping semantics) live in
+[`go-idioms.md`](go-idioms.md) and should be consulted alongside this file.
+
+## Canonical References
+
+- Language semantics (authoritative): https://go.dev/ref/spec
+- Idiomatic style (curated): https://go.dev/doc/effective_go
+- Upstream code-review checklist: https://go.dev/wiki/CodeReviewComments
+- Language idioms distilled for this project: [`go-idioms.md`](go-idioms.md)
+
+When a rule here contradicts an idiom in the canonical references, the project
+rule wins — but flag the discrepancy when you notice one, so we can revisit.
+
 ## Error Handling
 
 - Use unique error variable names to avoid shadowing: `parseErr`, `saveErr`, `fetchErr` (never reuse `err`)

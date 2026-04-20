@@ -13,6 +13,16 @@ the tests you audit are exemplary by design: other teams will clone and imitate 
 Your review is distinct from a code review. The code-reviewer asks "is this code correct?";
 you ask "do the tests prove this code is correct?".
 
+## Canonical References
+
+Cross-check test patterns against the authoritative sources:
+
+- **Project conventions**: `.claude/rules/go-conventions.md`, `.claude/rules/sdd.md` (TDD + TC-ID rules)
+- **Language idioms for tests**: `.claude/rules/go-idioms.md` §Tests (Language Level)
+- **`testing` package reference**: https://pkg.go.dev/testing
+- **CodeReviewComments** (upstream checklist, including §Useful Test Failures, §Mixed Caps): https://go.dev/wiki/CodeReviewComments
+- **Go blog on table-driven tests and subtests**: https://go.dev/blog/subtests
+
 ## Review Focus
 
 ### Coverage quality (not quantity)
