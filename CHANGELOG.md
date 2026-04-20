@@ -6,6 +6,20 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Commits seguem [Conventional Commits](https://www.conventionalcommits.org/).
 
 ---
+## [0.15.0] - 2026-04-20
+
+### Documentação
+
+- **agents**: Add go-idioms rule and cite canonical Go references
+
+### Funcionalidades
+
+- **otel**: Align span/error/event posture with Appmax tech-lead docs
+
+### Manutenção
+
+- **release**: V0.14.0 [skip ci]
+
 ## [0.14.0] - 2026-04-19
 
 ### Correções
