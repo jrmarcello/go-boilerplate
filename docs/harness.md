@@ -106,7 +106,6 @@ Each row is an artifact (or coherent group) that currently exists in the repo. C
 | gopls+goimports (PostToolUse) | sensor | C | maint | on-edit | [.claude/hooks/lint-go-file.sh](../.claude/hooks/lint-go-file.sh) |
 | gopls hints postprocessor | guide | C | maint | on-edit | [.claude/hooks/gopls-hints.awk](../.claude/hooks/gopls-hints.awk) (enriches diagnostics with actionable "fix by:" hints) |
 | Migration validator (PostToolUse) | sensor | C | maint | on-edit | [.claude/hooks/validate-migration.sh](../.claude/hooks/validate-migration.sh) |
-| Ralph-loop continuation (Stop) | guide | C | meta | stop-hook | [.claude/hooks/ralph-loop.sh](../.claude/hooks/ralph-loop.sh) |
 | Post-impl validation gate (Stop) | sensor | C | maint+arch | stop-hook | [.claude/hooks/stop-validate.sh](../.claude/hooks/stop-validate.sh) |
 | Worktree setup (WorktreeCreate) | guide | C | meta | scaffold-time | [.claude/hooks/worktree-create.sh](../.claude/hooks/worktree-create.sh) |
 | Worktree teardown (WorktreeRemove) | guide | C | meta | scaffold-time | [.claude/hooks/worktree-remove.sh](../.claude/hooks/worktree-remove.sh) |

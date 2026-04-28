@@ -163,12 +163,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ralph-loop.sh",
-            "timeout": 30,
-            "statusMessage": "Checking Ralph Loop status..."
-          },
-          {
-            "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/stop-validate.sh",
             "timeout": 120,
             "statusMessage": "Running post-implementation validation..."

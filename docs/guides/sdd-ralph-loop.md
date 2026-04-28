@@ -4,23 +4,29 @@
 
 O template inclui um fluxo de desenvolvimento integrado baseado em dois conceitos:
 
-- **SDD (Specification-Driven Development)** — Metodologia onde especificações estruturadas guiam a implementação, em vez de codar diretamente
-- **Ralph Loop** — Técnica de execução autônoma onde o agente de IA executa tasks uma a uma, com progresso rastreado no disco
+- **SDD (Specification-Driven Development)** — Metodologia onde especificações
+  estruturadas guiam a implementação, em vez de codar diretamente.
+- **Ralph Loop** — Execução autônoma da spec **em uma única passagem**, paralelizando
+  tasks via worktrees, com self-review obrigatória antes de apresentar resultados.
 
-Juntos, formam um workflow completo: **especificar → aprovar → executar → validar**.
+Juntos, formam um workflow completo:
+**debater → especificar → revisar spec → executar → revisar implementação → commitar**.
 
 ## Quick Start
 
 ```text
-# 1. Gerar uma especificação
+# 1. Debater o escopo (conversa)
+# 2. Gerar uma especificação (com self-review automática)
 /spec "Add audit logging to user write operations"
 
-# 2. Revisar e aprovar a spec gerada em .specs/
+# 3. Revisar a spec apresentada, pedir ajustes se necessário, aprovar
 
-# 3. Executar autonomamente
+# 4. Executar autonomamente — paraleliza onde der, faz self-review, apresenta
 /ralph-loop .specs/user-audit-log.md
 
-# 4. (Opcional) Revisar implementação contra spec
+# 5. Revisar o resultado apresentado, pedir ajustes se necessário, aprovar commit
+
+# 6. (Opcional) Auditoria independente contra os REQs
 /spec-review .specs/user-audit-log.md
 ```
 
@@ -31,190 +37,153 @@ Juntos, formam um workflow completo: **especificar → aprovar → executar → 
 | Feature nova com 3+ tasks | `/spec` + `/ralph-loop` |
 | Bug fix simples | `/fix-issue` (workflow existente) |
 | Novo endpoint isolado | `/new-endpoint` ou `/spec` (depende da complexidade) |
-| Refactor cross-cutting | `/spec` + execução manual (task por task) |
+| Refactor cross-cutting | `/spec` + `/ralph-loop` (paraleliza por área) |
 | Tarefa trivial (1-2 arquivos) | Execução direta, sem spec |
 
-**Princípio: profundidade proporcional** — a spec deve ser tão detalhada quanto a complexidade da task exige.
+**Princípio: profundidade proporcional** — a spec deve ser tão detalhada quanto a
+complexidade da task exige.
+
+## O fluxo em detalhe
+
+### Etapa 1 — `/spec`: três fases
+
+```text
+Author → Self-review (3 agents em paralelo) → Present
+```
+
+1. **Author** — `/spec` redige a spec a partir do `.specs/TEMPLATE.md`: Context,
+   Requirements, Test Plan, Design, Tasks, Parallel Batches, Validation Criteria.
+   Detecta arquivos shared-additive (e.g. `cmd/api/server.go`) e aplica o
+   accumulator pattern já no momento da escrita.
+2. **Self-review** — dispara três agents em paralelo numa única mensagem:
+   - `spec-reviewer` — gaps, ambiguidade, DAG, accumulator pattern, layer rules
+   - `test-reviewer` — coverage do Test Plan, boundary TCs, infra-failure TCs
+   - `code-reviewer` — Design vs convenções (Clean Architecture, apperror, span
+     classification, DI, idempotency)
+   Trivial fixes são aplicados inline; pontos de julgamento viram "Pontos de atenção".
+3. **Present** — spec é apresentada com resumo, stats do Test Plan, Parallel
+   Batches, fixes aplicados e pontos de atenção. Aguarda aprovação.
+
+Se você pedir mudanças após o present, **a self-review re-roda do zero** antes de
+re-apresentar. Isso é intencional: protege contra regressões nas próprias correções.
+
+### Etapa 2 — `/ralph-loop`: cinco fases
+
+```text
+Validate → Execute → Self-review → Present → Commit (após aprovação)
+```
+
+1. **Validate** — confere status da spec (`APPROVED`/`IN_PROGRESS`), presença de
+   Test Plan e Parallel Batches.
+2. **Execute** — para cada batch sequencialmente:
+   - **1 task no batch:** executa inline (TDD se houver `tests:`, merge se for
+     `TASK-MERGE-*`).
+   - **2+ tasks no batch:** dispara N `Agent(isolation: "worktree")` numa única
+     mensagem. Cada agent roda RED→GREEN→REFACTOR no seu worktree isolado.
+   - **Auto-rollback:** se algum agent falhar, **NADA é mergeado silenciosamente**.
+     A skill apresenta as opções (a) merge sucedidos + skip falho, (b) descartar
+     tudo e re-rodar, (c) parar para investigação manual. Default = (c).
+3. **Self-review** — três agents em paralelo (`code-reviewer`, `test-reviewer`,
+   `security-reviewer`) auditam o diff. Trivial fixes inline; CRITICAL/HIGH e
+   pontos de julgamento sobem como "Pontos de atenção".
+4. **Present** — apresenta resumo da execução, diff stat, fixes aplicados, pontos
+   de atenção, validação local. Aguarda aprovação.
+5. **Commit** — só após "ok"/"pode commitar". Stage apenas os arquivos listados nas
+   `files:` das tasks + a spec + os fragments mergeados.
+
+Se você pedir mudanças após o present, **a self-review re-roda do zero** antes de
+re-apresentar.
 
 ## Estrutura da Spec
 
-As specs ficam em `.specs/` e seguem o template em `.specs/TEMPLATE.md`:
+As specs ficam em `.specs/` e seguem o template em `.specs/TEMPLATE.md`. Veja o
+template para a estrutura completa; o resumo:
 
-```markdown
-# Spec: user-audit-log
-
-## Status: DRAFT
-
-## Context
-Precisamos de audit logging para todas as operações de escrita em user
-para compliance com requisitos de segurança.
-
-## Requirements
-- [ ] REQ-1: GIVEN um POST /api/v1/users WHEN a operação é bem-sucedida
-      THEN um evento de auditoria é registrado com user_id, action, timestamp
-- [ ] REQ-2: ...
-
-## Design
-### Architecture Decisions
-Criar um novo domínio `audit` com entity AuditEvent.
-Usar o padrão observer para capturar eventos nos use cases existentes.
-
-### Files to Create
-- internal/domain/audit/entity.go
-- internal/usecases/audit/create.go
-- ...
-
-### Files to Modify
-- cmd/api/server.go (DI wiring)
-
-## Tasks
-- [ ] TASK-1: Criar entity AuditEvent com campos (ID, UserID, Action, ...)
-- [ ] TASK-2: Criar use case CreateAuditEvent com interface de repository
-- [ ] TASK-3: Implementar repository PostgreSQL para AuditEvent
-- [ ] TASK-4: Integrar audit logging nos use cases de user (create, update, delete)
-- [ ] TASK-5: Adicionar migration para tabela audit_events
-- [ ] TASK-6: Escrever testes unitários para audit domain e use cases
-
-## Validation Criteria
-- [ ] `make lint` passes
-- [ ] `make test` passes
-- [ ] Eventos de auditoria são criados após POST/PUT/DELETE em /api/v1/users
-
-## Execution Log
-<!-- Ralph Loop preenche automaticamente -->
-```
-
-### Regras da Spec
-
-- **Status** é uma state machine: `DRAFT` → `APPROVED` → `IN_PROGRESS` → `DONE` | `FAILED`
-- **Requirements** usam formato GIVEN/WHEN/THEN para acceptance criteria não ambíguos
-- **Tasks** são agnósticas de arquitetura — ordenadas logicamente para a feature, sem impor camadas
-- Items incertos devem ser marcados `[NEEDS CLARIFICATION]`
-- Cada task deve ser verificável independentemente (`go build ./...` deve passar após cada uma)
-
-## Como o Ralph Loop Funciona
-
-### Mecanismo
-
-```text
-Claude executa 1 task → marca [x] → tenta parar
-  ↓
-ralph-loop.sh (Stop hook):
-  - .active.md existe? → conta tasks restantes
-  - Tasks restantes > 0? → exit 2 (continua na mesma sessão)
-  - Tasks restantes = 0? → exit 0 (passa para validação final)
-  ↓
-stop-validate.sh:
-  - Durante ralph loop: skip (detecta .active.md)
-  - Após ralph loop: validação completa (build + lint + tests)
-```
-
-### Ciclo de Vida
-
-1. **Startup**: `/ralph-loop` lê a spec, cria `.specs/<name>.active.md`, identifica o primeiro task
-2. **Iteração**: executa 1 task, marca `[x]`, loga no Execution Log, para
-3. **Continuação**: Stop hook detecta tasks restantes, re-injeta contexto via stderr, Claude continua
-4. **Finalização**: todos os tasks `[x]`, hook retorna exit 0, validação completa roda
-5. **Resultado**: spec marcada como `DONE` (ou `FAILED` se validação falhar)
-
-### Limites e Safety
-
-- **Máximo 30 iterações** por sessão (counter em `/tmp/ralph-loop-<session>`)
-- **Build check** a cada iteração (detecta erros de compilação cedo)
-- **Contexto acumulado**: exit code 2 continua na mesma sessão (não reinicia). Para features com muitas tasks (15+), divida em specs menores
-- **Emergency stop**: `rm .specs/*.active.md`
-- **Resume**: se interrompido, `/ralph-loop` retoma do último task incompleto
+- **Status** state machine: `DRAFT` → `APPROVED` → `IN_PROGRESS` → `DONE` | `FAILED`
+- **Requirements** em GIVEN/WHEN/THEN
+- **Test Plan** agrupado por camada (TC-D-NN, TC-UC-NN, TC-E2E-NN, TC-S-NN)
+- **Tasks** com `files:`, `tests:`, `depends:` — formam o DAG que dirige o paralelismo
+- **Parallel Batches** auto-gerada por `/spec`
+- **Validation Criteria** concretos (comandos, estados observáveis)
+- Items incertos marcados `[NEEDS CLARIFICATION]`
 
 ## Paralelismo
 
 ### Detecção de Batches
 
-O `/spec` analisa automaticamente as tasks e gera uma seção **Parallel Batches** na spec:
+`/spec` analisa as tasks e gera a seção **Parallel Batches** automaticamente. Duas
+tasks **não podem** rodar em paralelo se:
 
-```markdown
-## Tasks
-- [ ] TASK-1: Criar entity AuditEvent
-  - files: internal/domain/audit/entity.go, internal/domain/audit/errors.go
-- [ ] TASK-2: Criar use case CreateAuditEvent
-  - files: internal/usecases/audit/create.go, internal/usecases/audit/interfaces/repository.go
-  - depends: TASK-1
-- [ ] TASK-3: Criar use case ListAuditEvents
-  - files: internal/usecases/audit/list.go
-  - depends: TASK-1
-- [ ] TASK-4: Implementar repository PostgreSQL
-  - files: internal/infrastructure/db/postgres/repository/audit.go
-  - depends: TASK-1
-- [ ] TASK-5: Wiring no server.go
-  - files: cmd/api/server.go, internal/infrastructure/web/router/router.go
-  - depends: TASK-2, TASK-3, TASK-4
-
-## Parallel Batches
-
-Batch 1: [TASK-1]                    — foundation
-Batch 2: [TASK-2, TASK-3, TASK-4]    — parallel (no shared files)
-Batch 3: [TASK-5]                    — sequential (shared: cmd/api/server.go [additive])
-
-File overlap analysis:
-- Todos os arquivos do Batch 2 são exclusivos de uma task
-- cmd/api/server.go: só TASK-5 (sem conflito neste caso)
-```
-
-A análise considera dois critérios para definir que tasks **não podem** rodar em paralelo:
-
-1. **Dependência explícita** — `depends: TASK-N`
+1. **Dependência explícita** — uma aparece no `depends:` da outra
 2. **Overlap de arquivos** — mesma entrada em `files:`
 
-### Classificação de Arquivos Compartilhados
+### Classificação de arquivos compartilhados
 
 | Classificação | Definição | Estratégia |
 | --- | --- | --- |
 | **Exclusive** | Só uma task toca o arquivo | Paralelo direto |
-| **Shared-additive** | Múltiplas tasks adicionam linhas (ex: DI wiring, rotas) | Accumulator pattern — fragments em `.specs/wiring/` |
-| **Shared-mutative** | Múltiplas tasks modificam código existente no mesmo arquivo | Serializar (nunca paralelo) |
+| **Shared-additive** | Múltiplas tasks adicionam código (ex: DI wiring em `cmd/api/server.go`, rotas em `cmd/api/router.go`) | Accumulator pattern — fragments em `.specs/wiring/<spec-slug>/` + `TASK-MERGE-<TARGET>` |
+| **Shared-mutative** | Múltiplas tasks modificam código existente no mesmo arquivo | Serializar — batches diferentes |
 
-### Merge Strategy: Hybrid B+C
+### Accumulator pattern (detalhe)
 
-Para arquivos **shared-additive** (como `server.go`), cada task paralela gera um **fragment** em vez de editar o arquivo compartilhado:
+Para shared-additive, cada task paralela:
 
-```markdown
-<!-- .specs/wiring/task-2.md -->
-target: cmd/api/server.go
-function: buildDependencies
-adds:
-  - auditRepo := postgres.NewAuditRepository(dbCluster.Writer())
-  - createAuditUC := audit.NewCreateUseCase(auditRepo)
+1. **Remove** o arquivo compartilhado do seu próprio `files:`.
+2. **Ganha** um fragment em
+   `.specs/wiring/<spec-slug>/<task-id>.<target-slug>.fragment.md` listado no `files:`.
+3. Uma `TASK-MERGE-<TARGET>` no batch seguinte declara o arquivo compartilhado em
+   seu `files:`, lista todos os fragments, e tem `depends:` cobrindo todos os
+   produtores.
+
+`/ralph-loop` executa a `TASK-MERGE` inline (sequencial), aplica os fragments em
+ordem alfabética por `<task-id>`, e roda `gofmt -w` + `go build ./...` no final.
+Conflito entre dois fragments no mesmo anchor → para a merge, surface ao usuário.
+
+Anchors registrados (canonical para este projeto): ver
+[`.claude/rules/sdd.md`](../../.claude/rules/sdd.md) §Registered anchors.
+
+### Auto-rollback em batches paralelos
+
+Se 1 agent num batch paralelo falhar, `/ralph-loop` **nunca** mergeia silenciosamente
+os sucedidos. Em vez disso, apresenta:
+
+```text
+⚠️ Batch [TASK-3, TASK-4, TASK-5] — partial failure.
+
+✅ TASK-3: <summary>
+✅ TASK-4: <summary>
+❌ TASK-5: <one-line failure cause>
+
+Nothing has been merged into main. Choose:
+  (a) merge X and Y, leave Z for me to fix manually
+  (b) discard everything, rerun the batch with adjustments
+  (c) stop here so I can investigate
 ```
 
-Uma task de merge dedicada (`TASK-MERGE`) lê todos os fragments e aplica as adições de uma vez. Fragments descrevem **intenção** (o que adicionar), não patches.
+Default sem resposta = (c). Veja `.claude/rules/sdd.md` §Auto-rollback semantics.
 
-Para arquivos **shared-mutative**, as tasks são serializadas automaticamente — colocadas em batches diferentes.
+### Execução inter-spec (paralelismo entre specs)
 
-### Execução (Hoje vs Futuro)
+Specs independentes rodam em paralelo abrindo múltiplos terminais — cada um com um
+Claude executando `/ralph-loop` numa spec diferente, em seu próprio worktree.
 
-| Versão | O que faz | Como |
-| --- | --- | --- |
-| **v1 (atual)** | Ralph loop sequencial | Tasks executadas uma por vez na mesma sessão |
-| **v1.1 (atual)** | `/spec` detecta batches e sugere paralelismo | Informativo — dev decide como executar |
-| **v2 (futuro)** | `/ralph-loop --parallel` executa batches em worktrees | Cada task do batch roda em worktree isolado, merge automático |
-
-Independente da versão, a execução **inter-spec** em paralelo já funciona: abra múltiplos terminais, cada um com um Claude rodando `/ralph-loop` em uma spec diferente, cada um em seu worktree.
-
-## Integração com Workflows Existentes
-
-O SDD + Ralph Loop se integra sem quebrar nada:
+## Integração com workflows existentes
 
 | Workflow | Integração |
 | --- | --- |
 | `/new-endpoint` | Pode ser usado como referência para tasks na spec |
-| `/fix-issue` | Para bugs, continue usando `/fix-issue` — mais direto |
-| `/validate` | Roda automaticamente no final do ralph-loop via Stop hook |
-| `/review`, `/full-review-team` | Use após ralph-loop para review mais profundo |
-| `/spec-review` | Review específico contra os requirements da spec |
-| Lefthook (pre-commit) | Continua rodando normalmente nos commits |
-| `lint-go-file.sh` (PostToolUse) | Roda a cada edit durante o ralph-loop |
+| `/fix-issue` | Para bugs simples, continue usando — mais direto |
+| `/validate` | `/ralph-loop` já roda fmt/vet/lint/build/test ao fim do Phase 2; `/validate` adiciona Kind + smoke |
+| `/review`, `/full-review-team` | Use após `/ralph-loop` para review mais profundo |
+| `/spec-review` | Auditoria independente da implementação contra os REQs |
+| Lefthook (pre-commit) | Continua rodando normalmente |
+| `lint-go-file.sh` (PostToolUse) | Roda a cada edit, inclusive dentro de worktrees paralelos |
 
 ## Referências
 
 - [Specification-Driven Development (Thoughtworks/Martin Fowler)](https://martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html)
 - [Ralph Wiggum Technique (Geoffrey Huntley)](https://ghuntley.com/loop/)
-- [Claude Code Hooks — Stop hook exit codes](https://docs.anthropic.com/en/docs/claude-code/hooks)
+- [`.claude/rules/sdd.md`](../../.claude/rules/sdd.md) — regras formais (TC-IDs, fragment format, anchors, auto-rollback)
+- [`.claude/skills/spec/SKILL.md`](../../.claude/skills/spec/SKILL.md) — definição do `/spec`
+- [`.claude/skills/ralph-loop/SKILL.md`](../../.claude/skills/ralph-loop/SKILL.md) — definição do `/ralph-loop`

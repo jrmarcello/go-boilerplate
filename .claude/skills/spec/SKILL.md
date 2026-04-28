@@ -1,13 +1,15 @@
 ---
 name: spec
-description: Create a structured SDD specification (requirements, design, tasks) for a new feature or change
+description: Create + self-review an SDD specification (requirements, test plan, tasks, parallel batches) and present for user approval
 argument-hint: "<feature-description>"
 user-invocable: true
 ---
 
 # /spec <feature-description>
 
-Creates a structured specification document following Specification-Driven Development (SDD) principles.
+End-to-end spec authoring with built-in self-review. **No iteration loops** — runs once,
+presents the result, waits for your approval. After approval, run
+`/ralph-loop .specs/<name>.md` to execute it.
 
 ## Example
 
@@ -15,138 +17,229 @@ Creates a structured specification document following Specification-Driven Devel
 /spec "Add audit logging to all user write operations"
 ```
 
-## Workflow
+## Phases
 
-### 1. Understand the Request
+The skill runs three phases back-to-back in a single response:
+**Author → Self-review → Present**.
 
-- Parse the feature description
-- Identify affected domain(s) and code areas
-- Determine the type of change: new feature, refactor, bug fix, new domain, etc.
+### Phase 1 — Author
 
-### 2. Gather Context
+1. **Understand the request.** Parse the feature description; identify which domain(s)
+   are affected (`internal/domain/...`, `internal/usecases/...`,
+   `internal/infrastructure/...`, `cmd/api/`, `pkg/`); classify the change (new
+   domain, new use case, new endpoint, schema change, refactor, bug fix).
+2. **Gather context.** Read:
+   - `.specs/TEMPLATE.md`
+   - `.claude/rules/sdd.md`, `.claude/rules/go-conventions.md`, `.claude/rules/go-idioms.md`,
+     `.claude/rules/security.md`, `.claude/rules/migrations.md`
+   - Relevant ADRs in `docs/adr/`
+   - Closest existing pattern as reference (the `user` domain is the canonical
+     full-featured example with cache, singleflight, idempotency; the `role` domain
+     is the minimal multi-domain DI example)
+   - `docs/guides/error-handling.md` and `docs/guides/observability.md` if the change
+     adds error paths or instrumentation
+3. **Pick a name.** Lowercase, hyphen-separated:
+   `.specs/user-audit-log.md`, `.specs/role-permissions.md`, `.specs/fix-cache-stampede.md`.
+4. **Write `.specs/<name>.md`** from `.specs/TEMPLATE.md`. Fill in:
+   - **Context** — why the feature exists, link to relevant ADRs / guides.
+   - **Requirements** in GIVEN/WHEN/THEN form. No vague "should kinda".
+   - **Test Plan** (see *Test Plan rigor* below — this is the load-bearing section).
+   - **Design** — approach paragraph + affected files + dependencies. Mark unknown
+     items `[NEEDS CLARIFICATION]`.
+   - **Tasks** — concrete, ordered, each with `files:`, `tests:` (TC-IDs),
+     `depends:`. The accumulator pattern (see below) must be applied here, before
+     batches are computed.
+   - **Parallel Batches** — auto-generated from `files:` and `depends:` (see
+     *Parallelism analysis* below).
+   - **Validation Criteria** — `make lint`, `make test`, `make test-e2e` (when E2E
+     TCs exist), `swag init` (when HTTP handlers change), plus smoke step if a
+     `TASK-SMOKE` exists.
+   - **Status: DRAFT**.
 
-- Read existing code for affected areas
-- Check ADRs in `docs/adr/` for relevant architectural decisions
-- Identify existing patterns to follow (use `user` and `role` domains as reference)
-- Respect the project's chosen architecture (separate layers, collapsed, or hybrid)
+### Phase 2 — Self-review (BLOCKING — runs every time)
 
-### 3. Generate Spec
-
-- Create `.specs/<feature-name>.md` from the template at `.specs/TEMPLATE.md`
-- Fill in all sections: Context, Requirements, Test Plan, Design, Tasks, Parallel Batches, Validation Criteria
-- Requirements should use **GIVEN/WHEN/THEN** format for unambiguous acceptance criteria
-- Mark uncertain items with `[NEEDS CLARIFICATION]` instead of assuming
-- Tasks must be:
-  - Concrete and independently verifiable (`go build ./...` should pass after each)
-  - Ordered logically for the feature (not necessarily by architecture layer)
-  - Small enough to complete in a single focused iteration
-  - Self-contained — each task description should be understandable without reading previous tasks
-- Each task MUST include:
-  - `files:` — concrete file paths this task creates or modifies
-  - `depends:` — other TASK-N IDs that must complete first (omit if no dependencies)
-  - `tests:` — TC-IDs from the Test Plan that this task must satisfy (triggers TDD cycle in ralph-loop; omit for non-code tasks)
-
-### 4. Generate Test Plan
-
-After generating Requirements and Design, derive an **exhaustive** Test Plan. If a scenario can happen in production, it must have a test case.
-
-1. **For each REQ**: derive at least one happy-path TC plus all error/edge TCs
-2. **For each sentinel error** in domain `errors.go`: ensure >= 1 TC triggers it
-3. **For each validated field**: boundary TCs — valid min, valid max, invalid min-1, invalid max+1
-4. **For each external dependency** (repo, cache, publisher): >= 1 infra-failure TC
-5. **For each conditional branch** in use case flow: TCs for both paths
-6. **Concurrency scenarios**: required for operations with advisory lock, optimistic locking, or REPEATABLE READ
-7. **For each new HTTP endpoint**, generate smoke TCs covering:
-   - Happy path (201/200 + all response fields validated)
-   - Each distinct error status (400, 409, 422)
-   - Auth errors (missing/invalid service key)
-   - Response format consistency (`{"data": ...}` or `{"errors": {"message": ...}}`)
-   - Field boundaries and edge cases
-   - Idempotency (if applicable)
-8. **Assign TCs to tasks** via `tests:` metadata — smoke TCs go in dedicated `TASK-SMOKE`
-9. **Rigor check**: review the complete Test Plan and verify — no business rule untested, no error path missing, no boundary unchecked. Error/edge TCs should outnumber happy-path TCs.
-
-Group TCs by layer:
-
-- **Domain Tests** (TC-D-NN): pure domain logic, value objects, entity invariants
-- **Use Case Tests** (TC-UC-NN): application logic, dependency interactions, error mapping
-- **E2E Tests** (TC-E2E-NN): full HTTP round-trip via TestContainers
-- **Smoke Tests** (TC-S-NN): k6 checks against running app — HTTP status, response format, auth, field boundaries, idempotency, business rules visible via API
-
-Categories: `happy`, `validation`, `business`, `edge`, `infra`, `concurrency`, `idempotency`, `security`
-
-For non-code specs (config/docs only), the Test Plan may be `N/A` with justification.
-
-### 5. Analyze Parallelism
-
-After generating tasks, build the **Parallel Batches** section:
-
-1. Build a dependency graph from `depends:` and `files:` metadata
-2. Two tasks **cannot** be parallel if:
-   - One appears in the other's `depends:` list
-   - They share any file in their `files:` lists
-3. Group tasks into sequential batches using topological sort:
-   - Batch 1: all tasks with no dependencies
-   - Batch 2: all tasks whose dependencies are fully satisfied by Batch 1
-   - Batch N: all tasks whose dependencies are fully satisfied by Batches 1..N-1
-4. Classify shared files:
-   - **Exclusive**: only one task touches it — safe for parallel
-   - **Shared-additive**: multiple tasks touch it, but all are additive (e.g., `server.go` wiring, `router.go` routes) — candidate for accumulator pattern
-   - **Shared-mutative**: multiple tasks modify existing code in the same file — must serialize
-5. Present the batches to the user with the classification
-
-Example output:
+Spawn **three review agents in parallel** in a single message with three Agent calls:
 
 ```text
-## Parallel Batches
+Agent(spec-reviewer): Review .specs/<name>.md for gaps, ambiguity, missing tests, rule violations, and architectural mismatches.
 
-Batch 1: [TASK-1]                    — foundation
-Batch 2: [TASK-2, TASK-3, TASK-4]    — parallel (no shared files)
-Batch 3: [TASK-5]                    — sequential (shared: cmd/api/server.go [additive])
-Batch 4: [TASK-6]                    — sequential (depends: TASK-2, TASK-3)
+Agent(test-reviewer): Audit the Test Plan section of .specs/<name>.md for coverage gaps — every REQ has TC, every sentinel error has TC, every validated field has boundary TCs, every external dependency call has an infra-failure TC, every conditional branch has TCs for both paths. Apply the sdd.md rigor check (error TCs outnumber happy-path TCs).
 
-File overlap analysis:
-- cmd/api/server.go: TASK-2, TASK-3, TASK-5 -> classified as shared-additive (DI wiring)
-- All other files: exclusive to one task
+Agent(code-reviewer): Audit the Design section of .specs/<name>.md for project-rule adherence — Clean Architecture layer rules (domain ← usecases ← infrastructure), apperror mapping, span classification (WarnSpan vs FailSpan), DI pattern, response helpers (httpgin), idempotency on write paths, gRPC parity if applicable.
 ```
 
-### 6. Self-Review the Generated Spec (MANDATORY)
+Wait for all three. Aggregate findings:
 
-Before presenting to the user, **critically review your own draft**. The user should never be the first line of defense for gaps in the spec. Run through this checklist:
+1. **Apply trivially-correct fixes inline** to the spec file:
+   - Missing TC-IDs for declared sentinel errors → add the entry to the Test Plan.
+   - Missing `tests:` mapping on a task that produces testable code → add it.
+   - Wrong file path in `files:` → fix it.
+   - Missing dependency in `depends:` → add it.
+   - Boundary TCs missing for a validated field → add them.
+   - Privacy/auth constraint missing in Validation Criteria → add it.
+   - `make lint` / `make test` missing in Validation Criteria → add.
+   - `swag init` missing when HTTP handlers change → add.
+   - Trivial wording fixes.
 
-- **REQ ↔ Task coverage**: every REQ is addressed by at least one task. No orphan REQs.
-- **Task ↔ Files sync**: every file in Design's "Files to Create/Modify" appears in some task's `files:` metadata, and every `files:` entry maps back to the Design section. No orphan files in either direction.
-- **Test Plan completeness**: every REQ has ≥ 1 TC; the sdd.md Coverage Rules are all satisfied; error/edge TCs outnumber happy-path TCs.
-- **[NEEDS CLARIFICATION]**: any remaining? Surface them explicitly to the user — do not paper over.
-- **Architecture fit**: tasks respect the project's existing patterns (reference `user`/`role` domains, `pkg/`, `cmd/` layout). No task implies a cross-layer violation or introduces a framework without justification.
-- **Validation criteria**: each line is concrete and verifiable — maps to a command or observable state, not vague prose.
-- **Scope hygiene**: each task owns a clear REQ; no task expands scope beyond what REQs authorize.
-- **Task independence**: `go build ./...` passes after each task (per sdd.md). No mid-spec compile breakage.
-- **Parallel Batches**: no shared-mutative files in the same batch; shared-additive files flagged with mitigation (accumulator pattern or serialization).
-- **Best practices**: are we picking the simplest tool that solves the problem? Are we adding tests commensurate with risk? Are we honoring existing conventions (unique error names, `httpgin.SendSuccess`, `shared.ClassifyError`, hand-written mocks)?
+2. **Do NOT silently change** anything that requires a judgment call:
+   - Architectural choices ("use a different pattern", "split this domain").
+   - Adding/removing a REQ.
+   - Splitting a task into smaller tasks.
+   - Changing the parallel-batch grouping.
+   - Anything tagged MUST FIX that isn't a trivial typo or missing-mapping fix.
 
-**If any check fails, iterate on the spec before presenting.** When presenting to the user, include a "Spec self-review" paragraph listing any deliberate trade-offs, unresolved [NEEDS CLARIFICATION] markers, or deviations from convention. Explicit honesty beats silent hope.
+   These go to the user as "Pontos de atenção".
 
-### 7. Present for Approval
+3. Re-read the modified spec end-to-end to confirm consistency after inline fixes.
 
-- Display the spec to the user, highlighting the **Test Plan** and **Parallel Batches** sections
-- Include the **Spec self-review** notes from step 6
-- Set status to `DRAFT`
-- Ask: "Review this spec. Edit anything you want, then approve to begin implementation."
-- If parallel batches exist, note: "Batches with multiple tasks can run in parallel via worktree agents or sequentially via `/ralph-loop`."
-- On approval, set status to `APPROVED`
+### Phase 3 — Present for approval
+
+Output to the user, in this order:
+
+1. **Path of the spec file** (clickable).
+2. **Resumo da spec** — 3–5 bullets covering scope, approach, and parallelism summary.
+3. **Test Plan stats** — count by layer (Domain / Use Case / E2E / Smoke) and by
+   importance (REQ-bound / boundary / infra-failure / security).
+4. **Parallel Batches** — short summary
+   (e.g. "Batch 1: 1 task foundation, Batch 2: 4 tasks paralelos via worktree, Batch 3: TASK-MERGE em server.go").
+5. **Auto-revisão — fixes aplicados** — bullet list of trivial fixes made during phase 2.
+6. **⚠️ Pontos de atenção que NÃO foram aplicados** — every MUST FIX / SHOULD FIX
+   from the reviewers that requires user judgment, grouped by severity, with
+   file:line and suggested fix.
+7. **🟢 Aprovado o suficiente para implementar?** — explicit ask for the user to
+   either approve (status → APPROVED), edit, or push back on the points of attention.
+
+**Stop here.** Do not start implementation. Do not run `/ralph-loop`. The user
+explicitly drives the next step.
+
+#### What to do with user feedback
+
+After presenting, three things can happen:
+
+- **Approval ("ok", "aprovado", "pode rodar /ralph-loop"):** flip the spec status from
+  `DRAFT` to `APPROVED`. Stop. The user runs `/ralph-loop` themselves.
+- **Changes requested:** apply the requested changes to the spec file, **then re-run
+  Phase 2 self-review from scratch** (3 reviewers in parallel, fixes triviais
+  inline), **then re-present Phase 3**. The cycle continues until the user approves
+  or rejects. Re-running the review on every iteration is intentional — it keeps the
+  safety net honest and catches regressions in the corrections themselves. The cost
+  is a few seconds; the alternative (skipping) silently erodes the safety net.
+- **Rejection ("descarta", "não faz"):** delete the spec file (or move to
+  `.specs/archive/<name>.md` if the user wants to keep history). Stop.
+
+## Test Plan rigor
+
+This is the load-bearing section. The expanded checklist:
+
+1. **Per REQ:** ≥ 1 happy-path TC + all error/edge TCs that the requirement implies.
+2. **Per sentinel error** in the design's domain `errors.go`: ≥ 1 TC that triggers it.
+3. **Per validated field:** boundary TCs (valid min, valid max, invalid min-1,
+   invalid max+1).
+4. **Per external dependency** (sqlx repo, Redis cache, idempotency store, HTTP
+   client, gRPC client): ≥ 1 failure-mode TC (DB timeout, cache down, network
+   timeout, 5xx upstream).
+5. **Per conditional branch** in the use case flow: TCs for both paths.
+6. **Concurrency** specifics: operations with advisory lock, optimistic locking, or
+   `singleflight` need explicit concurrency TCs (leader vs waiter, contention).
+7. **Idempotency** specifics: write endpoints using the idempotency middleware need
+   TCs for the lock/unlock pattern (replay returns cached response, lock contention
+   returns 409).
+8. **HTTP endpoint** specifics: every new endpoint has Smoke TCs covering happy path
+   (status + every response field), every distinct error status (400/409/422), auth
+   (missing/invalid service key), response format
+   (`{"data": ...}` / `{"errors": {"message": ...}}`), field boundaries.
+9. **gRPC handler** specifics: every new method has TCs for the `toGRPCStatus()`
+   mapping (every domain error → gRPC status code).
+10. **Group by layer:**
+    - **Domain** (`TC-D-NN`): pure logic, value objects, invariants. NO mocks, NO containers.
+    - **Use case** (`TC-UC-NN`): hand-written mocks for collaborators, fast.
+    - **E2E** (`TC-E2E-NN`): TestContainers (Postgres + Redis), real HTTP via `httptest`.
+    - **Smoke** (`TC-S-NN`): k6, validates deployed behavior. NOT subject to TDD RED/GREEN.
+11. **Assign TCs to tasks** via `tests:` — each TC belongs to exactly one task.
+    Smoke TCs go in a dedicated `TASK-SMOKE` at the end of the spec.
+12. **Rigor check (do this last):** count happy-path vs error-path TCs. Errors should
+    outnumber happy paths. If they don't, you missed something — surface specific
+    gaps before presenting.
+
+Categories: `happy`, `validation`, `business`, `edge`, `infra`, `concurrency`,
+`idempotency`, `security`.
+
+## Parallelism analysis
+
+After tasks are written:
+
+1. Build a dependency graph from `depends:` and `files:` overlap.
+2. Two tasks **cannot** be in the same batch if either: one depends on the other, or
+   they share a file in `files:`.
+3. Topological sort into batches:
+   - Batch 1: zero-dep tasks.
+   - Batch N: tasks whose deps are satisfied by Batches 1..N-1.
+4. Classify any shared file:
+   - **Exclusive** — only one task touches it (safe for parallel).
+   - **Shared-additive** — multiple tasks add to it without removing existing content.
+     Common in this codebase: `cmd/api/server.go` (DI wiring in `buildDependencies`),
+     `cmd/api/router.go` (route registration), `cmd/api/grpc.go` (gRPC service
+     registration when applicable). **Apply the accumulator pattern** (see below) —
+     never let parallel tasks edit the shared file directly.
+   - **Shared-mutative** — multiple tasks modify existing code: must serialize. Put
+     them in different batches.
+5. Present the batches in the spec and in the Phase 3 summary, with classification
+   per shared file.
+
+### Accumulator pattern (for shared-additive files)
+
+When you detect a shared-additive file, **rewrite the parallel tasks** so they don't
+touch it directly:
+
+1. Each parallel task **drops the shared file from its own `files:`**.
+2. Each parallel task **gains a fragment file** in
+   `.specs/wiring/<spec-slug>/<task-id>.<target-slug>.fragment.md` that describes its
+   addition. The fragment lives in `files:` so the task owns it.
+3. Add a new `TASK-MERGE-<TARGET>` task in the **next batch after the parallel one**.
+   It:
+   - Has `files:` listing the shared file (e.g. `cmd/api/server.go`) plus all the
+     relevant fragment paths.
+   - Has `depends:` listing every parallel task that produces a fragment for that
+     target.
+   - Has no `tests:` of its own unless wiring correctness requires a quick smoke check.
+   - Will be executed sequentially by `/ralph-loop` in the main working tree (it
+     reads the fragments and applies them).
+
+Fragment format is defined in `.claude/rules/sdd.md` §Merge Strategy. Each fragment
+is a markdown file with sections:
+
+- **Intent** — one sentence
+- **Target** — full path of the shared file
+- **Imports** — Go imports to add (optional)
+- **Additions** — code blocks grouped under `### Section: <named anchor>` (the
+  registered anchors are listed in `.claude/rules/sdd.md`; the canonical ones for
+  this project are `buildDependencies` in `cmd/api/server.go` and
+  `route registration` in `cmd/api/router.go`)
+- **Notes** — optional ordering hints / known conflicts
+
+When you write parallel-batch tasks for the spec, **always look first** for
+shared-additive files and apply this pattern *before* presenting the batches. If you
+don't, the merge inevitably surfaces as a conflict in `/ralph-loop`'s phase 2.
 
 ## Rules
 
-- Spec files go in `.specs/` directory
-- File naming: lowercase, hyphen-separated: `.specs/user-audit-log.md`
-- Never include tasks that require user decisions — ask upfront during spec creation
-- Reference existing patterns: if a task is similar to existing code, note which files to use as reference
-- Match spec depth to task complexity — a simple bug fix needs fewer sections than a new domain
-- Architecture is flexible: the template recommends Clean Architecture but does not impose it. Adapt the spec to the project's chosen structure
+- Spec files in `.specs/` directory.
+- File naming: lowercase, hyphen-separated, optionally numeric prefix.
+- Never include tasks that require user decisions — ask upfront, before writing the spec.
+- Reference existing code: if a task is similar to an existing use case / handler /
+  repository, name those files in the Design section.
+- Match spec depth to task complexity: a simple bug fix doesn't need 30 TCs.
+- This skill **never** runs `/ralph-loop` automatically. The user does that
+  explicitly after reviewing the spec.
 
 ## Integration
 
-- After approval, run `/ralph-loop .specs/<name>.md` for autonomous execution
-- Or execute tasks manually one at a time
-- Use `/spec-review .specs/<name>.md` after implementation to verify against requirements
+After the user approves:
+
+```text
+/ralph-loop .specs/<name>.md
+```
+
+That's the next step — `/ralph-loop` executes the whole spec autonomously
+(parallelizing per batch via worktrees), self-reviews the implementation, and
+presents results back to you.

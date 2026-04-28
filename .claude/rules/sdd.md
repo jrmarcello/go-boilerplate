@@ -17,27 +17,43 @@ Two checkpoints exist alongside the normal flow. Skipping either is a process vi
 
 ### After creating a spec — mandatory self-review
 
-The `/spec` skill MUST run the self-review checklist before presenting (REQ↔Task sync, Files sync, Test Plan coverage, architecture fit, validation criteria concreteness, scope hygiene, [NEEDS CLARIFICATION] surfacing). See `.claude/skills/spec/SKILL.md` § "Self-Review". When presenting, explicit "Spec self-review" notes are required alongside the spec.
+The `/spec` skill MUST run Phase 2 before presenting: 3 review agents in parallel
+(`spec-reviewer`, `test-reviewer`, `code-reviewer`), trivial fixes applied inline,
+judgment-calls surfaced as "Pontos de atenção". See
+`.claude/skills/spec/SKILL.md` § Phase 2.
 
-### After executing a spec — mandatory final review + runtime validation
+If the user requests changes after the present, the self-review **re-runs from
+scratch** before re-presenting. This is intentional: it protects against regressions
+in the corrections themselves and keeps the audit honest.
 
-The `/ralph-loop` skill (or manual task-by-task execution) MUST conclude with:
+### After executing a spec — mandatory self-review + present-before-commit
 
-1. **Implementation audit** — every Files to Create/Modify item in Design is verified against code
-2. **Requirement audit** — each REQ mapped to concrete evidence
-3. **Validation criteria** — every checkbox executed (or explicitly deferred with reason)
-4. **Runtime validation** — if the spec touches runtime, the service is started and exercised with real requests and real data; error paths too, not only happy paths
-5. **Bug / gap disclosure** — any incidental findings are surfaced, not silently fixed
+The `/ralph-loop` skill MUST run Phase 3 before presenting: 3 review agents in
+parallel (`code-reviewer`, `test-reviewer`, `security-reviewer`), trivial fixes
+applied inline, judgment-calls surfaced as "Pontos de atenção". See
+`.claude/skills/ralph-loop/SKILL.md` § Phase 3.
 
-See `.claude/skills/ralph-loop/SKILL.md` § "Final Review + Runtime Validation" for the full sequence. **The user should never have to ask "did you validate?" — that question means the checkpoint was skipped.**
+The skill **never auto-commits**. It presents results in Phase 4 and waits for
+explicit user approval. If the user requests more changes, the self-review
+**re-runs from scratch** before re-presenting.
+
+**The user should never have to ask "did you validate?" — that question means a
+checkpoint was skipped.**
 
 ## Task Execution
 
-- Each task must be independently verifiable (`go build ./...` should pass after each task)
+- Each task must be independently verifiable (`go build ./...` should pass after
+  each task — RED phase is the explicit exception, where the test file references
+  symbols not yet implemented but the production tree still compiles)
 - Tasks are architecture-agnostic — no mandatory layer ordering
 - Order tasks logically for the feature, respecting the project's chosen structure
 - If a task is unclear, mark it `BLOCKED` with a reason and stop execution
-- **Mandatory review before testing**: after implementing a task, re-read the task description and verify ALL specified files, patterns, and behaviors were implemented. Check: all files listed in `files:` metadata were created/modified, all patterns from the Design section are followed, all error mappings and wrapping are complete, no implementation gap vs the spec. Only then proceed to tests. This is NEVER skipped.
+- **Mandatory review before testing**: after implementing a task, re-read the task
+  description and verify ALL specified files, patterns, and behaviors were
+  implemented. Check: all files listed in `files:` metadata were created/modified,
+  all patterns from the Design section are followed, all error mappings and
+  wrapping are complete, no implementation gap vs the spec. Only then proceed to
+  tests. This is NEVER skipped.
 
 ## Task Metadata
 
@@ -45,11 +61,13 @@ See `.claude/skills/ralph-loop/SKILL.md` § "Final Review + Runtime Validation" 
 - Tasks with dependencies MUST have a `depends:` sub-item listing prerequisite TASK-N IDs
 - `depends:` must form a DAG (no circular dependencies)
 - Tasks that share files in their `files:` lists cannot be in the same parallel batch
-- Tasks with testable code MUST have a `tests:` sub-item listing TC-IDs from the Test Plan (triggers TDD cycle in ralph-loop)
+- Tasks with testable code MUST have a `tests:` sub-item listing TC-IDs from the
+  Test Plan (triggers TDD cycle in `/ralph-loop`)
 
 ## Test Plan
 
-Every spec MUST include a `## Test Plan` section between Requirements and Design. The Test Plan contains tables grouped by layer:
+Every spec MUST include a `## Test Plan` section between Requirements and Design.
+The Test Plan contains tables grouped by layer:
 
 - **Domain Tests** (TC-D-NN): pure domain logic, value objects, entity invariants
 - **Use Case Tests** (TC-UC-NN): application logic, dependency interactions, error mapping
@@ -58,9 +76,11 @@ Every spec MUST include a `## Test Plan` section between Requirements and Design
 
 Each TC row has: `| TC-ID | REQ | Category | Description | Expected |`
 
-Categories: `happy`, `validation`, `business`, `edge`, `infra`, `concurrency`, `idempotency`, `security`
+Categories: `happy`, `validation`, `business`, `edge`, `infra`, `concurrency`,
+`idempotency`, `security`
 
-For non-code specs (config/docs only), the Test Plan may be `N/A` with a justification.
+For non-code specs (config/docs only), the Test Plan may be `N/A` with a
+justification.
 
 ### Coverage Rules
 
@@ -68,17 +88,24 @@ Every spec MUST satisfy all of the following:
 
 - Every REQ has >= 1 TC (at minimum the happy path)
 - Every sentinel error in domain `errors.go` has >= 1 TC that triggers it
-- Every validated field has boundary TCs: valid min, valid max, invalid min-1, invalid max+1
+- Every validated field has boundary TCs: valid min, valid max, invalid min-1,
+  invalid max+1
 - Every external dependency call (repo, cache, publisher) has >= 1 infra-failure TC
 - Every conditional branch in use case flow has TCs for both paths
 - Concurrency scenarios required for operations with advisory lock or optimistic locking
-- Every new HTTP endpoint has smoke TCs: happy path (201/200 + all response fields), each distinct error status (400/409/422), response format, auth, field boundaries, idempotency
-- **Rigor check**: error/edge TCs should outnumber happy-path TCs — review the complete Test Plan and verify no business rule untested, no error path missing, no boundary unchecked
+- Every new HTTP endpoint has smoke TCs: happy path (201/200 + all response fields),
+  each distinct error status (400/409/422), response format, auth, field
+  boundaries, idempotency
+- **Rigor check**: error/edge TCs should outnumber happy-path TCs — review the
+  complete Test Plan and verify no business rule untested, no error path missing,
+  no boundary unchecked
 
 ### Mutability
 
-- TCs may be **added** during IN_PROGRESS (new edge cases discovered during implementation)
-- TCs may NEVER be **removed** — if a TC is no longer applicable, mark it as `SKIPPED` with a reason
+- TCs may be **added** during IN_PROGRESS (new edge cases discovered during
+  implementation)
+- TCs may NEVER be **removed** — if a TC is no longer applicable, mark it as
+  `SKIPPED` with a reason
 - REQ references in TCs must remain valid
 
 ### Smoke Tests (k6)
@@ -87,11 +114,13 @@ Every spec MUST satisfy all of the following:
 - Smoke tests are executed by `TASK-SMOKE` — a dedicated task at the end of the spec
 - Smoke tests do NOT follow the TDD RED/GREEN cycle (they are executed directly)
 - If the app is not running, log `SMOKE: DEFERRED` in the Execution Log
-- Smoke file convention: `tests/load/users.js`, `tests/load/roles.js`, `tests/load/main.js`, `tests/load/helpers.js`
+- Smoke file convention: `tests/load/users.js`, `tests/load/roles.js`,
+  `tests/load/main.js`, `tests/load/helpers.js`
 
 ## TDD Execution
 
-When a task has `tests:` metadata, the ralph-loop follows the TDD cycle:
+When a task has `tests:` metadata, `/ralph-loop` (or the parallel agent assigned
+the task) follows the TDD cycle:
 
 ### RED Phase
 
@@ -129,24 +158,126 @@ TDD: RED(N failing) -> GREEN(N passing) -> REFACTOR(clean)
 
 ## Parallel Batches
 
-- The Parallel Batches section is auto-generated by `/spec` based on dependency and file analysis
+- The Parallel Batches section is auto-generated by `/spec` based on dependency and
+  file analysis
 - Batches are sequential: Batch N+1 starts only after all tasks in Batch N complete
 - Tasks within a batch are independent: no shared files, no inter-dependencies
 - Shared files are classified as:
   - **exclusive** — only one task touches it (safe for parallel)
-  - **shared-additive** — multiple tasks add to it, e.g. DI wiring, route registration (accumulator pattern candidate)
+  - **shared-additive** — multiple tasks add to it, e.g. DI wiring, route
+    registration (accumulator pattern candidate)
   - **shared-mutative** — multiple tasks modify existing code (must serialize)
 
-## Merge Strategy (Hybrid B+C)
+### Auto-rollback semantics (parallel batches)
 
-When parallel tasks share additive files (e.g. `server.go`), use the accumulator pattern:
+When a batch with 2+ tasks runs in parallel via worktrees and **any agent fails**,
+`/ralph-loop` MUST NOT silently merge the successful worktrees. The contract:
 
-- Each parallel task generates a wiring fragment in `.specs/wiring/` instead of editing the shared file
-- A dedicated merge task (`TASK-MERGE`) reads all fragments and applies them sequentially
-- Fragments describe intent (what to add), not patches
-- Shared-mutative files always serialize (Opção B) — never run in parallel
+1. Stop after the failing batch.
+2. Surface to the user: which tasks succeeded, which failed, the failure cause
+   (one line per failure).
+3. Offer three options: (a) merge successful + skip failed, (b) discard everything
+   and rerun, (c) stop for manual investigation.
+4. Default (no answer) is (c). Never merge a partially-failed batch silently.
+
+This contract is non-negotiable — it preserves the user's ability to reason about
+the working tree state.
+
+## Merge Strategy (accumulator pattern)
+
+When parallel tasks share **additive** files (e.g. `cmd/api/server.go` for DI
+wiring, `cmd/api/router.go` for route registration), use the accumulator pattern:
+
+- Each parallel task generates a wiring fragment in
+  `.specs/wiring/<spec-slug>/<task-id>.<target-slug>.fragment.md` instead of
+  editing the shared file directly
+- A dedicated merge task (`TASK-MERGE-<TARGET>`) reads all fragments and applies
+  them sequentially in the next batch
+- Fragments describe **intent** (what to add), not patches
+- Shared-mutative files always serialize (different batches) — never run in parallel
+
+### Fragment format
+
+A fragment is a markdown file with these sections (all required unless noted):
+
+```markdown
+# Fragment: TASK-<N> → <target-file>
+
+## Intent
+
+<one-sentence description of what this fragment adds>
+
+## Target
+
+<full path of the shared file, e.g. cmd/api/server.go>
+
+## Imports
+
+<optional — Go import lines to add to the target file's import block,
+deduplicated when merged>
+
+```go
+"github.com/marcelojr/gopherplate/internal/usecases/audit"
+"github.com/marcelojr/gopherplate/internal/infrastructure/db/postgres/repository/audit"
+```
+
+## Additions
+
+### Section: <named anchor>
+
+<code block to insert at this anchor>
+
+```go
+auditRepo := audit.NewRepository(db.Writer())
+auditUC := audit.NewLogUseCase(auditRepo)
+```
+
+### Section: <another named anchor>
+
+```go
+deps.AuditUseCase = auditUC
+```
+
+## Notes
+
+<optional — ordering hints, known interactions, things the merge task
+should be aware of>
+```
+
+### Registered anchors (canonical for this project)
+
+The merge task locates the named anchor in the target file and inserts the
+fragment's code block. Anchors are project-specific because they map to known
+locations in known files:
+
+| Target file | Anchor | Insert position |
+| ----------- | ------ | --------------- |
+| `cmd/api/server.go` | `buildDependencies` | inside `buildDependencies(...)`, before `return Dependencies{...}` |
+| `cmd/api/server.go` | `Dependencies struct` | inside the `Dependencies` struct definition, alphabetical by field name |
+| `cmd/api/router.go` | `route registration` | inside the route group setup, after existing route declarations |
+| `cmd/api/grpc.go` | `service registration` | inside the gRPC server registration block (when applicable) |
+
+When a new shared-additive target is needed, add an anchor row to this table in
+the same PR — never let fragments use unregistered anchors silently.
+
+### Merge conflict semantics
+
+If two fragments target the same anchor with **incompatible content** (different
+code performing the same wiring slot, e.g. two competing definitions of the same
+variable), the merge task STOPS, leaves the merge unchecked, and surfaces the
+conflict to the user. The fix is to clarify intent in the spec — usually this
+means one of the parallel tasks needed an explicit `depends:` on the other.
+
+## Re-review on user feedback
+
+Both `/spec` (Phase 2) and `/ralph-loop` (Phase 3) re-run their full self-review
+when the user requests more changes after the present. This is intentional — the
+review pass is cheap (a few seconds) and protects against regressions introduced by
+the corrections themselves. Do not skip it on subsequent iterations.
 
 ## Naming
 
 - Spec files: lowercase, hyphen-separated: `user-audit-log.md`, `role-permissions.md`
-- Active state files: `<name>.active.md` (auto-created by ralph-loop, do not edit manually)
+- Wiring fragments:
+  `.specs/wiring/<spec-slug>/<task-id>.<target-slug>.fragment.md`
+  (e.g. `.specs/wiring/user-audit-log/task-3.cmd-api-server-go.fragment.md`)

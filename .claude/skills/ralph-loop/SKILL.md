@@ -1,13 +1,16 @@
 ---
 name: ralph-loop
-description: Autonomous task-by-task execution loop from an SDD spec file (Stop hook-based iteration)
+description: Autonomous single-run execution of an approved SDD spec — parallel via worktrees, self-reviewed, presented for approval before commit
 argument-hint: "<spec-file-path>"
 user-invocable: true
 ---
 
 # /ralph-loop <spec-file>
 
-Executes tasks from a spec file autonomously, one task per iteration. Uses the Stop hook (exit code 2) to continue in the same session after each task.
+Executes an approved spec **end-to-end in a single run** — no Stop-hook iteration, no
+per-task pauses. Parallelizes whatever the Parallel Batches section allows (one
+worktree per parallel task), then self-reviews the diff before handing back to the
+user. Commits only after explicit user approval.
 
 ## Example
 
@@ -15,245 +18,344 @@ Executes tasks from a spec file autonomously, one task per iteration. Uses the S
 /ralph-loop .specs/user-audit-log.md
 ```
 
-## Mechanism
+## Phases
 
-The loop uses the Stop hook pattern:
+The skill runs five phases back-to-back:
+**Validate → Execute → Self-review → Present → Commit (only after approval)**.
+The only pause point is between Present and Commit (waiting for the user to approve).
 
-1. You execute ONE task from the spec
-2. When you finish (try to stop), the `ralph-loop.sh` Stop hook fires
-3. If tasks remain: hook returns exit 2 (continue) — you receive a stderr message with progress
-4. If all tasks done: hook returns exit 0 — `stop-validate.sh` runs final validation
-5. Each iteration adds context to the same session — be focused and concise
+### Phase 1 — Validate inputs
 
-## Startup
+1. Read the spec file. Refuse if status ≠ `APPROVED` or `IN_PROGRESS`.
+2. Verify the **Parallel Batches** section exists. If missing, regenerate from
+   `files:`/`depends:` and warn.
+3. Verify the **Test Plan** section is non-empty.
+4. Verify no other `.specs/*.active.md` exists (legacy state file from old Stop-hook
+   ralph-loop). If found, delete it — single-run mode doesn't use state files.
+5. Set spec status to `IN_PROGRESS` (if not already).
 
-1. Read the spec file path from argument
-2. Validate the spec exists and has status `APPROVED` or `IN_PROGRESS`
-3. Verify no other ralph-loop is active (no other `.active.md` files in `.specs/`)
-4. Set status to `IN_PROGRESS` if not already
-5. Create state file: `.specs/<name>.active.md` containing the spec file path (this signals the Stop hook)
-6. Check the **Parallel Batches** section to determine execution order:
-   - If batches exist: follow batch order (Batch 1 -> Batch 2 -> ...)
-   - Within a batch: check if parallel execution applies (see below)
-   - If no batches section: fall back to sequential `TASK-N` order
-7. Identify the next uncompleted `- [ ] TASK-N:` entry respecting batch order
+If anything fails: stop, report what's missing, and tell the user to re-run `/spec`
+or fix the spec manually.
 
-## Parallel Execution (multi-task batches)
+### Phase 2 — Execute (autonomous, parallel where possible)
 
-When a batch contains 2+ tasks, evaluate whether to parallelize:
+For each batch in **Parallel Batches**, sequentially:
 
-### Decision Flow
+#### Case A — Batch with 1 task (TASK-MERGE-* or anything else)
 
-```text
-Read next batch from spec
-  │
-  ├── 1 uncompleted task  → Execute sequentially (normal iteration)
-  │
-  └── 2+ uncompleted tasks
-        │
-        ├── All files exclusive → Launch parallel agents in worktrees
-        │
-        └── Shared files exist  → Execute sequentially within batch
-```
+Execute inline in the main working tree (no worktree overhead):
 
-### How to Parallelize
+1. Read spec for the task: `files:`, `tests:`, Design section, relevant rules.
+2. **If the task name starts with `TASK-MERGE-`** (accumulator pattern, see
+   `.claude/rules/sdd.md` §Merge Strategy):
+   - Read every fragment under `.specs/wiring/<spec-slug>/`.
+   - Group fragments by `Target`. Verify all targets in fragments match files in this
+     task's `files:`.
+   - For each target file, in fragment-name order (alphabetical sort of `<task-id>`):
+     - Apply imports (deduplicated, merged into the existing import block).
+     - For each `### Section: <anchor>` block, locate the named anchor in the target
+       file and insert the code block at the correct position
+       (`buildDependencies` → before `return Dependencies{...}`,
+       `route registration` → inside the route group setup, etc. — see
+       `.claude/rules/sdd.md` for the full anchor catalogue).
+   - If two fragments contradict each other at the same anchor with different
+     content: STOP, report the conflict, leave the task `[ ]`.
+   - On merge success, run `gofmt -w` on the target file, then `go build ./...`.
+3. **Else if `tests:` present (TDD cycle):**
+   - **RED:** Write the test file(s) first with all listed TCs as table-driven
+     entries (test names: natural English, not TC-IDs). Run
+     `go test ./<relevant-pkg>/...` to confirm RED state (compile fail OR test fail).
+   - **GREEN:** Implement production code until all tests pass.
+   - **REFACTOR:** Clean up duplication, extract helpers, improve naming. Re-run
+     tests + `go build ./...` — must stay green.
+   - Re-read spec, verify all `files:` were touched and all patterns followed.
+4. **Else** (migrations, config, schema-only): execute as described.
+5. Run `go build ./...` to verify compilation. If the change touches HTTP handlers,
+   run `swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal`.
+6. Mark `- [ ] TASK-N:` → `- [x] TASK-N:` in the spec.
+7. Append a one-line entry to the Execution Log:
 
-1. Identify all uncompleted tasks in the current batch
-2. For each task, launch an Agent call with `isolation: "worktree"` — ALL Agent calls MUST be in a single message (this ensures real parallelism)
-3. Wait for all agents to complete
-4. Collect results — each agent returns its worktree path (if changes were made)
-5. Merge worktrees sequentially into main working directory (use `cp` from worktree paths)
-6. **Cleanup worktrees MANUALLY** (CRITICAL — the runtime does NOT auto-cleanup Agent worktrees when changes were made):
-
-   ```bash
-   git worktree remove <worktreePath> --force
-   git worktree prune
+   ```markdown
+   ### TASK-N (YYYY-MM-DD HH:MM)
+   TDD: RED(X) → GREEN(X) → REFACTOR(clean) — <1-line summary>
    ```
 
-   Run this for EACH worktree immediately after merging its files. Orphan worktrees pile up fast (one per Agent call) and break the VS Code Go extension (it tries to resolve modules in each worktree). The `WorktreeRemove` hook only fires on explicit removal, not on Agent completion.
+   For `TASK-MERGE-*`, the entry is `MERGE: <N> fragments → <target-file>`.
 
-7. Verify: `go build ./...` and `go test ./...` pass after merge
-8. Mark all completed tasks as `[x]` in the spec
-9. Log all tasks in a single Execution Log entry
+#### Case B — Batch with 2+ tasks (PARALLEL via worktrees)
 
-### Agent Prompt Template
+Launch **all tasks in the batch as parallel `Agent` calls in a SINGLE message** with
+`isolation: "worktree"`:
 
-Each parallel agent receives a self-contained prompt with:
-
-- **Task**: full task description from spec
-- **Files**: the `files:` list — only these files should be created/modified
-- **Test Plan**: TC-IDs from `tests:` metadata with descriptions from the Test Plan section
-- **TDD Cycle**: if `tests:` present, follow RED -> GREEN -> REFACTOR
-- **Conventions**: module path, unique error names, table-driven tests, hand-written mocks
-- **REVIEW**: "Re-read the Task and Files sections. Verify all files created/modified, all patterns followed, all mappings complete. This is mandatory before running tests."
-- **Report**: return summary of what was done, files changed, TDD results
-
-### When NOT to Parallelize
-
-- Tasks share **mutative** files (both modify existing code in the same file)
-- Worktree isolation is unavailable
-- Tasks are trivial (< 1 minute each) — overhead of worktrees outweighs benefit
-- Fewer than 2 tasks in the batch
-
-### Merge Strategy
-
-- **All succeeded**: merge worktrees sequentially, verify build + tests
-- **Some failed**: merge successful ones, leave failed tasks unchecked, log failures
-- **Merge conflicts**: resolve manually, verify build + tests after resolution
-
-## Per-Iteration Execution
-
-**CRITICAL: Execute exactly ONE task per iteration (unless parallelizing a batch).**
-
-For each task:
-
-1. **Read the spec file** to find the current task (first unchecked `- [ ] TASK-N:`)
-2. **Read relevant code** referenced in the spec's Design section
-3. **Check `tests:` metadata** on the task to determine execution mode:
-
-### If task has `tests:` (with non-smoke TCs) -> TDD Cycle
-
-**RED Phase:**
-
-1. Write the test file FIRST (before production code)
-2. Tests reference the function/type to be implemented
-3. Run `go test` — tests MUST fail (compilation failure = valid RED)
-
-**GREEN Phase:**
-
-1. Write MINIMUM production code to make tests pass
-2. Follow existing patterns: hand-written mocks in `mocks_test.go`, table-driven tests
-3. Run `go test` — all TCs in `tests:` MUST pass
-
-**REFACTOR Phase:**
-
-1. Clean up: remove duplication, improve naming
-2. Run `go test` + `go build ./...` — must pass
-
-### If task has `tests: TC-S-*` (smoke only) -> Smoke Execution
-
-1. Write k6 smoke checks as described
-2. Run `k6 run --env SCENARIO=smoke tests/load/main.js`
-3. If app not running: log `SMOKE: DEFERRED`
-4. Do NOT follow RED/GREEN cycle
-
-### If task has no `tests:` -> Normal Execution
-
-1. Execute the task as described
-2. Verify: `go build ./...`
-
-### After execution (all modes)
-
-1. **Mandatory review** (NEVER skip): re-read task description and verify: all files listed in `files:` were created/modified, all patterns from the Design section are followed, all error mappings/wrapping/classifications are complete, no implementation gap vs the spec
-2. **Mark complete**: change `- [ ] TASK-N:` to `- [x] TASK-N:`
-3. **Log**: append to Execution Log:
-
-```markdown
-### Iteration N — TASK-N (YYYY-MM-DD HH:MM)
-
-<1-2 sentence summary>
-TDD: RED(N failing) -> GREEN(N passing) -> REFACTOR(clean)  <!-- if TDD -->
+```text
+[in one message:]
+Agent(general-purpose, isolation: worktree): execute TASK-3 from <spec> ...
+Agent(general-purpose, isolation: worktree): execute TASK-4 from <spec> ...
+Agent(general-purpose, isolation: worktree): execute TASK-5 from <spec> ...
 ```
 
-1. **Stop** — let the hook decide whether to continue or finish
+Each agent prompt is self-contained:
 
-## TDD Edge Cases
+```text
+Execute TASK-N from .specs/<name>.md.
 
-- **Compilation failure counts as valid RED** — the test file exists but can't compile because the production type/function doesn't exist yet
-- **Test file before production file** — always create `*_test.go` before the implementation file
-- **Mocks**: add to existing `mocks_test.go` in the package, or create one if it doesn't exist
-- **Existing tests break**: fix immediately before proceeding to GREEN
-- **Multiple TCs in one task**: all TCs must pass in GREEN phase
+## Task
+<full task description>
 
-## On Final Task
+## Files
+<files: from task metadata>
 
-After marking the last task complete:
+## Test Plan (relevant rows)
+<TC-IDs from this task's tests:, with descriptions and expected outcomes>
 
-1. The Stop hook detects all tasks done, returns exit 0
-2. `stop-validate.sh` runs full validation (build + lint + tests)
-3. If validation passes: set spec status to `DONE`
-4. If validation fails: fix issues (stop-validate retries up to 3 times)
-5. **Perform the Final Review + Runtime Validation below** — this is MANDATORY before telling the user the spec is done
-6. Suggest: "Run `/spec-review .specs/<name>.md` for a formal review against requirements"
+## Wiring fragments (if any)
+If your `files:` includes a fragment path like
+`.specs/wiring/<spec-slug>/<task-id>.<target-slug>.fragment.md`, you must
+write that fragment instead of editing the shared target file directly.
+Format spec: `.claude/rules/sdd.md` §Merge Strategy (accumulator pattern).
 
-## Final Review + Runtime Validation (MANDATORY before presenting results)
+## TDD Cycle
+1. Write tests FIRST (*_test.go) for all TCs listed
+2. `go test ./<relevant-pkg>/...` to confirm RED
+3. Implement production code
+4. REVIEW: re-read Task and Files. Verify all files created/modified, all patterns
+   followed, all error mappings/wrapping/classifications complete.
+5. `go test ./<relevant-pkg>/...` to confirm GREEN
+6. REFACTOR: clean duplication, improve naming. Tests must stay green.
+7. `go build ./...` to confirm compile
 
-Before reporting completion, run this sequence. The user having to ask "did you validate?" or "did we miss anything?" means this block was skipped — that is a process violation.
+## Conventions
+- See .claude/rules/go-conventions.md, go-idioms.md, security.md
+- Unique error variable names (parseErr, saveErr — never reuse `err`)
+- Hand-written mocks in mocks_test.go per package — no frameworks
+- Domain errors are pure sentinels (var Err... = errors.New(...))
+- Use cases return *apperror.AppError via local toAppError()
+- Use cases classify spans via shared.ClassifyError(span, err, expectedErrors, "ctx")
+- Handlers use httpgin.SendSuccess / httpgin.SendError (pkg/httputil/httpgin)
+- gRPC handlers translate via toGRPCStatus()
 
-### 1. Implementation audit (spec vs. code)
-
-Re-read the spec's **Design** section end-to-end. For each item, confirm the implementation matches:
-
-- **Files to Create**: every listed file exists with the intended shape (not just touched).
-- **Files to Modify**: every listed modification actually landed — diff is not trivial/empty.
-- **Architecture Decisions**: each decision is honored in code (not silently contradicted).
-- **Dependencies**: every declared dependency is wired (`go.mod`, `pip install` in CI, `go install` in Makefile, etc.).
-
-### 2. Requirement audit
-
-For each REQ: locate the concrete code/config that satisfies it, and write one line citing the evidence. If a REQ cannot be mapped to evidence, flag it — do not assume "probably covered".
-
-### 3. Validation criteria
-
-Run every item in the spec's **Validation Criteria** section. Mark each with:
-
-- `[x] executed and passed`
-- `[ ] deferred (reason)` — e.g., "needs CI to exercise"
-- `[ ] failed (details)` — STOP and fix before presenting
-
-### 4. Runtime validation (if applicable)
-
-If the spec touches runtime behavior and the service can be started, **do so and exercise it with real data**:
-
-- Start the service (`./bin/api &` after `make build`, `make dev`, or the spec's equivalent)
-- Issue real requests against the changed code paths
-- Verify response shape, status codes, side effects (DB rows, cache entries, emitted events, log lines)
-- Exercise error paths too, not just happy paths
-- Stop the service cleanly
-
-If runtime validation is not applicable (docs-only, CI-only changes, config-only), state so explicitly in the final report. Do not skip silently.
-
-### 5. Bug / gap disclosure
-
-If you found bugs or gaps during review — in the spec itself, in the implementation, in adjacent code, in tooling config — list them in the Execution Log AND surface them to the user. Quietly fixing a latent bug without mentioning it hides signal. Surface first, then offer to fix.
-
-### 6. Present findings
-
-Only after (1)–(5) are complete, present the user with:
-
-- **Delivered artifacts** — files and what each does
-- **Spec vs. implementation review** — what matched, what deviated, what was deferred (and why)
-- **Bugs / gaps found** — how each was handled
-- **Validation results** — local checks + runtime validation (or explicit N/A)
-- **"Ready to commit?"** as an explicit question
-
-A final report that lacks this structure signals the review was skipped. If the user had to ask "revise se está tudo ok" or "valide com dados reais", the presentation was premature.
-
-## Resume After Interruption
-
-If a loop was interrupted (Ctrl+C, crash, etc.):
-
-1. The `.active.md` state file remains on disk
-2. Running `/ralph-loop .specs/<name>.md` again picks up from the first unchecked task
-3. No work is lost — completed tasks are already marked `[x]`
-
-## Rules
-
-- **ONE task per iteration** — unless parallelizing a batch (then all batch tasks in one iteration)
-- **Parallel batches launch multiple agents** in a single message with `isolation: "worktree"`
-- **Read the spec file first** every iteration — it is the single source of truth
-- Never modify the spec's Requirements or Design sections during execution
-- If a task is unclear or blocked, mark it `BLOCKED` in the spec, remove the `.active.md` file, and stop
-- Follow project conventions: unique error variable names, existing patterns, etc.
-- Be concise in responses — context accumulates across iterations
-- For features with many tasks (15+), consider splitting into smaller specs
-
-## Emergency Stop
-
-To stop the loop at any time:
-
-```bash
-rm .specs/*.active.md
+Report: list files created/modified, RED count → GREEN count, any issues.
 ```
 
-This removes the state file. The Stop hook will see no active loop and pass through normally.
+After **all parallel agents return**:
+
+##### Auto-rollback on partial failure
+
+Before merging anything, count how many agents succeeded:
+
+- **All agents succeeded:** continue to the merge step below.
+- **Any agent failed:** STOP. **Do not merge any worktree.** Surface to the user:
+
+  ```text
+  ⚠️ Batch [TASK-X, TASK-Y, TASK-Z] — partial failure.
+
+  ✅ TASK-X: <summary>
+  ✅ TASK-Y: <summary>
+  ❌ TASK-Z: <one-line failure cause>
+
+  Nothing has been merged into main. Choose:
+    (a) merge X and Y, leave Z for me to fix manually
+    (b) discard everything, rerun the batch with adjustments
+    (c) stop here so I can investigate
+  ```
+
+  Wait for explicit user direction. Default (no answer): treat as (c). **Never merge
+  a partially-failed batch silently.** This is the auto-rollback contract.
+
+##### Merge step (only when all succeeded, or after user picks option (a))
+
+1. For each merged worktree, in order:
+   - Copy files from the worktree path back into the main working tree (the spec's
+     `files:` is the authoritative list — do not pull files outside it).
+   - **Cleanup the worktree manually** (CRITICAL — runtime does NOT auto-cleanup
+     when changes were made):
+
+     ```bash
+     git worktree remove <worktreePath> --force
+     git worktree prune
+     ```
+
+     Orphan worktrees pile up fast (one per Agent call) and break the VS Code Go
+     extension (each worktree carries its own `go.mod`). Run cleanup immediately
+     after copying files out of each worktree.
+   - If a shared-additive file conflicts (which shouldn't happen if accumulator
+     pattern was applied properly): STOP, report, ask user. The fix is usually a
+     missing `TASK-MERGE` in the next batch.
+2. **Verify merged state:** `gofmt -l .`, `go vet ./...`, `go build ./...`,
+   `go test ./internal/...`.
+3. Mark all successfully-executed tasks `[x]` in the spec. Tasks from option (a)'s
+   skipped set remain `[ ]`.
+4. Append a single batch entry to the Execution Log:
+
+   ```markdown
+   ### Batch [TASK-3, TASK-4, TASK-5] (YYYY-MM-DD HH:MM)
+   Parallel via worktrees.
+   - TASK-3: <summary> — TDD: RED(X) → GREEN(X)
+   - TASK-4: <summary> — TDD: RED(X) → GREEN(X)
+   - TASK-5: <summary> — TDD: RED(X) → GREEN(X)
+   ```
+
+   For partial merge (option a), include `- TASK-Z: SKIPPED — <reason>`.
+
+#### After all batches
+
+- All successfully-executed tasks marked `[x]`. Set spec status to `DONE`
+  (still subject to phase-4 approval — this is just bookkeeping).
+- Run final validation in the working tree:
+  - `gofmt -l .` (must be empty)
+  - `go vet ./...`
+  - `golangci-lint run` (matches CI lint configuration)
+  - `swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal`
+    (when HTTP handlers changed)
+  - `go build ./...`
+  - `go test ./internal/...`
+  - **Optional but recommended:** `make ci-local` — simulates a fresh-clone CI run
+    in an isolated worktree and catches drift the local pipeline misses (proto-gen,
+    swag drift, lint variation). Worth the 30–60s if the change is non-trivial.
+- Capture the diff vs `main` (`git diff main...HEAD --stat`) for the self-review phase.
+
+### Phase 3 — Self-review (BLOCKING — runs every time)
+
+Spawn **three review agents in parallel** in a single message:
+
+```text
+Agent(code-reviewer): Review the implementation of .specs/<name>.md against:
+  - the spec's Design and Tasks sections
+  - .claude/rules/go-conventions.md, go-idioms.md, migrations.md
+  - Clean Architecture layer rules: domain ← usecases ← infrastructure
+  - apperror mapping (toAppError), span classification (WarnSpan / FailSpan)
+  - DI pattern (manual wiring in cmd/api/server.go), httpgin response helpers
+  Flag MUST FIX / SHOULD FIX / NICE TO HAVE.
+
+Agent(test-reviewer): Audit the tests added by .specs/<name>.md:
+  - every TC in the spec's Test Plan has a matching test (table-driven)
+  - test names are natural English, not TC-IDs
+  - hand-written mocks in mocks_test.go (no testify/mock or gomock)
+  - error-path TCs outnumber happy-path TCs
+  - boundary tests on validated fields
+  - go-sqlmock for repository tests; TestContainers only for E2E
+  - no t.Skip without reason; no time.Sleep; no shared state breaking t.Parallel
+  Flag MUST FIX / SHOULD FIX / NICE TO HAVE.
+
+Agent(security-reviewer): Audit the diff for security/privacy violations:
+  - no PII in logs, fixtures, or response bodies
+  - parameterized queries (no string-concat SQL)
+  - service-key auth on new endpoints (X-Service-Name + X-Service-Key)
+  - no secrets in committed config or tests
+  - no removal of input validation
+  - migration Down sections present and reversible
+  Flag CRITICAL / HIGH / MEDIUM / LOW.
+```
+
+Wait for all three. Aggregate findings:
+
+1. **Apply trivially-correct fixes inline.** Then re-run `go build ./... && go test
+   ./internal/...` to confirm nothing broke.
+   - Test name converted from TC-ID to natural English.
+   - Forgotten error-message context wrap (`fmt.Errorf("...: %w", err)`).
+   - Missing `WarnSpan` / `FailSpan` call in a use case path.
+   - `fmt.Println` / `log.Println` left in production code.
+   - Missing index on a foreign-key column in a migration.
+   - `.With...()` builder argument forgotten in DI wiring.
+2. **Do NOT silently change** anything that requires judgment:
+   - Architectural pushback ("this should be its own package").
+   - Adding a TC the reviewer thinks should exist (mention it, let user decide).
+   - Refactoring suggestions.
+   - Security CRITICAL / HIGH findings — never auto-fix; always escalate.
+
+### Phase 4 — Present for approval
+
+Output to the user, in this order:
+
+1. **Spec status** — DONE (pending commit).
+2. **Resumo da execução** — N tasks done, M batches, X paralelos via worktree, total
+   tempo, total LOC adicionado.
+3. **Diff stat** — `git diff main --stat` summary.
+4. **Auto-revisão — fixes aplicados** — bullet list of trivial fixes from phase 3.
+5. **⚠️ Pontos de atenção** — every MUST FIX / SHOULD FIX / CRITICAL / HIGH from the
+   reviewers, with file:line and suggested fix.
+6. **🟢 Validação** — `gofmt`, `go vet`, `golangci-lint`, `go build`, `go test`,
+   `make ci-local` (if run) — pass/fail counts.
+7. **🟢 Posso commitar?** — explicit ask for the user to either approve, push back,
+   or request more changes.
+
+**Stop here.** Do not commit yet.
+
+#### What to do with user feedback
+
+After presenting, three things can happen:
+
+- **Approval ("ok", "commit", "pode commitar"):** advance to Phase 5.
+- **More changes requested:** apply the requested changes, **then re-run Phase 3
+  self-review from scratch** (3 reviewers in parallel, fix triviais inline),
+  **then re-present Phase 4**. The cycle continues until the user approves.
+  Re-running the review every loop is intentional — it protects against regressions
+  in the corrections themselves and keeps the audit honest. The cost is a few
+  seconds; the alternative (skipping) silently erodes the safety net.
+- **Rejection / abort:** mark spec status as `FAILED` with a one-line reason in the
+  Execution Log. Stop.
+
+### Phase 5 — Commit (only after explicit user approval)
+
+1. Stage only the files in the spec's Tasks `files:` lists (plus the spec file
+   itself, plus any merged-in fragment files under `.specs/wiring/<spec-slug>/`).
+2. Commit with the message:
+
+   ```text
+   feat(<scope>): <one-line summary based on spec REQs>
+
+   - <bullet per major REQ implemented>
+   - Spec: .specs/<name>.md
+   ```
+
+   **Do NOT add `Co-Authored-By` trailers.** (User preference: no AI-attribution trailers.)
+3. Show `git log -1` and current status.
+4. Suggest next steps: `/spec-review .specs/<name>.md` for an independent post-merge
+   audit, or `/spec <next-feature>` to start the next item.
+5. **Do not push.** The user runs `git push` (or asks).
+
+## Failure handling
+
+- **Agent in a worktree fails:** auto-rollback semantics (Phase 2 Case B). **Do not
+  merge any worktree** of the batch silently. Stop, report which task failed, and
+  ask the user to choose between (a) merge successful + skip failed, (b) discard
+  everything and rerun, (c) stop for manual investigation.
+- **Merge conflict on a shared file (after agents succeeded):** stop the batch,
+  leave all batch tasks unchecked, surface in Phase 4. The fix is usually a missing
+  `TASK-MERGE` in the next batch — re-`/spec` may be needed.
+- **`TASK-MERGE` conflict (two fragments contradict each other at the same anchor):**
+  stop, leave the merge task unchecked, surface to user. The fix is to clarify
+  intent in the spec.
+- **Validation fails after a batch:** stop. Do not start the next batch. Surface
+  what broke.
+- **Test fails after RED→GREEN:** the implementing agent must fix it before
+  reporting success. If it gives up, the task is unchecked, fail the batch.
+
+## What the skill does NOT do
+
+- Does not iterate task-by-task with the Stop hook (the old Ralph Loop). Single
+  pass, parallel where possible.
+- Does not use `.specs/*.active.md` state files — those were the trigger for the old
+  Stop-hook loop; this skill is single-run.
+- Does not auto-commit. Always waits for user approval.
+- Does not modify the spec's Requirements or Test Plan during execution. Tasks may
+  be marked `[x]`, the Execution Log appended to. Nothing else.
+- Does not skip phase 3 (self-review). Even for trivial specs, the review pass runs.
+- Does not push to remote. The user runs `git push` (or asks).
+
+## When to use vs. /spec
+
+- `/spec` writes the spec; you review and approve.
+- `/ralph-loop` executes the approved spec end-to-end and presents results.
+
+The two are explicitly separate — you always have a checkpoint between them.
+
+## Resume after interruption
+
+If the skill was interrupted (Ctrl+C, crash) mid-execution:
+
+1. Re-running `/ralph-loop .specs/<name>.md` picks up from the first uncompleted
+   `- [ ] TASK-N:`. The spec file is the source of truth.
+2. Any orphan worktrees from the interrupted run should be cleaned manually:
+   `git worktree list` to find them, then
+   `git worktree remove <path> --force && git worktree prune`.

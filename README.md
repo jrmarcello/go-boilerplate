@@ -383,13 +383,13 @@ A spec é agnóstica de arquitetura — funciona tanto com camadas separadas qua
 | `guard-bash.sh` | Antes de comandos bash | Bloqueia `.env` staging, `git add -A`, DROP, `--no-verify` |
 | `lint-go-file.sh` | Após editar arquivo Go | goimports + gopls diagnostics |
 | `validate-migration.sh` | Após editar migration | Garante seções Up + Down |
-| `ralph-loop.sh` | Ao finalizar tarefa | Controla iteração do Ralph Loop |
 | `stop-validate.sh` | Ao finalizar tarefa | Gate de qualidade: build + lint + testes |
 
 #### Agentes Especializados
 
-4 agentes com memória persistente, usados pelos skills de review e debug e também por solicitação:
+5 agentes com memória persistente, usados pelos skills de review/debug/spec e por solicitação:
 
+- **spec-reviewer** — Auditoria de specs SDD antes da implementação (gaps, ambiguidade, TCs faltando, layer violations, accumulator pattern)
 - **code-reviewer** — Compliance de arquitetura, idiomas Go, padrões do template
 - **security-reviewer** — OWASP Top 10, injeção, auth, dados sensíveis
 - **db-analyst** — Schema, performance de queries, migrations, pool

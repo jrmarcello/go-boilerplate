@@ -170,15 +170,16 @@ Per-sensor deep-dive guides live in `docs/guides/`:
 | `/debug-logs` | Analyze logs from Kind/Docker | Quick log-based debugging |
 | `/debug-team` | Parallel bug investigation with competing hypotheses (Agent Team) | Complex bugs that resist sequential debugging |
 | `/load-test` | Run k6 load tests + analyze results | Performance validation and regression |
-| `/spec` | Create SDD specification (requirements, design, tasks) | Before implementing a new feature or complex change |
-| `/ralph-loop` | Autonomous task-by-task execution from a spec | After `/spec` approval, for autonomous implementation |
-| `/spec-review` | Review implementation against specification | After `/ralph-loop` completes or manual implementation |
+| `/spec` | Author + self-review SDD specification, present for approval | Before implementing a new feature or complex change |
+| `/ralph-loop` | Autonomous single-pass execution of an approved spec (parallel via worktrees, self-reviewed, present-before-commit) | After `/spec` approval, for autonomous implementation |
+| `/spec-review` | Independent audit of implementation against specification | After `/ralph-loop` completes (or manual implementation) |
 
 ### Agent Teams and Subagents
 
 Agent Teams enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`). Team skills spawn 3 parallel teammates each. Use for tasks where parallel exploration adds value: reviews, audits, debugging.
 
-- `security-reviewer`, `code-reviewer`, `db-analyst`, `test-reviewer` — all with persistent memory (`memory: project`). Delegate with "use a subagent to..."
+- `spec-reviewer`, `security-reviewer`, `code-reviewer`, `db-analyst`, `test-reviewer` — all with persistent memory (`memory: project`). Delegate with "use a subagent to..."
+- `spec-reviewer` audits SDD specs **before** implementation (gaps, ambiguity, missing TCs, layer violations, accumulator pattern). Used by `/spec` Phase 2 alongside `test-reviewer` and `code-reviewer`.
 - `test-reviewer` specializes in test quality (mutation-survivor hints, error-path density, mocking discipline, test smells, TDD compliance). Use it whenever a change adds or modifies tests, or whenever you suspect under-tested behavior. Pairs with the mutation-nightly report artifact.
 
 ### Rules
@@ -192,8 +193,7 @@ Three-layer quality enforcement:
 - **PreToolUse[Bash]** — `guard-bash.sh`: blocks .env staging, `git add -A`, DROP statements, `--no-verify`
 - **PostToolUse[Edit|Write]** — `lint-go-file.sh`: goimports/gopls diagnostics on every Go file edit (enriched with actionable "fix by:" hints via [gopls-hints.awk](.claude/hooks/gopls-hints.awk))
 - **PostToolUse[Edit|Write]** — `validate-migration.sh`: ensures Up + Down sections in migrations
-- **Stop** — `ralph-loop.sh`: checks spec task progress, returns exit 2 to continue autonomous execution (transparent when no loop active)
-- **Stop** — `stop-validate.sh`: build + fmt + vet + swagger + lint + tests gate (auto-retry with tiered validation; skipped during active ralph-loop)
+- **Stop** — `stop-validate.sh`: build + fmt + vet + swagger + lint + tests gate (auto-retry with tiered validation)
 - **WorktreeCreate/Remove** — automated git worktree setup and cleanup
 
 ### Execution Directives
@@ -202,8 +202,10 @@ Three-layer quality enforcement:
 2. **Mandatory cycle** for non-trivial tasks: **Plan** → **Implement** → **Review** → **Test** → **Validate**. Do not finish without concrete validation evidence.
 3. **The Review step is MANDATORY and AUTOMATIC** — after implementing, re-read the plan/spec and diff what was implemented vs what was specified (files, patterns, mappings, wrapping). Verify: all files listed in `files:` metadata were created/modified, all patterns from the Design section are followed, all error mappings and classifications are complete, no implementation gap vs the spec. Only then proceed to tests. This is NEVER skipped.
 4. **Post-implementation validation** — enforced automatically by the **Stop hook** (build + fmt + vet + swagger + lint + tests). The hook blocks completion until validation passes. For the full pipeline including E2E, Kind deploy, and smoke tests, run `/validate` explicitly.
-5. **SDD workflow** for complex features: `/spec` → approve → `/ralph-loop` → `/spec-review`. Specs live in `.specs/`. The ralph-loop uses the Stop hook (exit code 2) to iterate task-by-task within the same session. See `docs/guides/sdd-ralph-loop.md`.
-    - **Post-spec-creation self-review is MANDATORY**: after `/spec` drafts a spec, it MUST run the self-review checklist (REQ↔Task sync, Files sync, Test Plan coverage, scope hygiene) before presenting. See `.claude/skills/spec/SKILL.md` § "Self-Review".
-    - **Post-execution final review + runtime validation is MANDATORY**: when `/ralph-loop` finishes the last task, it MUST audit spec vs. code, run every validation criterion, and — if runtime is applicable — start the service and exercise the changed code paths with real requests/data (including error paths). Bugs/gaps found during this review are surfaced to the user, not silently fixed. See `.claude/skills/ralph-loop/SKILL.md` § "Final Review + Runtime Validation". The user should never have to ask "did you validate?" — that means the checkpoint was skipped.
+5. **SDD workflow** for complex features: `/spec` → approve → `/ralph-loop` → approve commit → `/spec-review` (optional). Specs live in `.specs/`. See `docs/guides/sdd-ralph-loop.md`.
+    - `/spec` runs three phases: **Author → Self-review (3 agents in parallel: spec-reviewer + test-reviewer + code-reviewer) → Present**. Trivial fixes applied inline; judgment calls surface as "Pontos de atenção". The skill never auto-runs `/ralph-loop`.
+    - `/ralph-loop` runs five phases: **Validate → Execute (parallel via worktrees, with auto-rollback on partial failure) → Self-review (3 agents in parallel: code-reviewer + test-reviewer + security-reviewer) → Present → Commit (only after explicit user approval)**. Never auto-commits; never silently merges a partially-failed batch.
+    - **Re-review on user feedback is MANDATORY**: if the user requests changes after either skill's Present phase, the self-review re-runs **from scratch** before re-presenting. Skipping this silently erodes the safety net.
+    - **The user should never have to ask "did you validate?" or "did you review the spec?"** — those questions mean a checkpoint was skipped. See `.claude/rules/sdd.md` §Discipline Checkpoints.
 6. **Parallelism** — Three types: (a) **Intra-spec**: `/spec` auto-generates Parallel Batches from task `files:` and `depends:` metadata; ralph-loop launches parallel agents with `isolation: "worktree"` for multi-task batches. (b) **Inter-spec**: independent specs run in separate worktrees. (c) Shared files classified as exclusive, shared-additive (accumulator pattern), or shared-mutative (must serialize).
 7. **Agent worktree cleanup is MANUAL** — when launching `Agent` with `isolation: "worktree"`, the runtime does NOT auto-cleanup worktrees if the agent made changes. After merging files from a worktree, ALWAYS run `git worktree remove <path> --force && git worktree prune`. Orphan worktrees accumulate fast and break IDE Go tooling (each worktree has its own go.mod). The `WorktreeRemove` hook only fires on explicit removal.
