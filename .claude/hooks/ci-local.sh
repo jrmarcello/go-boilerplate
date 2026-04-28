@@ -38,6 +38,27 @@ if [ -f "$CACHE_FILE" ] && [ "$(cat "$CACHE_FILE" 2>/dev/null)" = "$HEAD_SHA" ];
 fi
 
 # ── Resolve Go env from the active toolchain (asdf-aware) ──────────
+# Lefthook (and other hook runners) spawn with a stripped PATH. Probe the
+# common asdf shims directory and binary install locations so subsequent
+# `go`/`asdf` invocations resolve regardless of how the user installed asdf
+# (Homebrew, legacy bash script, ASDF_DATA_DIR override).
+ASDF_DATA_DIR_RESOLVED="${ASDF_DATA_DIR:-$HOME/.asdf}"
+if [ -d "$ASDF_DATA_DIR_RESOLVED/shims" ]; then
+  export PATH="$ASDF_DATA_DIR_RESOLVED/shims:$PATH"
+fi
+if ! command -v asdf >/dev/null 2>&1; then
+  for asdf_bin in \
+    "$ASDF_DATA_DIR_RESOLVED/bin/asdf" \
+    "/opt/homebrew/bin/asdf" \
+    "/usr/local/bin/asdf" \
+    "/opt/asdf-vm/bin/asdf"; do
+    if [ -x "$asdf_bin" ]; then
+      export PATH="$(dirname "$asdf_bin"):$PATH"
+      break
+    fi
+  done
+fi
+
 if command -v asdf >/dev/null 2>&1; then
   GO_BIN="$(asdf which go 2>/dev/null || true)"
   if [ -n "${GO_BIN:-}" ]; then
