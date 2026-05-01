@@ -11,6 +11,14 @@ End-to-end spec authoring with built-in self-review. **No iteration loops** — 
 presents the result, waits for your approval. After approval, run
 `/ralph-loop .specs/<name>.md` to execute it.
 
+> 🎯 **Princípio diretor:** qualidade > velocidade > custo. Antes de cada decisão
+> nesta skill (qual REQ escrever, qual TC adicionar, qual finding triagem como
+> trivial vs judgment), aplicar a máxima do projeto pinada em
+> [CLAUDE.md](../../../CLAUDE.md) e [.claude/rules/sdd.md](../../rules/sdd.md)
+> §Princípio diretor. Concretamente: pergunte "qual a versão **certa** desta REQ?"
+> não "esta REQ é boa o suficiente?". NICE TO HAVE pode ser MUST sob a lupa de
+> qualidade. Round 3+ de self-review é feature, não bug. Token cost é secundário.
+
 ## Example
 
 ```text
@@ -90,7 +98,18 @@ Wait for all three. Aggregate findings:
 
    These go to the user as "Pontos de atenção".
 
-3. Re-read the modified spec end-to-end to confirm consistency after inline fixes.
+3. **Triagem of NICE TO HAVE under the quality-first lens.** Before discarding a
+   NICE TO HAVE finding, ask: "is this rigor or polish?"
+   - **Rigor** (e.g., a missed boundary TC, a missing infra-failure TC, an
+     ambiguous REQ phrasing that admits two readings, an unwrapped error context,
+     a missing `errors.Is`/`errors.As` assertion in a test): **upgrade to MUST,
+     apply inline if trivial, otherwise surface as "Pontos de atenção".**
+   - **Polish** (e.g., comment phrasing, alphabetical ordering of imports, naming
+     style preference): defer with an explicit one-line note in "Pontos de
+     atenção" so the user knows it was considered.
+   - When unsure: treat as rigor.
+
+4. Re-read the modified spec end-to-end to confirm consistency after inline fixes.
 
 ### Phase 3 — Present for approval
 
@@ -121,9 +140,11 @@ After presenting, three things can happen:
 - **Changes requested:** apply the requested changes to the spec file, **then re-run
   Phase 2 self-review from scratch** (3 reviewers in parallel, fixes triviais
   inline), **then re-present Phase 3**. The cycle continues until the user approves
-  or rejects. Re-running the review on every iteration is intentional — it keeps the
-  safety net honest and catches regressions in the corrections themselves. The cost
-  is a few seconds; the alternative (skipping) silently erodes the safety net.
+  or rejects. Re-running the review on every iteration is intentional — a correction
+  is itself spec text that can introduce regressions, and the runtime cost (seconds
+  per pass) is insignificant compared to merging a flawed spec. **Round 3, Round 4,
+  Round N are normal under the quality-first lens** — keep going until the user
+  approves or rejects.
 - **Rejection ("descarta", "não faz"):** delete the spec file (or move to
   `.specs/archive/<name>.md` if the user wants to keep history). Stop.
 
@@ -160,6 +181,14 @@ This is the load-bearing section. The expanded checklist:
 12. **Rigor check (do this last):** count happy-path vs error-path TCs. Errors should
     outnumber happy paths. If they don't, you missed something — surface specific
     gaps before presenting.
+
+> **Quality-first lens applied to the Test Plan:** when in doubt between covering
+> a scenario and skipping it, **cover it**. Boundary TCs, infra-failure TCs,
+> branch-both-paths TCs, concurrency TCs (singleflight leader/waiter, advisory
+> lock contention), idempotency TCs (replay, lock contention), version evolution
+> paths — none of these are "nice to have"; they are rigor. The cost of writing a
+> table-driven entry is seconds; the cost of a missing TC is a regression in
+> production.
 
 Categories: `happy`, `validation`, `business`, `edge`, `infra`, `concurrency`,
 `idempotency`, `security`.

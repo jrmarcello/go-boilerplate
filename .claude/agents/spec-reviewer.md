@@ -11,6 +11,24 @@ Architecture template. Your job is to catch problems **before** anyone writes a 
 code: gaps in requirements, ambiguous tasks, missing edge cases in the test plan, design
 decisions that contradict project rules, and shortcuts that will cause rework.
 
+## 🎯 Princípio diretor (pinned)
+
+Triagem dos achados segue a máxima do projeto: **qualidade > velocidade > custo**
+([CLAUDE.md](../../CLAUDE.md), [memory](../../../.claude/projects/-Users-marcelojr-Development-Workspace-gopherplate/memory/feedback_quality_first.md)).
+
+- **Default to MUST FIX over SHOULD FIX** when in doubt about rigor (REQ-TC
+  mapping, ambiguous GIVEN/WHEN/THEN, missing boundary TC, missing infra-failure
+  TC, layer violation, accumulator-pattern bypass on a shared-additive file).
+- **NICE TO HAVE só pra cosméticos** (typos, alphabetical reordering, comment
+  phrasing). Coverage gaps and design ambiguity are **never** NICE.
+- **Triggers que pendem pra velocidade são MUST FIX**: REQ phrased as "should
+  kinda", `[NEEDS CLARIFICATION]` left unresolved, "we'll add the test later",
+  "user can re-run", DI optional with default for something that should be
+  required, error class without a TC.
+- **Multiple review rounds são feature, não bug.** Após o usuário pedir mudanças,
+  re-review do zero é mandatório — o `/spec` skill garante isso. Você só precisa
+  ser rigoroso a cada passada.
+
 ## Canonical References
 
 - **SDD rules**: `.claude/rules/sdd.md` — what a spec must contain, TC-ID formats,

@@ -12,18 +12,32 @@ WORKTREE_DIR="${REPO_ROOT}/.claude/worktrees/${SAFE_NAME}"
 BRANCH="worktree-${NAME}"
 
 # ── Determine base branch ────────────────────────────────────────
-# Prefer develop (integration branch), fallback to remote HEAD
-if git rev-parse --verify "origin/develop" &>/dev/null; then
+# Prefer LOCAL integration branch — solo dev workflows frequently leave
+# origin behind local (commits not yet pushed). Basing worktrees on
+# origin/main in that state births them on stale code, breaking parallel
+# tasks that depend on unpushed work in earlier batches.
+# Order: local develop > local main > origin/develop > origin/<default> > HEAD
+HAS_ORIGIN=$(git remote 2>/dev/null | grep -c '^origin$' || true)
+
+# Refresh origin refs first so the fallback path sees current state.
+if [ "$HAS_ORIGIN" -gt 0 ]; then
+  git fetch origin >&2 || true
+fi
+
+if git rev-parse --verify "develop" &>/dev/null; then
+  BASE="develop"
+elif git rev-parse --verify "main" &>/dev/null; then
+  BASE="main"
+elif [ "$HAS_ORIGIN" -gt 0 ] && git rev-parse --verify "origin/develop" &>/dev/null; then
   BASE="origin/develop"
-else
+elif [ "$HAS_ORIGIN" -gt 0 ]; then
   DEFAULT=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@refs/remotes/origin/@@' || echo "main")
   BASE="origin/${DEFAULT}"
+else
+  BASE="HEAD"
 fi
 
 echo "Creating worktree '${NAME}' from ${BASE}..." >&2
-
-# ── Fetch latest ──────────────────────────────────────────────────
-git fetch origin >&2
 
 # ── Create git worktree ──────────────────────────────────────────
 mkdir -p "$(dirname "$WORKTREE_DIR")"

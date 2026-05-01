@@ -12,6 +12,16 @@ per-task pauses. Parallelizes whatever the Parallel Batches section allows (one
 worktree per parallel task), then self-reviews the diff before handing back to the
 user. Commits only after explicit user approval.
 
+> 🎯 **Princípio diretor:** qualidade > velocidade > custo. Antes de cada decisão
+> de execução (qual TC adicionar quando descobrir um cenário novo, qual finding
+> triagem como trivial vs judgment, se um SHOULD FIX deveria ser MUST), aplicar a
+> máxima do projeto pinada em [CLAUDE.md](../../../CLAUDE.md) e
+> [.claude/rules/sdd.md](../../rules/sdd.md) §Princípio diretor. Concretamente:
+> NICE TO HAVE pode ser MUST sob a lupa de qualidade. Round 3+ de self-review é
+> feature, não bug. Quando em dúvida entre rollback parcial e merge silencioso de
+> sucessos, **rollback** — preserva a capacidade do usuário de raciocinar sobre o
+> working tree.
+
 ## Example
 
 ```text
@@ -263,6 +273,16 @@ Wait for all three. Aggregate findings:
    - Refactoring suggestions.
    - Security CRITICAL / HIGH findings — never auto-fix; always escalate.
 
+3. **Triagem of NICE TO HAVE under the quality-first lens.** Before discarding a
+   NICE TO HAVE finding, ask: "is this rigor or polish?"
+   - **Rigor** (e.g., a missed boundary test, a forgotten `errors.Is` assertion,
+     an unwrapped error context, a missing span attribute that drops observability,
+     a hand-written mock that doesn't assert call args): **upgrade to MUST, apply
+     inline if trivial, otherwise surface as "Pontos de atenção".**
+   - **Polish** (e.g., comment phrasing, reorder of struct fields, naming
+     preference): defer with an explicit one-line note in "Pontos de atenção".
+   - When unsure: treat as rigor.
+
 ### Phase 4 — Present for approval
 
 Output to the user, in this order:
@@ -289,9 +309,10 @@ After presenting, three things can happen:
 - **More changes requested:** apply the requested changes, **then re-run Phase 3
   self-review from scratch** (3 reviewers in parallel, fix triviais inline),
   **then re-present Phase 4**. The cycle continues until the user approves.
-  Re-running the review every loop is intentional — it protects against regressions
-  in the corrections themselves and keeps the audit honest. The cost is a few
-  seconds; the alternative (skipping) silently erodes the safety net.
+  Re-running the review every loop is intentional — a correction is itself code
+  that can introduce regressions. The cost is a few seconds; the alternative
+  (skipping) silently erodes the safety net. **Round 3, Round 4, Round N are
+  normal under the quality-first lens** — keep going until the user approves.
 - **Rejection / abort:** mark spec status as `FAILED` with a one-line reason in the
   Execution Log. Stop.
 

@@ -13,6 +13,27 @@ the tests you audit are exemplary by design: other teams will clone and imitate 
 Your review is distinct from a code review. The code-reviewer asks "is this code correct?";
 you ask "do the tests prove this code is correct?".
 
+## 🎯 Princípio diretor (pinned)
+
+Triagem segue a máxima do projeto: **qualidade > velocidade > custo**
+([CLAUDE.md](../../CLAUDE.md), [memory](../../../.claude/projects/-Users-marcelojr-Development-Workspace-gopherplate/memory/feedback_quality_first.md)).
+
+- **When in doubt between covering and skipping, cover it** — boundary TCs,
+  infra-failure TCs, branch-both-paths TCs, concurrency TCs (singleflight
+  leader/waiter, advisory lock contention), idempotency TCs (replay, lock
+  contention), version evolution paths. Flag as MUST ADD.
+- **Tests que passam por coincidência são MUST FIX** — a weak assertion that
+  accepts `0`/`""`/`nil` when the intent is "real value", a `require.NoError`
+  that masks the actual failure, a happy-path test asserting only `err == nil`
+  without checking the side effect.
+- **Boundary inclusive vs exclusive ambiguity** is MUST FIX (creates flaky
+  tests). Test descriptions that don't match the REQ behavior are also MUST FIX.
+- **NICE TO HAVE só pra naming/style cosmético** (rename `it` → naming-style
+  preference, alphabetize subtest order). **Coverage insufficiency is never
+  NICE** — flag as SHOULD or MUST.
+- **Mock que não asserta call args é dead weight** — flag MUST FIX. Either
+  assert what was called with what, or remove the recording.
+
 ## Canonical References
 
 Cross-check test patterns against the authoritative sources:

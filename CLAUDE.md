@@ -2,6 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🎯 Princípio diretor: qualidade > velocidade > custo
+
+**Esta máxima precede e prevalece sobre qualquer outra heurística desta documentação.**
+
+Ao planejar, projetar, implementar, revisar ou tomar qualquer decisão neste repositório:
+
+1. **Pergunte primeiro "qual a melhor opção?"**, não "qual a opção mais simples?" nem "qual a mais rápida?".
+2. **Não economize trabalho ou retrabalho** quando isso comprometer rigor. Iterações múltiplas de self-review, refatorações largas, e specs densas são desejadas — não evitadas.
+3. **"NICE TO HAVE" sob a lente de qualidade pode virar MUST.** Sempre revisitar findings de reviewers com essa lupa antes de descartar.
+4. **Edge cases dismissados como "raros" exigem handling correto** — não pular cobertura porque "improvável".
+5. **Triggers que sinalizam decisão pendendo pra velocidade** (e devem ser questionados): "pra simplicidade", "por enquanto", "defer pra Phase X", "user pode re-rodar", "YAGNI" usado fracamente, "implícito é suficiente", `interface{}`/`any` em vez de tipo concreto, optional+default em vez de required, error com pouca contextual info. Quando aparecerem na sua decisão, parar e perguntar: o que seria a versão **certa**? Implementar essa.
+6. **Token cost só importa quando o usuário explicitamente pede pra economizar.** Default: gastar tokens à vontade pra entregar a melhor versão.
+7. **Apresentar opções:** sempre liderar pela melhor (não a "pragmática"). Se houver trade-off de qualidade entre alternativas, **explicar honestamente** — nunca esconder a opção mais cara/rigorosa atrás de "essa é melhor mas mais trabalhosa".
+
+Memory persistente em [memory/feedback_quality_first.md](../../.claude/projects/-Users-marcelojr-Development-Workspace-gopherplate/memory/feedback_quality_first.md). Implicações concretas no fluxo SDD em [.claude/rules/sdd.md](.claude/rules/sdd.md) §Princípio diretor.
+
 ## Project Overview
 
 Gopherplate/template for microservices, part of the Appmax ecosystem. Uses Clean Architecture with PostgreSQL, Redis cache, and OpenTelemetry observability. Hosted on GitHub, deployed to AWS EKS via ArgoCD with Kustomize overlays.

@@ -4,6 +4,61 @@ applies-to: ".specs/**"
 
 # SDD Spec Rules
 
+## 🎯 Princípio diretor: qualidade > velocidade > custo
+
+**Antes de qualquer decisão tomada nesse fluxo (autoria de spec, escolha de design,
+triagem de findings de reviewers, escolha de TC coverage, etc.):** aplicar a máxima
+do projeto pinada em [CLAUDE.md](../../CLAUDE.md) e
+[memory](../../../.claude/projects/-Users-marcelojr-Development-Workspace-gopherplate/memory/feedback_quality_first.md).
+
+Implicações concretas pra SDD:
+
+- **Authoring de spec:** quando confrontado com "esta REQ é boa o suficiente?",
+  perguntar "esta é a versão **certa** desta REQ?". DI required > optional com
+  default mágico. Error classes com contexto rico > strings genéricas. Retry/backoff
+  > "user re-roda". Span classification explícita > silence em paths de erro.
+  Idempotência em writes > "user fica de olho em duplicatas".
+- **Triagem de self-review findings:** **NICE TO HAVE não é descartável**.
+  Revisitar cada NICE TO HAVE pela lente "isso é rigor, ou é polish?". Rigor →
+  upgrade pra MUST. Polish → defer com justificativa explícita.
+- **Multiple review rounds são feature, não bug.** Se ainda houver findings após
+  Round 2, rodar Round 3 (e Round N) sem hesitar. Cada round refina. Custo de
+  tokens é insignificante perto de spec defeituosa virando código defeituoso.
+- **TC coverage:** quando em dúvida entre "cobrir" e "skipar", **cobrir**.
+  Boundary TCs, infra-failure TCs, branch-both-paths TCs, concurrency TCs, version
+  evolution paths — tudo isso é rigor obrigatório, não opcional.
+- **Trade-off transparency:** se decidir pragmático em vez de "melhor",
+  **documentar explicitamente na spec** com justificativa (e.g., "Idempotência via
+  Redis lock seria mais robusta que UNIQUE constraint, mas a tabela tem volume
+  baixo o suficiente que constraint é defensável — ADR-XX"). Não esconder.
+
+## Flow
+
+```text
+/spec <description>
+   ├─ Author: write .specs/<name>.md from TEMPLATE
+   ├─ Self-review: 3 agents in parallel (spec-reviewer, test-reviewer, code-reviewer)
+   ├─ Apply trivial fixes inline
+   └─ Present + wait for user approval (status DRAFT)
+
+   (user approves)
+
+/ralph-loop .specs/<name>.md
+   ├─ Validate: status APPROVED/IN_PROGRESS, batches present
+   ├─ Execute: per-batch parallel via worktrees (one Agent call per task in a single message)
+   ├─ Self-review: 3 agents in parallel (code-reviewer, test-reviewer, security-reviewer)
+   ├─ Apply trivial fixes inline + re-validate
+   └─ Present + wait for user approval (status DONE pending commit)
+
+   (user approves)
+
+/ralph-loop commits with feat(scope) message linking to the spec.
+```
+
+There is **no Stop-hook iteration**, no `.active.md` state files, no per-task
+pauses. The autonomy boundary is per-spec: one approval to author, one approval to
+commit.
+
 ## Spec File Integrity
 
 - Never modify the Requirements section during execution (only during DRAFT status)
@@ -103,10 +158,14 @@ Every spec MUST satisfy all of the following:
 ### Mutability
 
 - TCs may be **added** during IN_PROGRESS (new edge cases discovered during
-  implementation)
-- TCs may NEVER be **removed** — if a TC is no longer applicable, mark it as
-  `SKIPPED` with a reason
+  implementation — quality-first lens means this happens often, not rarely)
+- TCs may NEVER be **removed** during IN_PROGRESS — if a TC is no longer
+  applicable, mark it as `SKIPPED` with a reason. Removal only allowed during
+  DRAFT, and re-running the self-review afterwards is mandatory.
 - REQ references in TCs must remain valid
+- **Never modify Requirements and Test Plan in the same change.** REQ changes
+  invalidate TC mappings; doing both at once erases the audit trail. Update REQ
+  first, re-run self-review, then update TCs in a separate pass.
 
 ### Smoke Tests (k6)
 
@@ -179,9 +238,14 @@ When a batch with 2+ tasks runs in parallel via worktrees and **any agent fails*
 3. Offer three options: (a) merge successful + skip failed, (b) discard everything
    and rerun, (c) stop for manual investigation.
 4. Default (no answer) is (c). Never merge a partially-failed batch silently.
+5. **The user's choice is recorded in the Execution Log** so the spec history
+   shows what happened — never silently revise it after.
 
 This contract is non-negotiable — it preserves the user's ability to reason about
-the working tree state.
+the working tree state. **Even if the failure is in an "independent" task,
+dependencies between tasks may not be fully visible from `depends:` alone**
+(shared imports, shared test fixtures, shared package-level state). The
+quality-first lens says: when in doubt, stop and let the user verify.
 
 ## Merge Strategy (accumulator pattern)
 
@@ -271,9 +335,15 @@ means one of the parallel tasks needed an explicit `depends:` on the other.
 ## Re-review on user feedback
 
 Both `/spec` (Phase 2) and `/ralph-loop` (Phase 3) re-run their full self-review
-when the user requests more changes after the present. This is intentional — the
-review pass is cheap (a few seconds) and protects against regressions introduced by
-the corrections themselves. Do not skip it on subsequent iterations.
+when the user requests more changes after the present. This is intentional and
+**non-negotiable**:
+
+- A correction is itself code (or spec text) that can introduce regressions.
+- Skipping the audit on round 2+ silently erodes the safety net.
+- The runtime cost is small (seconds per pass) compared to the cost of merging a
+  flawed correction or approving a spec with a regressed REQ.
+- Quality-first lens: **multiple review rounds are a feature, not a bug.** Round
+  3, Round 4 are fine. Stop only when the user approves or rejects.
 
 ## Naming
 
